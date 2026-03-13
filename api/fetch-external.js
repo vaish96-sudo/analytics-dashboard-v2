@@ -1,0 +1,118 @@
+export const config = { runtime: 'edge' }
+
+function getNestedValue(obj, path) {
+  if (!path || path.trim() === '') return obj
+  const parts = path.split('.')
+  let current = obj
+  for (const part of parts) {
+    if (current === null || current === undefined) return null
+    current = current[part]
+  }
+  return current
+}
+
+function flattenObject(obj, prefix = '') {
+  const result = {}
+  for (const [key, value] of Object.entries(obj)) {
+    const newKey = prefix ? `${prefix}.${key}` : key
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      Object.assign(result, flattenObject(value, newKey))
+    } else {
+      result[newKey] = value
+    }
+  }
+  return result
+}
+
+export default async function handler(req) {
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } })
+  }
+
+  try {
+    const { url, auth_method, auth_value, json_path } = await req.json()
+
+    if (!url) {
+      return new Response(JSON.stringify({ error: 'URL is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // Validate URL
+    let parsedUrl
+    try {
+      parsedUrl = new URL(url)
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid URL' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // Block internal/private IPs
+    const hostname = parsedUrl.hostname.toLowerCase()
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.startsWith('172.')) {
+      return new Response(JSON.stringify({ error: 'Cannot fetch from internal/private addresses' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // Build headers
+    const headers = { 'Accept': 'application/json' }
+    if (auth_method === 'api_key' && auth_value) {
+      headers['X-API-Key'] = auth_value
+    } else if (auth_method === 'bearer' && auth_value) {
+      headers['Authorization'] = `Bearer ${auth_value}`
+    }
+
+    // Fetch the external API
+    const res = await fetch(url, {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(15000), // 15s timeout
+    })
+
+    if (!res.ok) {
+      return new Response(JSON.stringify({ error: `API returned ${res.status}: ${res.statusText}` }), { status: 400, headers: { 'Content-Type': 'application/json' } })
+    }
+
+    const contentType = res.headers.get('content-type') || ''
+    if (!contentType.includes('json')) {
+      return new Response(JSON.stringify({ error: 'API did not return JSON. Content-Type: ' + contentType }), { status: 400, headers: { 'Content-Type': 'application/json' } })
+    }
+
+    const data = await res.json()
+
+    // Navigate to the data array using json_path
+    let rows = getNestedValue(data, json_path)
+
+    if (!Array.isArray(rows)) {
+      // If the result is an object, try to find the first array property
+      if (rows && typeof rows === 'object') {
+        const arrayProp = Object.entries(rows).find(([, v]) => Array.isArray(v))
+        if (arrayProp) {
+          rows = arrayProp[1]
+        } else {
+          // Wrap single object as array
+          rows = [rows]
+        }
+      } else {
+        return new Response(JSON.stringify({ error: 'Could not find an array of records in the response. Try specifying a JSON path.' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
+      }
+    }
+
+    if (rows.length === 0) {
+      return new Response(JSON.stringify({ error: 'The API returned an empty data array' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // Flatten nested objects in each row
+    const flatRows = rows.slice(0, 10000).map(row => {
+      if (typeof row !== 'object' || row === null) return { value: row }
+      return flattenObject(row)
+    })
+
+    return new Response(JSON.stringify({
+      rows: flatRows,
+      row_count: flatRows.length,
+      column_count: Object.keys(flatRows[0] || {}).length,
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  } catch (err) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+      return new Response(JSON.stringify({ error: 'Request timed out after 15 seconds' }), { status: 408, headers: { 'Content-Type': 'application/json' } })
+    }
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+  }
+}
