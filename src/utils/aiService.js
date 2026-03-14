@@ -71,12 +71,13 @@ Provide a clear, concise, actionable answer. Use specific numbers from the data.
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)) }
 
 async function callClaude(system, messages, maxTokens = 1024, model = MODEL_SONNET, retries = 3) {
+  let actualModel = model
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ system, messages, max_tokens: maxTokens, model }),
+        body: JSON.stringify({ system, messages, max_tokens: maxTokens, model: actualModel }),
       })
 
       if (!res.ok) {
@@ -89,8 +90,9 @@ async function callClaude(system, messages, maxTokens = 1024, model = MODEL_SONN
         }
 
         // If Opus fails, fallback to Sonnet
-        if (model === MODEL_OPUS && attempt === retries - 1) {
+        if (actualModel === MODEL_OPUS && attempt === retries - 1) {
           console.log('Opus failed, falling back to Sonnet')
+          actualModel = MODEL_SONNET
           return callClaude(system, messages, maxTokens, MODEL_SONNET, 2)
         }
 
@@ -105,15 +107,14 @@ async function callClaude(system, messages, maxTokens = 1024, model = MODEL_SONN
       }
 
       const text = data.content?.map(c => c.text || '').join('') || ''
-      return { text, usage: data.usage || {} }
+      return { text, usage: data.usage || {}, model: actualModel }
     } catch (err) {
       if (attempt < retries - 1 && (err.message.includes('overloaded') || err.message.includes('fetch'))) {
         await sleep((attempt + 1) * 3000)
         continue
       }
 
-      // Opus fallback
-      if (model === MODEL_OPUS) {
+      if (actualModel === MODEL_OPUS) {
         console.log('Opus failed, falling back to Sonnet')
         return callClaude(system, messages, maxTokens, MODEL_SONNET, 2)
       }
@@ -202,10 +203,13 @@ Be specific with numbers. Think like a senior strategist presenting to a C-suite
     { role: 'user', content: `Data summary (${rawData.length} total rows):\n${summaryParts.join('\n')}\n\nProvide 4-5 strategic insights.` }
   ], 1500, MODEL_OPUS)
 
+  const modelLabel = call.model === MODEL_OPUS ? 'Claude Opus 4' : 'Claude Sonnet 4'
+
   try {
     const cleaned = call.text.replace(/```json|```/g, '').trim()
-    return JSON.parse(cleaned)
+    const parsed = JSON.parse(cleaned)
+    return { insights: parsed, model: modelLabel }
   } catch {
-    return [{ type: 'alert', title: 'Analysis Error', description: call.text, impact: 'medium' }]
+    return { insights: [{ type: 'alert', title: 'Analysis Error', description: call.text, impact: 'medium' }], model: modelLabel }
   }
 }

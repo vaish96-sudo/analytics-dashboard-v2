@@ -105,7 +105,7 @@ export default function HomeScreen({ onOpenProject, onNewProject }) {
     if (type === 'projects') { setActiveView('projects'); scrollToProjects() }
     else if (type === 'datasets') { setActiveView('datasets'); scrollToProjects() }
     else if (type === 'chats' || type === 'insights') {
-      if (projects.length > 0) onOpenProject(projects[0].id)
+      // Coming soon — will be a dedicated page
     }
   }
 
@@ -147,17 +147,23 @@ export default function HomeScreen({ onOpenProject, onNewProject }) {
               <p className="text-xs px-2 py-4" style={{ color: 'var(--text-muted)' }}>No projects yet</p>
             ) : (
               projects.slice(0, 15).map((p, i) => (
-                <button key={p.id} onClick={() => onOpenProject(p.id)}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors hover:opacity-90"
+                <div key={p.id} className="group flex items-center gap-0.5 rounded-lg transition-colors hover:opacity-90"
                   style={{ color: 'var(--text-secondary)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <div className={`w-2 h-2 rounded-full ${PROJECT_COLORS[i % PROJECT_COLORS.length]} shrink-0`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{timeAgo(p.updated_at)}</p>
-                  </div>
-                </button>
+                  <button onClick={() => onOpenProject(p.id)}
+                    className="flex-1 flex items-center gap-2.5 px-2.5 py-2 text-left min-w-0">
+                    <div className={`w-2 h-2 rounded-full ${PROJECT_COLORS[i % PROJECT_COLORS.length]} shrink-0`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{timeAgo(p.updated_at)}</p>
+                    </div>
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this project?')) deleteProject(p.id) }}
+                    className="p-1 mr-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0" style={{ color: 'var(--text-muted)' }}>
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
               ))
             )}
           </div>
@@ -290,7 +296,7 @@ export default function HomeScreen({ onOpenProject, onNewProject }) {
                 <MessageSquare className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" style={{ color: '#8b5cf6' }} />
               </div>
               <p className="text-2xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>—</p>
-              <p className="text-[10px] mt-1 group-hover:underline" style={{ color: '#8b5cf6' }}>Open AI →</p>
+              <p className="text-[10px] mt-1" style={{ color: '#8b5cf6' }}>Coming soon →</p>
             </button>
             <button className="rounded-xl p-4 text-left transition-all hover:scale-[1.02] hover:shadow-md nb-card group"
               onClick={() => handleCardClick('insights')}>
@@ -299,7 +305,7 @@ export default function HomeScreen({ onOpenProject, onNewProject }) {
                 <Lightbulb className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" style={{ color: '#f59e0b' }} />
               </div>
               <p className="text-2xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>—</p>
-              <p className="text-[10px] mt-1 group-hover:underline" style={{ color: '#f59e0b' }}>Explore →</p>
+              <p className="text-[10px] mt-1" style={{ color: '#f59e0b' }}>Coming soon →</p>
             </button>
           </div>
 

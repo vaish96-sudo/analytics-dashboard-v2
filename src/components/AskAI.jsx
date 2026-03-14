@@ -163,11 +163,16 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
       try {
         await projectService.addMessage(convId, { role: 'assistant', content: r.answer, sqlPlan: r.sql, meta: { tokensUsed: r.tokensUsed, estimatedCost: r.estimatedCost } })
       } catch {}
+
+      // Auto-name conversation from first user question
+      if (withUserMsg.filter(m => m.role === 'user').length === 1) {
+        const title = q.length > 50 ? q.slice(0, 47) + '...' : q
+        try { await projectService.updateConversation(convId, { title }) } catch {}
+      }
     } catch (err) {
       setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err.message}` }])
     } finally {
       setLoading(false)
-      // Refresh conversation list to get auto-generated title
       await loadConversationList()
     }
   }

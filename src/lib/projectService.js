@@ -163,6 +163,19 @@ export async function listConversations(projectId) {
   return data || []
 }
 
+export async function listAllConversations(projectIds) {
+  if (!projectIds || projectIds.length === 0) return []
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('id, title, project_id, dataset_id, created_at, updated_at')
+    .in('project_id', projectIds)
+    .order('updated_at', { ascending: false })
+    .limit(50)
+
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
 export async function createConversation(projectId, datasetId) {
   const { data, error } = await supabase
     .from('conversations')

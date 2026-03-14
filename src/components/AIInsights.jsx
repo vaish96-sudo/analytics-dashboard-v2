@@ -12,12 +12,15 @@ export default function AIInsights() {
   const { schema, rawData, aggregateUnfiltered, updateDatasetState, insights, insightsLoaded } = useData()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [usedModel, setUsedModel] = useState(null)
 
   const fetchInsights = async () => {
     setLoading(true); setError(null)
     try {
       const result = await getInsights(schema, rawData, aggregateUnfiltered)
-      updateDatasetState('insights', result)
+      const insightsData = result.insights || result
+      setUsedModel(result.model || null)
+      updateDatasetState('insights', insightsData)
       updateDatasetState('insights_loaded', true)
       updateDatasetState('insightsLoaded', true)
     } catch (err) { setError(err.message) } finally { setLoading(false) }
@@ -38,7 +41,9 @@ export default function AIInsights() {
           <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><img src="/logo_mark.png" alt="NB" className="w-5 h-5 object-contain" /></div>
           <div className="min-w-0">
             <h3 className="text-sm font-display font-semibold text-slate-800">AI Insights</h3>
-            <p className="text-xs text-slate-400 truncate">Strategic recommendations</p>
+            <p className="text-xs text-slate-400 truncate">
+              Strategic recommendations{usedModel && <span> · Powered by <span className="text-slate-500 font-medium">{usedModel}</span></span>}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -62,11 +67,12 @@ export default function AIInsights() {
       </div>
       <div className="p-4">
         {loading ? (
-          <div className="flex items-center justify-center gap-3 py-12"><Loader2 className="w-5 h-5 text-accent animate-spin" /><span className="text-sm text-slate-400">Analyzing your data…</span></div>
+          <div className="flex items-center justify-center gap-3 py-12"><Loader2 className="w-5 h-5 text-accent animate-spin" /><span className="text-sm text-slate-400">Analyzing your data with AI…</span></div>
         ) : error ? (
           <div className="text-center py-12">
             <AlertTriangle className="w-10 h-10 text-red-300 mx-auto mb-3" />
             <p className="text-sm text-red-500">{error}</p>
+            <button onClick={fetchInsights} className="mt-3 text-xs text-accent hover:underline">Try again</button>
           </div>
         ) : insights.length === 0 ? (
           <div className="text-center py-12">
