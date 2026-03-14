@@ -5,7 +5,7 @@ import { useTheme } from '../context/ThemeContext'
 import {
   FolderOpen, FolderPlus, Upload, FileSpreadsheet, Globe, LogOut,
   ChevronRight, Loader2, Search, Database, MessageSquare, Lightbulb, Sun, Moon, Monitor,
-  Crown, Sparkles, Menu, X, User, Settings
+  Crown, Sparkles, Menu, X, User, Settings, Trash2
 } from 'lucide-react'
 
 function getGreeting() {
@@ -70,7 +70,7 @@ function PremiumBadge() {
 
 export default function HomeScreen({ onOpenProject, onNewProject }) {
   const { user, logout } = useAuth()
-  const { projects, loading } = useProject()
+  const { projects, loading, deleteProject } = useProject()
   const [searchQuery, setSearchQuery] = useState('')
   const [activeView, setActiveView] = useState(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -423,6 +423,10 @@ export default function HomeScreen({ onOpenProject, onNewProject }) {
                             {firstDs?.file_name || 'No datasets'} · {totalRows.toLocaleString()} rows · {timeAgo(p.updated_at)}
                           </p>
                         </div>
+                        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this project and all its data?')) deleteProject(p.id) }}
+                          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 shrink-0" style={{ color: 'var(--text-muted)' }} title="Delete project">
+                          <Trash2 className="w-3.5 h-3.5 hover:text-red-500" />
+                        </button>
                         <ChevronRight className="w-4 h-4 shrink-0 transition-colors" style={{ color: 'var(--text-muted)' }} />
                       </button>
                     )

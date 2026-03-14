@@ -41,8 +41,8 @@ function ThemeToggleSmall() {
 function PremiumBadge() {
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold tracking-wide"
-      style={{ background: 'linear-gradient(135deg, #1e1b4b, #312e81)', color: '#c4b5fd', border: '1px solid rgba(139, 92, 246, 0.3)', letterSpacing: '0.05em' }}>
-      <Crown className="w-2.5 h-2.5" style={{ color: '#a78bfa' }} />Pro
+      style={{ background: 'linear-gradient(135deg, #1c1917, #292524)', color: '#d4a574', border: '1px solid rgba(212, 165, 116, 0.2)', letterSpacing: '0.05em' }}>
+      <Crown className="w-2.5 h-2.5" style={{ color: '#c9956b' }} />Pro
     </span>
   )
 }
@@ -193,6 +193,20 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome }) {
               <Upload className="w-3 h-3" />New file
             </button>
           </div>
+          {user && (
+            <div className="flex items-center gap-2.5 mt-3 pt-3" style={{ borderTop: '1px solid var(--border-light)' }}>
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: 'var(--accent)' }}>
+                {(user.name || user.email || '?')[0].toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{user.name || 'User'}</p>
+                <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{user.email}</p>
+              </div>
+              <button onClick={onLogout} className="p-1.5 rounded-lg transition-colors hover:opacity-80" style={{ color: 'var(--text-muted)' }} title="Sign out">
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 

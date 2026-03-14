@@ -1,5 +1,3 @@
-// Real AI service — calls Anthropic API via Vercel serverless function at /api/claude
-
 const API_URL = '/api/claude'
 const MODEL_SONNET = 'claude-sonnet-4-20250514'
 const MODEL_OPUS = 'claude-opus-4-20250514'
@@ -17,7 +15,7 @@ ${cols}
 IMPORTANT RULES:
 - Dimensions are text/category columns for grouping.
 - Metrics are numeric columns for aggregation (SUM, COUNT, etc).
-- NEVER use AVG on rate columns (CTR, eCPC, eCPM, conversion rate, etc). Always compute rates as ratios: CTR = SUM(clicks)/SUM(impressions), eCPC = SUM(cost)/SUM(clicks), etc.
+- NEVER use AVG on rate columns (CTR, eCPC, eCPM, conversion rate, etc). Always compute rates as ratios.
 - When asked about totals, SUM the metric columns.
 - When grouping, use SUM for metrics unless the user specifically asks for averages of non-rate columns.
 - Be precise with numbers. Format currency with $ and commas. Format percentages with %.
@@ -27,8 +25,7 @@ IMPORTANT RULES:
 
 function cleanHistory(messages) {
   if (!messages || messages.length === 0) return []
-  const recent = messages.slice(-8)
-  return recent.map(msg => ({
+  return messages.slice(-8).map(msg => ({
     role: msg.role === 'user' ? 'user' : 'assistant',
     content: msg.role === 'user' ? (msg.content || '') : (msg.content || '').slice(0, 400)
   })).filter(msg => msg.content && msg.content.trim().length > 0)
@@ -49,7 +46,7 @@ Respond with ONLY a JSON object (no markdown, no backticks, no explanation) desc
 
 If the user asks for totals with no grouping, use empty dimensions array.
 If the question doesn't relate to the data, respond with: {"error": "I can't answer that from this dataset."}
-If the user asks a follow-up question (like "is that a lot?", "break it down", "show me more", "compare that"), use the conversation history to understand what they're referring to and build an appropriate query.`
+If the user asks a follow-up question, use the conversation history to understand context.`
 
   const messages = []
   cleanHistory(history).forEach(msg => messages.push(msg))
@@ -60,9 +57,7 @@ If the user asks a follow-up question (like "is that a lot?", "break it down", "
 function buildAnswerPrompt(question, schema, queryResult, totalsRow, history) {
   const system = buildSchemaPrompt(schema) + `\n\nYou are answering a data question. You have been given the aggregated results from the user's dataset.
 
-CRITICAL: Use the TOTALS row provided for any aggregate numbers. Do NOT try to sum the result rows yourself — the TOTALS row is computed precisely.
-
-You may also see previous conversation for context. If the user asks follow-up questions, use the conversation history to give a relevant answer.
+CRITICAL: Use the TOTALS row provided for any aggregate numbers. Do NOT try to sum the result rows yourself.
 
 Provide a clear, concise, actionable answer. Use specific numbers from the data. Format large numbers with commas and appropriate units ($, %, K, M).`
 
@@ -73,53 +68,63 @@ Provide a clear, concise, actionable answer. Use specific numbers from the data.
   return { system, messages }
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)) }
 
 async function callClaude(system, messages, maxTokens = 1024, model = MODEL_SONNET, retries = 3) {
   for (let attempt = 0; attempt < retries; attempt++) {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ system, messages, max_tokens: maxTokens, model }),
-    })
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ system, messages, max_tokens: maxTokens, model }),
+      })
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: 'API request failed' }))
-      const errMsg = err.error || `API error ${res.status}`
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'API request failed' }))
+        const errMsg = err.error || `API error ${res.status}`
 
-      // Retry on overloaded or 529 status
-      if ((res.status === 529 || errMsg.toLowerCase().includes('overloaded')) && attempt < retries - 1) {
-        const waitTime = (attempt + 1) * 3000 // 3s, 6s, 9s
-        console.log(`API overloaded, retrying in ${waitTime / 1000}s (attempt ${attempt + 1}/${retries})`)
-        await sleep(waitTime)
+        if ((res.status === 529 || res.status === 503 || errMsg.toLowerCase().includes('overloaded')) && attempt < retries - 1) {
+          await sleep((attempt + 1) * 3000)
+          continue
+        }
+
+        // If Opus fails, fallback to Sonnet
+        if (model === MODEL_OPUS && attempt === retries - 1) {
+          console.log('Opus failed, falling back to Sonnet')
+          return callClaude(system, messages, maxTokens, MODEL_SONNET, 2)
+        }
+
+        throw new Error(errMsg)
+      }
+
+      const data = await res.json()
+
+      if (data.error?.type === 'overloaded_error' && attempt < retries - 1) {
+        await sleep((attempt + 1) * 3000)
         continue
       }
 
-      throw new Error(errMsg)
+      const text = data.content?.map(c => c.text || '').join('') || ''
+      return { text, usage: data.usage || {} }
+    } catch (err) {
+      if (attempt < retries - 1 && (err.message.includes('overloaded') || err.message.includes('fetch'))) {
+        await sleep((attempt + 1) * 3000)
+        continue
+      }
+
+      // Opus fallback
+      if (model === MODEL_OPUS) {
+        console.log('Opus failed, falling back to Sonnet')
+        return callClaude(system, messages, maxTokens, MODEL_SONNET, 2)
+      }
+
+      throw err
     }
-
-    const data = await res.json()
-
-    // Check for overloaded in response body
-    if (data.error?.type === 'overloaded_error' && attempt < retries - 1) {
-      const waitTime = (attempt + 1) * 3000
-      console.log(`API overloaded (response), retrying in ${waitTime / 1000}s`)
-      await sleep(waitTime)
-      continue
-    }
-
-    const text = data.content?.map(c => c.text || '').join('') || ''
-    const usage = data.usage || {}
-    return { text, usage }
   }
-
   throw new Error('AI service is temporarily busy. Please try again in a moment.')
 }
 
 export async function askAI(question, schema, rawData, aggregateFn, history = []) {
-  // Call 1: Get query plan (Sonnet — fast and cheap)
   const { system: sys1, messages: msgs1 } = buildQueryPrompt(question, schema, history)
   const call1 = await callClaude(sys1, msgs1, 500, MODEL_SONNET)
 
@@ -150,13 +155,11 @@ export async function askAI(question, schema, rawData, aggregateFn, history = []
     })
   }
 
-  const limit = queryPlan.limit || 200
-  results = results.slice(0, limit)
+  results = results.slice(0, queryPlan.limit || 200)
 
   const totals = { _ROW: 'TOTALS' }
   mets.forEach(m => { totals[m] = results.reduce((sum, row) => sum + (parseFloat(row[m]) || 0), 0) })
 
-  // Call 2: Expert answer (Sonnet — fast and cheap)
   const { system: sys2, messages: msgs2 } = buildAnswerPrompt(question, schema, results, totals, history)
   const call2 = await callClaude(sys2, msgs2, 1024, MODEL_SONNET)
 
@@ -165,7 +168,7 @@ export async function askAI(question, schema, rawData, aggregateFn, history = []
 
   return {
     answer: call2.text,
-    sql: `Dimensions: [${dims.join(', ')}]\nMetrics: [${mets.join(', ')}]\nSort: ${queryPlan.sort_by} ${queryPlan.sort_dir}\nLimit: ${limit}\n\n// ${queryPlan.description || ''}`,
+    sql: `Dimensions: [${dims.join(', ')}]\nMetrics: [${mets.join(', ')}]\nSort: ${queryPlan.sort_by} ${queryPlan.sort_dir}\nLimit: ${queryPlan.limit || 200}\n\n// ${queryPlan.description || ''}`,
     tokensUsed: { input: totalInput, output: totalOutput },
     estimatedCost: (totalInput * 3 + totalOutput * 15) / 1_000_000,
   }
@@ -189,21 +192,14 @@ export async function getInsights(schema, rawData, aggregateFn) {
       topData.map(r => `  ${r[dimensions[0].col]}: ${r[metrics[0].col]?.toLocaleString()}`).join('\n'))
   }
 
-  const system = buildSchemaPrompt(schema) + `\n\nYou are a world-class strategic analyst providing deep, actionable insights from data. Respond with ONLY a JSON array (no markdown, no backticks) of 4-5 insights:
-[
-  {
-    "type": "opportunity|trend|alert|recommendation",
-    "title": "Short title",
-    "description": "2-3 sentence actionable insight with specific numbers. Be strategic and specific — connect data points to business implications. Don't just state facts, explain what they mean and what action to take.",
-    "impact": "high|medium|low"
-  }
-]
+  const system = buildSchemaPrompt(schema) + `\n\nYou are a world-class strategic analyst. Respond with ONLY a JSON array (no markdown, no backticks) of 4-5 insights:
+[{"type":"opportunity|trend|alert|recommendation","title":"Short title","description":"2-3 sentence actionable insight with specific numbers.","impact":"high|medium|low"}]
 
-Base insights on the actual data summary provided. Be specific with numbers. Think like a senior strategist presenting to a C-suite executive. Don't be generic.`
+Be specific with numbers. Think like a senior strategist presenting to a C-suite executive.`
 
-  // Use Opus for strategic insights — deeper reasoning
+  // Try Opus first, falls back to Sonnet automatically
   const call = await callClaude(system, [
-    { role: 'user', content: `Data summary (${rawData.length} total rows):\n${summaryParts.join('\n')}\n\nProvide 4-5 strategic insights with specific, actionable recommendations.` }
+    { role: 'user', content: `Data summary (${rawData.length} total rows):\n${summaryParts.join('\n')}\n\nProvide 4-5 strategic insights.` }
   ], 1500, MODEL_OPUS)
 
   try {

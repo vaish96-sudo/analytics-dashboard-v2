@@ -6,7 +6,7 @@ import { exportToPDF, exportToWord } from '../utils/exportService'
 import * as projectService from '../lib/projectService'
 import {
   MessageSquare, Send, Loader2, Code, User, Sparkles,
-  Plus, History, Download, FileText, File
+  Plus, History, FileText, File, Trash2, MoreHorizontal
 } from 'lucide-react'
 
 function MarkdownText({ text }) {
@@ -86,17 +86,9 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
   const [conversations, setConversations] = useState([])
   const scrollRef = useRef(null)
 
-  // Sync external conversation ID
-  useEffect(() => {
-    if (externalConvId) loadConversation(externalConvId)
-  }, [externalConvId])
-
+  useEffect(() => { if (externalConvId) loadConversation(externalConvId) }, [externalConvId])
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight }, [messages])
-
-  // Load conversation list
-  useEffect(() => {
-    if (activeProjectId) loadConversationList()
-  }, [activeProjectId])
+  useEffect(() => { if (activeProjectId) loadConversationList() }, [activeProjectId])
 
   const loadConversationList = async () => {
     try {
@@ -111,9 +103,7 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
       setMessages(msgs)
       setConversationId(id)
       onConversationChange?.(id)
-    } catch (err) {
-      console.error('Failed to load conversation:', err)
-    }
+    } catch (err) { console.error('Failed to load conversation:', err) }
   }
 
   const startNewChat = async () => {
@@ -123,9 +113,15 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
       setMessages([])
       onConversationChange?.(conv.id)
       await loadConversationList()
-    } catch (err) {
-      console.error('Failed to create conversation:', err)
-    }
+    } catch (err) { console.error('Failed to create conversation:', err) }
+  }
+
+  const deleteConversation = async (id) => {
+    try {
+      await projectService.deleteConversation(id)
+      if (conversationId === id) { setConversationId(null); setMessages([]) }
+      await loadConversationList()
+    } catch (err) { console.error('Failed to delete conversation:', err) }
   }
 
   const suggestions = useMemo(() => {
@@ -143,7 +139,6 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
     const q = input.trim()
     setInput('')
 
-    // Ensure we have a conversation
     let convId = conversationId
     if (!convId) {
       try {
@@ -151,10 +146,7 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
         convId = conv.id
         setConversationId(conv.id)
         onConversationChange?.(conv.id)
-      } catch (err) {
-        console.error('Failed to create conversation:', err)
-        return
-      }
+      } catch (err) { console.error('Failed to create conversation:', err); return }
     }
 
     const userMsg = { role: 'user', content: q }
@@ -162,57 +154,29 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
     setMessages(withUserMsg)
     setLoading(true)
 
-    // Save user message to DB
-    try {
-      await projectService.addMessage(convId, { role: 'user', content: q })
-    } catch {}
+    try { await projectService.addMessage(convId, { role: 'user', content: q }) } catch {}
 
     try {
       const r = await askAI(q, schema, rawData, aggregateUnfiltered, withUserMsg)
-      const assistantMsg = {
-        role: 'assistant',
-        content: r.answer,
-        sql_plan: r.sql,
-        meta: { tokensUsed: r.tokensUsed, estimatedCost: r.estimatedCost }
-      }
+      const assistantMsg = { role: 'assistant', content: r.answer, sql_plan: r.sql, meta: { tokensUsed: r.tokensUsed, estimatedCost: r.estimatedCost } }
       setMessages(prev => [...prev, assistantMsg])
-
-      // Save assistant message to DB
       try {
-        await projectService.addMessage(convId, {
-          role: 'assistant',
-          content: r.answer,
-          sqlPlan: r.sql,
-          meta: { tokensUsed: r.tokensUsed, estimatedCost: r.estimatedCost },
-        })
+        await projectService.addMessage(convId, { role: 'assistant', content: r.answer, sqlPlan: r.sql, meta: { tokensUsed: r.tokensUsed, estimatedCost: r.estimatedCost } })
       } catch {}
     } catch (err) {
-      const errorMsg = { role: 'assistant', content: `Error: ${err.message}` }
-      setMessages(prev => [...prev, errorMsg])
+      setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err.message}` }])
     } finally {
       setLoading(false)
-      loadConversationList()
+      // Refresh conversation list to get auto-generated title
+      await loadConversationList()
     }
-  }
-
-  const handleExportPDF = () => {
-    exportToPDF({ type: 'chat', messages }, 'AI_Conversation')
-  }
-
-  const handleExportWord = () => {
-    exportToWord({ type: 'chat', messages }, 'AI_Conversation')
   }
 
   return (
     <div className="flex gap-4">
       {/* Chat History Sidebar (desktop) */}
-      <div className={`hidden lg:block w-64 shrink-0 rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden h-[600px]`}>
-        <ChatHistoryPanel
-          conversations={conversations}
-          activeId={conversationId}
-          onSelect={loadConversation}
-          onNewChat={startNewChat}
-        />
+      <div className="hidden lg:block w-64 shrink-0 rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden h-[600px]">
+        <ChatHistoryPanel conversations={conversations} activeId={conversationId} onSelect={loadConversation} onNewChat={startNewChat} onDelete={deleteConversation} />
       </div>
 
       {/* Main Chat */}
@@ -229,10 +193,10 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
             </button>
             {messages.length > 0 && (
               <>
-                <button onClick={handleExportPDF} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Export as PDF">
+                <button onClick={() => exportToPDF({ type: 'chat', messages }, 'AI_Conversation')} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Export as PDF">
                   <FileText className="w-4 h-4" />
                 </button>
-                <button onClick={handleExportWord} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Export as Word">
+                <button onClick={() => exportToWord({ type: 'chat', messages }, 'AI_Conversation')} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Export as Word">
                   <File className="w-4 h-4" />
                 </button>
               </>
@@ -243,16 +207,12 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
           </div>
         </div>
 
-        {/* Mobile history dropdown */}
         {showHistory && (
           <div className="lg:hidden border-b border-slate-100 max-h-48 overflow-y-auto bg-slate-50">
-            <ChatHistoryPanel
-              conversations={conversations}
-              activeId={conversationId}
+            <ChatHistoryPanel conversations={conversations} activeId={conversationId}
               onSelect={(id) => { loadConversation(id); setShowHistory(false) }}
               onNewChat={() => { startNewChat(); setShowHistory(false) }}
-              compact
-            />
+              onDelete={deleteConversation} compact />
           </div>
         )}
 
@@ -282,8 +242,9 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
   )
 }
 
-// Inline chat history panel
-function ChatHistoryPanel({ conversations, activeId, onSelect, onNewChat, compact }) {
+function ChatHistoryPanel({ conversations, activeId, onSelect, onNewChat, onDelete, compact }) {
+  const [menuId, setMenuId] = useState(null)
+
   return (
     <div className={`flex flex-col ${compact ? '' : 'h-full'}`}>
       <div className={`${compact ? 'px-3 py-2' : 'p-3 border-b border-slate-100'}`}>
@@ -296,12 +257,26 @@ function ChatHistoryPanel({ conversations, activeId, onSelect, onNewChat, compac
         {conversations.length === 0 ? (
           <p className="text-xs text-slate-400 text-center py-4">No conversations yet</p>
         ) : conversations.map(c => (
-          <button key={c.id} onClick={() => onSelect(c.id)}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors text-xs
-              ${activeId === c.id ? 'bg-blue-50 text-accent' : 'text-slate-600 hover:bg-slate-50'}`}>
-            <MessageSquare className="w-3 h-3 shrink-0 opacity-50" />
-            <span className="truncate flex-1">{c.title}</span>
-          </button>
+          <div key={c.id} className="relative group">
+            <button onClick={() => onSelect(c.id)}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors text-xs
+                ${activeId === c.id ? 'bg-blue-50 text-accent' : 'text-slate-600 hover:bg-slate-50'}`}>
+              <MessageSquare className="w-3 h-3 shrink-0 opacity-50" />
+              <span className="truncate flex-1">{c.title || 'New conversation'}</span>
+              <button onClick={(e) => { e.stopPropagation(); setMenuId(menuId === c.id ? null : c.id) }}
+                className="p-0.5 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 rounded transition-opacity shrink-0">
+                <MoreHorizontal className="w-3 h-3" />
+              </button>
+            </button>
+            {menuId === c.id && (
+              <div className="absolute right-2 top-full mt-1 w-32 bg-white border border-slate-200 rounded-lg shadow-lg z-50 animate-fade-in">
+                <button onClick={() => { onDelete(c.id); setMenuId(null) }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 rounded-lg">
+                  <Trash2 className="w-3 h-3" /> Delete
+                </button>
+              </div>
+            )}
+          </div>
         ))}
       </div>
     </div>
