@@ -73,22 +73,49 @@ Provide a clear, concise, actionable answer. Use specific numbers from the data.
   return { system, messages }
 }
 
-async function callClaude(system, messages, maxTokens = 1024, model = MODEL_SONNET) {
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ system, messages, max_tokens: maxTokens, model }),
-  })
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'API request failed' }))
-    throw new Error(err.error || `API error ${res.status}`)
+async function callClaude(system, messages, maxTokens = 1024, model = MODEL_SONNET, retries = 3) {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ system, messages, max_tokens: maxTokens, model }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'API request failed' }))
+      const errMsg = err.error || `API error ${res.status}`
+
+      // Retry on overloaded or 529 status
+      if ((res.status === 529 || errMsg.toLowerCase().includes('overloaded')) && attempt < retries - 1) {
+        const waitTime = (attempt + 1) * 3000 // 3s, 6s, 9s
+        console.log(`API overloaded, retrying in ${waitTime / 1000}s (attempt ${attempt + 1}/${retries})`)
+        await sleep(waitTime)
+        continue
+      }
+
+      throw new Error(errMsg)
+    }
+
+    const data = await res.json()
+
+    // Check for overloaded in response body
+    if (data.error?.type === 'overloaded_error' && attempt < retries - 1) {
+      const waitTime = (attempt + 1) * 3000
+      console.log(`API overloaded (response), retrying in ${waitTime / 1000}s`)
+      await sleep(waitTime)
+      continue
+    }
+
+    const text = data.content?.map(c => c.text || '').join('') || ''
+    const usage = data.usage || {}
+    return { text, usage }
   }
 
-  const data = await res.json()
-  const text = data.content?.map(c => c.text || '').join('') || ''
-  const usage = data.usage || {}
-  return { text, usage }
+  throw new Error('AI service is temporarily busy. Please try again in a moment.')
 }
 
 export async function askAI(question, schema, rawData, aggregateFn, history = []) {

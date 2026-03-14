@@ -41,8 +41,8 @@ function ThemeToggleSmall() {
 function PremiumBadge() {
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold tracking-wide"
-      style={{ background: 'linear-gradient(135deg, #1c1917, #292524)', color: '#d4a574', border: '1px solid rgba(212, 165, 116, 0.2)', letterSpacing: '0.05em' }}>
-      <Crown className="w-2.5 h-2.5" style={{ color: '#c9956b' }} />Pro
+      style={{ background: 'linear-gradient(135deg, #1e1b4b, #312e81)', color: '#c4b5fd', border: '1px solid rgba(139, 92, 246, 0.3)', letterSpacing: '0.05em' }}>
+      <Crown className="w-2.5 h-2.5" style={{ color: '#a78bfa' }} />Pro
     </span>
   )
 }
