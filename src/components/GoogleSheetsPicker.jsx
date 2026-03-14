@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useData } from '../context/DataContext'
+import LogoMark from './LogoMark'
 import { FileSpreadsheet, Loader2, ArrowLeft, RefreshCw, Search, AlertCircle } from 'lucide-react'
 
 export default function GoogleSheetsPicker({ accessToken, onBack }) {
@@ -70,7 +71,7 @@ export default function GoogleSheetsPicker({ accessToken, onBack }) {
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-4 mb-4">
             <div className="w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-200">
-              <img src="/logo_mark.png" alt="NB" className="w-10 h-10 object-contain" />
+              <LogoMark className="w-10 h-10 object-contain" alt="NB" />
             </div>
             <div className="text-left">
               <h1 className="text-2xl font-display font-bold tracking-tight text-slate-900">NORTHERN BIRD</h1>

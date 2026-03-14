@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
 import { useData } from '../context/DataContext'
+import LogoMark from './LogoMark'
 import { Tag, Hash, Calendar, EyeOff, ArrowRight, ArrowLeft, FileSpreadsheet, ChevronDown, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react'
 
 const TYPE_CONFIG = {
@@ -60,7 +61,7 @@ export default function ColumnTagger({ onConfirm }) {
       <div className="max-w-3xl mx-auto">
         <div className="mb-6 sm:mb-8 animate-fade-in">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center"><img src="/logo_mark.png" alt="NB" className="w-5 h-5 object-contain" /></div>
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center"><LogoMark className="w-5 h-5 object-contain" alt="NB" /></div>
             <h1 className="text-xl sm:text-2xl font-display font-bold text-slate-900">Tag Your Columns</h1>
           </div>
           <p className="text-sm sm:text-base text-slate-500 mt-1">Tell us what each column represents. Adjust anything that's off.</p>

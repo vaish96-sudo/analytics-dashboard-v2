@@ -10,6 +10,7 @@ import FileUpload from './components/FileUpload'
 import ColumnTagger from './components/ColumnTagger'
 import Dashboard from './components/Dashboard'
 import GoogleSheetsPicker from './components/GoogleSheetsPicker'
+import LogoMark from './components/LogoMark'
 import { Loader2 } from 'lucide-react'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
@@ -36,7 +37,7 @@ function GoogleAuthCallback({ onToken, onError }) {
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
       <div className="text-center">
         <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-4 animate-pulse">
-          <img src="/logo_mark.png" alt="NB" className="w-8 h-8 object-contain" />
+          <LogoMark className="w-8 h-8 object-contain" />
         </div>
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Connecting to Google Sheets…</p>
       </div>
@@ -102,7 +103,7 @@ function AppContent() {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
         <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center animate-pulse">
-          <img src="/logo_mark.png" alt="NB" className="w-6 h-6 object-contain" />
+          <LogoMark className="w-6 h-6 object-contain" />
         </div>
       </div>
     )

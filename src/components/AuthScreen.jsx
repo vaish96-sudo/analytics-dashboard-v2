@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import LogoMark from './LogoMark'
 import { Mail, Lock, User, ArrowRight, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react'
 
 function PasswordInput({ value, onChange, placeholder, disabled }) {
@@ -80,7 +81,7 @@ export default function AuthScreen() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 sm:gap-4 mb-4">
             <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-200">
-              <img src="/logo_mark.png" alt="NB" className="w-8 h-8 sm:w-12 sm:h-12 object-contain" />
+              <LogoMark className="w-8 h-8 sm:w-12 sm:h-12 object-contain" />
             </div>
             <div className="text-left">
               <h1 className="text-xl sm:text-2xl font-display font-bold tracking-tight text-slate-900">NORTHERN BIRD</h1>

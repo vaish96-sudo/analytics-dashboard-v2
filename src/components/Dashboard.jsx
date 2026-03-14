@@ -11,6 +11,7 @@ import AskAI from './AskAI'
 import AIInsights from './AIInsights'
 import GlobalFilterBar from './GlobalFilterBar'
 import UserProfile from './UserProfile'
+import LogoMark from './LogoMark'
 import {
   LayoutDashboard, BarChart3, Table2, Wand2, MessageSquare, Lightbulb,
   FileSpreadsheet, Upload, ChevronRight, Settings, Menu, X, ChevronDown,
@@ -123,7 +124,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome }) {
       <aside className="hidden lg:flex w-60 shrink-0 flex-col fixed h-full z-40 nb-sidebar">
         <div className="p-5" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2.5">
-            <img src="/logo_mark.png" alt="Northern Bird" className="w-9 h-9 object-contain" />
+            <LogoMark className="w-9 h-9 object-contain" alt="Northern Bird" />
             <div>
               <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>NORTHERN BIRD</span>
               <div className="flex items-center gap-2 mt-0.5">
@@ -214,7 +215,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome }) {
       <div className="lg:hidden sticky top-0 z-40 px-4 py-3 nb-sidebar" ref={menuRef}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src="/logo_mark.png" alt="NB" className="w-7 h-7 object-contain" />
+            <LogoMark className="w-7 h-7 object-contain" alt="NB" />
             <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>NORTHERN BIRD</span>
             <PremiumBadge />
           </div>

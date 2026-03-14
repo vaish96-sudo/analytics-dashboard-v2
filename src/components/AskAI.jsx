@@ -8,6 +8,7 @@ import {
   MessageSquare, Send, Loader2, Code, User, Sparkles,
   Plus, History, FileText, File, Trash2, MoreHorizontal
 } from 'lucide-react'
+import LogoMark from './LogoMark'
 
 function MarkdownText({ text }) {
   if (!text) return null
@@ -55,7 +56,7 @@ function MessageBubble({ message }) {
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''} animate-slide-up`}>
       <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-blue-50">
-        {isUser ? <User className="w-4 h-4 text-accent" /> : <img src="/logo_mark.png" alt="NB" className="w-5 h-5 object-contain" />}
+        {isUser ? <User className="w-4 h-4 text-accent" /> : <LogoMark className="w-5 h-5 object-contain" alt="NB" />}
       </div>
       <div className={`max-w-[80%] rounded-xl p-4 ${isUser ? 'bg-blue-50 border border-blue-200' : 'bg-white border border-slate-200'}`}>
         {message.content && (isUser ? <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{message.content}</div> : <MarkdownText text={message.content} />)}
@@ -187,7 +188,7 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
       {/* Main Chat */}
       <div className="flex-1 rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[600px] animate-fade-in">
         <div className="p-3 sm:p-4 border-b border-slate-100 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><img src="/logo_mark.png" alt="NB" className="w-5 h-5 object-contain" /></div>
+          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><LogoMark className="w-5 h-5 object-contain" alt="NB" /></div>
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-display font-semibold text-slate-800">Ask AI</h3>
             <p className="text-xs text-slate-400 truncate">Ask about your data in plain English</p>

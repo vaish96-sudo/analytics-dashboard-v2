@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useProject } from '../context/ProjectContext'
 import { useTheme } from '../context/ThemeContext'
+import LogoMark from './LogoMark'
 import {
   FolderOpen, FolderPlus, Upload, FileSpreadsheet, Globe, LogOut,
   ChevronRight, Loader2, Search, Database, MessageSquare, Lightbulb, Sun, Moon, Monitor,
@@ -117,7 +118,7 @@ export default function HomeScreen({ onOpenProject, onNewProject }) {
       <aside className="hidden lg:flex w-60 shrink-0 flex-col fixed h-full z-40 nb-sidebar">
         <div className="p-5" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2.5">
-            <img src="/logo_mark.png" alt="Northern Bird" className="w-9 h-9 object-contain" />
+            <LogoMark className="w-9 h-9 object-contain" alt="Northern Bird" />
             <div className="flex-1">
               <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>NORTHERN BIRD</span>
               <div className="flex items-center gap-2 mt-0.5">
@@ -191,7 +192,7 @@ export default function HomeScreen({ onOpenProject, onNewProject }) {
         style={{ borderBottom: '1px solid var(--border)' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src="/logo_mark.png" alt="NB" className="w-7 h-7 object-contain" />
+            <LogoMark className="w-7 h-7 object-contain" alt="NB" />
             <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>NORTHERN BIRD</span>
             <PremiumBadge />
           </div>

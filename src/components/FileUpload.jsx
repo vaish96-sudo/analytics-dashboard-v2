@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react'
 import { Upload, FileSpreadsheet, AlertCircle, Plus } from 'lucide-react'
 import { useData } from '../context/DataContext'
+import LogoMark from './LogoMark'
 
 export default function FileUpload() {
   const { loadData, datasets, switchDataset } = useData()
@@ -42,7 +43,7 @@ export default function FileUpload() {
         <div className="text-center mb-8 sm:mb-10">
           <div className="inline-flex items-center gap-3 sm:gap-4 mb-4">
             <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-200">
-              <img src="/logo_mark.png" alt="NB" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
+              <LogoMark className="w-8 h-8 sm:w-10 sm:h-10 object-contain" alt="NB" />
             </div>
             <div className="text-left">
               <h1 className="text-xl sm:text-2xl font-display font-bold tracking-tight text-slate-900">NORTHERN BIRD</h1>
