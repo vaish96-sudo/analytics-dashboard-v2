@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react'
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useData } from '../context/DataContext'
 import { CHART_COLORS, smartFormat, truncate } from '../utils/formatters'
@@ -119,8 +119,12 @@ function ChartCard({ defaultType, defaultDim, defaultMet, index, schema, columns
 
 export default function AutoCharts() {
   const { rawData, schema, columnsByType, aggregate, activeDatasetId, updateDatasetState, globalFilters, setGlobalFilters, chartsState } = useData()
+  const [aiChartConfigs, setAiChartConfigs] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const aiRequestedRef = useRef(null)
 
-  const charts = useMemo(() => {
+  // Basic heuristic charts (instant fallback)
+  const basicCharts = useMemo(() => {
     if (!rawData || !schema) return []
     const { dimensions, metrics, dates } = columnsByType; const c = []
     if (dimensions.length > 0 && metrics.length > 0) c.push({ type: 'bar', dim: dimensions[0], met: metrics[0] })
@@ -128,8 +132,103 @@ export default function AutoCharts() {
     if (dimensions.length > 0 && metrics.length > 0) c.push({ type: 'pie', dim: dimensions[0], met: metrics[0] })
     if (metrics.length > 1 && dimensions.length > 0) c.push({ type: 'bar', dim: dimensions.length > 1 ? dimensions[1] : dimensions[0], met: metrics[1] })
     if (metrics.length >= 2 && dimensions.length > 0) c.push({ type: 'line', dim: dimensions[0], met: metrics.length > 2 ? metrics[2] : metrics[1] })
-    return c.slice(0, 5)
+    return c.slice(0, 4)
   }, [rawData, schema, columnsByType])
+
+  // AI-powered smart chart selection — runs once per dataset
+  useEffect(() => {
+    if (!rawData || !schema || !activeDatasetId) return
+    if (activeDatasetId === '__pending__') return
+    if (aiRequestedRef.current === activeDatasetId) return
+    // If user already has saved chart states, don't override
+    if (chartsState && Object.keys(chartsState).length > 0) return
+
+    aiRequestedRef.current = activeDatasetId
+    setAiLoading(true)
+
+    const cols = Object.entries(schema)
+      .filter(([, def]) => def.type !== 'ignore')
+      .map(([col, def]) => `- ${col} (${def.type}): "${def.label}"`)
+      .join('\n')
+
+    // Build a data summary for AI
+    const { dimensions, metrics, dates } = columnsByType
+    const summaryParts = []
+
+    // Unique value counts for dimensions
+    dimensions.slice(0, 6).forEach(dim => {
+      const unique = new Set(rawData.map(r => r[dim])).size
+      summaryParts.push(`${dim}: ${unique} unique values`)
+    })
+
+    // Metric ranges
+    metrics.slice(0, 6).forEach(met => {
+      const vals = rawData.map(r => parseFloat(String(r[met] ?? 0).replace(/[,$%]/g, ''))).filter(v => !isNaN(v))
+      if (vals.length > 0) {
+        const min = Math.min(...vals), max = Math.max(...vals), avg = vals.reduce((a, b) => a + b, 0) / vals.length
+        summaryParts.push(`${met}: min=${min.toFixed(1)}, max=${max.toFixed(1)}, avg=${avg.toFixed(1)}`)
+      }
+    })
+
+    if (dates.length > 0) summaryParts.push(`Date columns: ${dates.join(', ')}`)
+
+    const system = `You are a data visualization expert. Given a dataset's columns and statistics, recommend the 4 most insightful chart combinations.
+
+Dataset columns:
+${cols}
+
+Data summary (${rawData.length} rows):
+${summaryParts.join('\n')}
+
+Rules:
+- Use EXACT column names from the list above.
+- Pick combinations that reveal interesting patterns, not obvious totals.
+- If there are date columns, include at least one time series (line or area chart).
+- If a dimension has 2-8 unique values, it's great for pie charts. If 8+, use bar.
+- Pair high-variance metrics with the most relevant dimensions.
+- Avoid repeating the same dimension+metric combo.
+- Chart types: "bar", "line", "pie", "area"
+
+Respond with ONLY a JSON array (no markdown, no backticks):
+[{"type":"bar","dim":"column_name","met":"column_name","reason":"Brief explanation"}]`
+
+    fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system,
+        messages: [{ role: 'user', content: 'Recommend the 4 best chart combinations for this dataset.' }],
+        max_tokens: 500,
+        model: 'claude-sonnet-4-6',
+      }),
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data) return
+        const text = data.content?.map(c => c.text || '').join('') || ''
+        try {
+          const configs = JSON.parse(text.replace(/```json|```/g, '').trim())
+          // Validate: all dimensions and metrics must exist in schema
+          const validTypes = ['bar', 'line', 'pie', 'area']
+          const valid = configs.filter(c =>
+            validTypes.includes(c.type) &&
+            schema[c.dim] &&
+            schema[c.met]
+          )
+          if (valid.length >= 2) {
+            setAiChartConfigs(valid.slice(0, 4))
+            console.log('Smart charts:', valid.map(c => `${c.met} by ${c.dim} (${c.type})`).join(', '))
+          }
+        } catch (e) {
+          console.log('Smart chart parsing failed:', e.message)
+        }
+      })
+      .catch(() => {})
+      .finally(() => setAiLoading(false))
+  }, [activeDatasetId, rawData, schema, columnsByType])
+
+  // Use AI configs if available, otherwise fallback to basic
+  const charts = aiChartConfigs || basicCharts
 
   const handleChartStateChange = useCallback((index, state) => { updateDatasetState('chartsState', { ...chartsState, [index]: state }) }, [chartsState, updateDatasetState])
 
