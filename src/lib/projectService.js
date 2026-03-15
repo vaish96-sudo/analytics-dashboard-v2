@@ -60,38 +60,19 @@ export async function getProject(projectId) {
     }
   }
 
-  // If any dataset has multiple dashboard_states rows, merge insights into the first
-  // and clean up duplicates so this never happens again
+  // Ensure every dataset has a dashboard_states row
   if (data?.datasets) {
     for (const ds of data.datasets) {
       const states = ds.dashboard_states || []
-      if (states.length > 1) {
-        // Find the row that has insights (if any)
-        const withInsights = states.find(s => s.insights && s.insights.length > 0)
-        const primary = withInsights || states[0]
-        const duplicateIds = states.filter(s => s.id !== primary.id).map(s => s.id)
-
-        // If insights exist on a non-primary row, merge them to the primary
-        if (withInsights && withInsights.id !== states[0].id) {
-          await supabase
-            .from('dashboard_states')
-            .update({ insights: withInsights.insights, insights_loaded: withInsights.insights_loaded })
-            .eq('id', states[0].id)
-          states[0].insights = withInsights.insights
-          states[0].insights_loaded = withInsights.insights_loaded
+      if (states.length === 0) {
+        console.log('No dashboard_states row for dataset', ds.id, '— creating one')
+        const { data: newRow } = await supabase
+          .from('dashboard_states')
+          .insert({ dataset_id: ds.id })
+          .select('id, active_tab, global_filters, charts_state, report_builder_state, data_table_state, insights, insights_loaded, ai_charts, updated_at')
+        if (newRow && newRow.length > 0) {
+          ds.dashboard_states = newRow
         }
-
-        // Delete duplicate rows
-        if (duplicateIds.length > 0) {
-          await supabase
-            .from('dashboard_states')
-            .delete()
-            .in('id', duplicateIds)
-          console.log('Cleaned up', duplicateIds.length, 'duplicate dashboard_states rows for dataset', ds.id)
-        }
-
-        // Keep only the primary row
-        ds.dashboard_states = [states[0]]
       }
     }
   }
@@ -187,24 +168,32 @@ export async function saveDashboardState(datasetId, state) {
   // CRITICAL: Strip insights fields — they must ONLY be written by saveInsightsOnly()
   const { insights, insights_loaded, ...safeState } = state
 
-  console.log('DB WRITE for dataset', datasetId, '→ filters:', Object.keys(safeState.global_filters || {}).length, 'ai_charts:', (safeState.ai_charts || []).length, 'charts_state keys:', Object.keys(safeState.charts_state || {}).length)
-
-  // Update by dataset_id (same targeting as saveInsightsOnly)
-  // Only updates columns present in safeState — leaves insights untouched
+  // Try update first
   const { data, error } = await supabase
     .from('dashboard_states')
     .update({ ...safeState, updated_at: new Date().toISOString() })
     .eq('dataset_id', datasetId)
     .select('id')
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('DB WRITE update error:', error.message)
+    throw new Error(error.message)
+  }
 
   // If no row existed, insert one
   if (!data || data.length === 0) {
-    const { error: insertErr } = await supabase
+    console.log('DB WRITE: no row found for dataset', datasetId, '— inserting new row')
+    const { data: inserted, error: insertErr } = await supabase
       .from('dashboard_states')
       .insert({ dataset_id: datasetId, ...safeState })
-    if (insertErr) throw new Error(insertErr.message)
+      .select('id')
+    if (insertErr) {
+      console.error('DB WRITE insert error:', insertErr.message)
+      throw new Error(insertErr.message)
+    }
+    console.log('DB WRITE: inserted new row', inserted?.[0]?.id)
+  } else {
+    console.log('DB WRITE for dataset', datasetId, '→ filters:', Object.keys(safeState.global_filters || {}).length, 'ai_charts:', (safeState.ai_charts || []).length, 'updated row:', data[0]?.id)
   }
 
   return true
