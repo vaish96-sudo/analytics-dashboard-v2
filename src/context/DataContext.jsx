@@ -81,6 +81,7 @@ export function DataProvider({ children }) {
       setActiveDatasetId(firstDs.id)
       // Load dashboard state with proper key normalization
       const raw = firstDs.dashboard_states?.[0] || {}
+      console.log('Loading project dashboard state — insights count:', (raw.insights || []).length, 'insights_loaded:', raw.insights_loaded)
       setLocalDashboardState({
         global_filters: raw.global_filters || {},
         chartsState: raw.charts_state || {},
@@ -261,8 +262,11 @@ export function DataProvider({ children }) {
       if (stateStr === lastSavedRef.current) return
       lastSavedRef.current = stateStr
 
+      console.log('Debounced save — insights count:', (localDashboardState.insights || []).length, 'for dataset:', activeDatasetId)
+
       try {
         await projectService.saveDashboardState(activeDatasetId, stateToSave)
+        console.log('Debounced save complete')
       } catch (err) {
         console.error('Failed to save dashboard state:', err)
       }
