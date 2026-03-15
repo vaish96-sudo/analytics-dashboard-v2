@@ -8,7 +8,7 @@ function TogglePill({ col, label, type, isSelected, onToggle, isCustom }) {
   const baseColors = type === 'dimension'
     ? (isSelected ? 'bg-sky-100 text-sky-800 border-sky-300' : 'bg-sky-50 text-sky-600 border-sky-200 opacity-70')
     : isCustom
-      ? (isSelected ? 'bg-amber-200 text-amber-900 border-amber-400' : 'bg-amber-100 text-amber-700 border-amber-300 opacity-80')
+      ? (isSelected ? 'bg-teal-100 text-teal-800 border-teal-400 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-600' : 'bg-teal-50 text-teal-700 border-teal-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700 opacity-80')
       : (isSelected ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-50 text-emerald-600 border-emerald-200 opacity-70')
   const Icon = type === 'dimension' ? Tag : Hash
   return (
@@ -30,7 +30,7 @@ function DropZone({ label, items, onDrop, onRemove, accept }) {
       <div className="flex items-center gap-1.5 flex-wrap">
         {items.length === 0 && <span className="text-xs text-slate-400 flex items-center gap-1"><Plus className="w-3 h-3" />{label}</span>}
         {items.map(item => (
-          <span key={item.col} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium ${item.type === 'dimension' ? 'bg-sky-50 text-sky-700 border-sky-200' : item.isCustom ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+          <span key={item.col} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium ${item.type === 'dimension' ? 'bg-sky-50 text-sky-700 border-sky-200' : item.isCustom ? 'bg-teal-50 text-teal-700 border-teal-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
             {item.type === 'dimension' ? <Tag className="w-2.5 h-2.5" /> : <Hash className="w-2.5 h-2.5" />}
             {item.label}
             <button onClick={() => onRemove(item.col)} className="ml-0.5 hover:opacity-70"><X className="w-2.5 h-2.5" /></button>

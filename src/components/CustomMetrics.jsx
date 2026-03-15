@@ -1,9 +1,26 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useData } from '../context/DataContext'
+import { useTheme } from '../context/ThemeContext'
 import {
   Plus, X, Check, Pencil, Trash2, Calculator, Sparkles, FlaskConical,
   Loader2, Lightbulb, ChevronDown,
 } from 'lucide-react'
+
+// Theme-aware colors: teal on light, amber on dark
+function useCustomMetricColors() {
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
+  return {
+    accent: isDark ? '#d97706' : '#0d9488',
+    accentLight: isDark ? 'rgba(217, 119, 6, 0.1)' : 'rgba(13, 148, 136, 0.08)',
+    accentBorder: isDark ? 'rgba(217, 119, 6, 0.25)' : 'rgba(13, 148, 136, 0.3)',
+    accentBorderLight: isDark ? 'rgba(217, 119, 6, 0.15)' : 'rgba(13, 148, 136, 0.2)',
+    accentBg: isDark ? 'rgba(217, 119, 6, 0.1)' : 'rgba(13, 148, 136, 0.06)',
+    accentBgHover: isDark ? 'rgba(217, 119, 6, 0.12)' : 'rgba(13, 148, 136, 0.1)',
+    pillBg: isDark ? 'rgba(217, 119, 6, 0.1)' : 'rgba(13, 148, 136, 0.08)',
+    pillBorder: isDark ? 'rgba(217, 119, 6, 0.2)' : 'rgba(13, 148, 136, 0.25)',
+  }
+}
 
 const API_URL = '/api/claude'
 
@@ -112,7 +129,7 @@ function ColumnPicker({ metrics, schema, onSelect, trigger }) {
 }
 
 // ─── Metric Form (formula-based) ────────────────────────────────
-function MetricForm({ schema, columnsByType, onSave, onCancel, initial }) {
+function MetricForm({ schema, columnsByType, onSave, onCancel, initial, colors }) {
   const [name, setName] = useState(initial?.name || '')
   const [formula, setFormula] = useState(initial?.formula || '')
   const [suffix, setSuffix] = useState(initial?.suffix || '')
@@ -138,7 +155,7 @@ function MetricForm({ schema, columnsByType, onSave, onCancel, initial }) {
   const canSave = name.trim() && formula.trim()
 
   return (
-    <div className="rounded-xl overflow-hidden animate-fade-in" style={{ background: 'var(--bg-surface)', border: '1px solid rgba(217, 119, 6, 0.3)' }}>
+    <div className="rounded-xl overflow-hidden animate-fade-in" style={{ background: 'var(--bg-surface)', border: `1px solid ${colors.accentBorder}` }}>
       <div className="p-4 space-y-3">
         <div className="flex gap-3">
           <div className="flex-1">
@@ -168,8 +185,8 @@ function MetricForm({ schema, columnsByType, onSave, onCancel, initial }) {
         </div>
 
         {formula && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(217, 119, 6, 0.1)', border: '1px solid rgba(217, 119, 6, 0.15)' }}>
-            <Calculator className="w-3.5 h-3.5 shrink-0" style={{ color: '#d97706' }} />
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: colors.accentBg, border: `1px solid ${colors.accentBorderLight}` }}>
+            <Calculator className="w-3.5 h-3.5 shrink-0" style={{ color: colors.accent }} />
             <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
               {name || '?'} = {formulaToDisplay(formula, schema)}{suffix && ` (${suffix})`}
             </span>
@@ -181,7 +198,7 @@ function MetricForm({ schema, columnsByType, onSave, onCancel, initial }) {
           <button onClick={() => canSave && onSave({ name: name.trim(), formula: formula.trim(), suffix })}
             disabled={!canSave}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-40 text-white"
-            style={{ background: '#d97706' }}>
+            style={{ background: colors.accent }}>
             <Check className="w-3.5 h-3.5" /> {initial ? 'Update' : 'Create'}
           </button>
         </div>
@@ -191,23 +208,23 @@ function MetricForm({ schema, columnsByType, onSave, onCancel, initial }) {
 }
 
 // ─── AI Suggestion Card ──────────────────────────────────────────
-function SuggestionCard({ suggestion, schema, onAccept, accepted }) {
+function SuggestionCard({ suggestion, schema, onAccept, accepted, colors }) {
   return (
-    <div className="flex items-start gap-3 p-3 rounded-xl transition-all" style={{ background: accepted ? 'rgba(217, 119, 6, 0.1)' : 'var(--bg-overlay)', border: `1px solid ${accepted ? 'rgba(217, 119, 6, 0.25)' : 'var(--border-light)'}` }}>
-      <Lightbulb className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#d97706' }} />
+    <div className="flex items-start gap-3 p-3 rounded-xl transition-all" style={{ background: accepted ? colors.accentBg : 'var(--bg-overlay)', border: `1px solid ${accepted ? colors.accentBorder : 'var(--border-light)'}` }}>
+      <Lightbulb className="w-4 h-4 mt-0.5 shrink-0" style={{ color: colors.accent }} />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{suggestion.name}</p>
-        <p className="text-[11px] font-mono mt-0.5" style={{ color: '#d97706' }}>{formulaToDisplay(suggestion.formula, schema)}{suggestion.suffix && ` (${suggestion.suffix})`}</p>
+        <p className="text-[11px] font-mono mt-0.5" style={{ color: colors.accent }}>{formulaToDisplay(suggestion.formula, schema)}{suggestion.suffix && ` (${suggestion.suffix})`}</p>
         <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>{suggestion.description}</p>
       </div>
       {accepted ? (
-        <span className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium" style={{ background: 'rgba(217, 119, 6, 0.15)', color: '#b45309' }}>
+        <span className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium" style={{ background: colors.accentBg, color: colors.accent }}>
           <Check className="w-3 h-3" /> Added
         </span>
       ) : (
         <button onClick={onAccept}
           className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all hover:scale-[1.02] shrink-0 text-white"
-          style={{ background: '#d97706' }}>
+          style={{ background: colors.accent }}>
           <Plus className="w-3 h-3" /> Add
         </button>
       )}
@@ -216,14 +233,14 @@ function SuggestionCard({ suggestion, schema, onAccept, accepted }) {
 }
 
 // ─── Metric Pill ─────────────────────────────────────────────────
-function MetricPill({ metric, schema, onEdit, onRemove }) {
+function MetricPill({ metric, schema, onEdit, onRemove, colors }) {
   return (
     <div className="group flex items-center gap-2 px-3 py-2 rounded-lg transition-all"
-      style={{ background: 'rgba(217, 119, 6, 0.1)', border: '1px solid rgba(217, 119, 6, 0.2)' }}>
-      <FlaskConical className="w-3.5 h-3.5 shrink-0" style={{ color: '#d97706' }} />
+      style={{ background: colors.accentBg, border: `1px solid ${colors.pillBorder}` }}>
+      <FlaskConical className="w-3.5 h-3.5 shrink-0" style={{ color: colors.accent }} />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{metric.name}</p>
-        <p className="text-[10px] font-mono truncate" style={{ color: '#d97706' }}>
+        <p className="text-[10px] font-mono truncate" style={{ color: colors.accent }}>
           {formulaToDisplay(metric.formula, schema)}{metric.suffix && ` (${metric.suffix})`}
         </p>
       </div>
@@ -239,6 +256,7 @@ function MetricPill({ metric, schema, onEdit, onRemove }) {
 export default function CustomMetrics() {
   const { schema, rawData, columnsByType, updateDatasetState } = useData()
   const customMetrics = useData().localCustomMetrics || []
+  const colors = useCustomMetricColors()
 
   const [showForm, setShowForm] = useState(false)
   const [editIndex, setEditIndex] = useState(null)
@@ -296,10 +314,10 @@ export default function CustomMetrics() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <FlaskConical className="w-4 h-4" style={{ color: '#d97706' }} />
-          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#d97706' }}>Custom Metrics</span>
+          <FlaskConical className="w-4 h-4" style={{ color: colors.accent }} />
+          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: colors.accent }}>Custom Metrics</span>
           {customMetrics.length > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ background: 'rgba(217, 119, 6, 0.15)', color: '#b45309' }}>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ background: colors.accentBg, color: colors.accent }}>
               {customMetrics.length}
             </span>
           )}
@@ -307,14 +325,14 @@ export default function CustomMetrics() {
         <div className="flex items-center gap-2">
           <button onClick={handleSuggest} disabled={suggestLoading}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all hover:scale-[1.02] disabled:opacity-50"
-            style={{ background: 'rgba(217, 119, 6, 0.12)', color: '#d97706', border: '1px solid rgba(217, 119, 6, 0.2)' }}>
+            style={{ background: colors.accentBgHover, color: colors.accent, border: `1px solid ${colors.pillBorder}` }}>
             {suggestLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
             <span className="hidden sm:inline">{suggestLoading ? 'Analyzing...' : 'AI Suggest'}</span>
           </button>
           {!showForm && (
             <button onClick={() => { setShowForm(true); setEditIndex(null) }}
               className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all hover:scale-[1.02] text-white"
-              style={{ background: '#d97706' }}>
+              style={{ background: colors.accent }}>
               <Plus className="w-3 h-3" /> Add
             </button>
           )}
@@ -325,7 +343,7 @@ export default function CustomMetrics() {
       {customMetrics.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {customMetrics.map((m, i) => (
-            <MetricPill key={`${m.name}-${i}`} metric={m} schema={schema}
+            <MetricPill key={`${m.name}-${i}`} metric={m} schema={schema} colors={colors}
               onEdit={() => handleEdit(i)} onRemove={() => handleRemove(i)} />
           ))}
         </div>
@@ -333,7 +351,7 @@ export default function CustomMetrics() {
 
       {/* Manual form */}
       {showForm && (
-        <MetricForm schema={schema} columnsByType={columnsByType}
+        <MetricForm schema={schema} columnsByType={columnsByType} colors={colors}
           onSave={handleSave} onCancel={() => { setShowForm(false); setEditIndex(null) }}
           initial={editIndex !== null ? customMetrics[editIndex] : null} />
       )}
@@ -346,7 +364,7 @@ export default function CustomMetrics() {
         <div className="space-y-2 animate-fade-in">
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-              <Sparkles className="w-3 h-3 inline mr-1" style={{ color: '#d97706' }} />
+              <Sparkles className="w-3 h-3 inline mr-1" style={{ color: colors.accent }} />
               AI-Suggested metrics for your data
             </p>
             <button onClick={() => setSuggestions(null)} className="p-1 rounded" style={{ color: 'var(--text-muted)' }}>
@@ -355,7 +373,7 @@ export default function CustomMetrics() {
           </div>
           <div className="space-y-2">
             {suggestions.map((s, i) => (
-              <SuggestionCard key={i} suggestion={s} schema={schema}
+              <SuggestionCard key={i} suggestion={s} schema={schema} colors={colors}
                 onAccept={() => handleAcceptSuggestion(s, i)}
                 accepted={acceptedSuggestions.has(i)} />
             ))}
