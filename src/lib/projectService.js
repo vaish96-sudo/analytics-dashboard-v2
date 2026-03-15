@@ -135,47 +135,55 @@ export async function getDashboardState(datasetId) {
 }
 
 export async function saveDashboardState(datasetId, state) {
-  const { data, error } = await supabase
-    .from('dashboard_states')
-    .upsert({
-      dataset_id: datasetId,
-      ...state,
-    }, { onConflict: 'dataset_id' })
-    .select()
-    .single()
-
-  if (error) throw new Error(error.message)
-  return data
-}
-
-export async function saveInsightsOnly(datasetId, insights, insightsLoaded) {
-  // First check if a dashboard_state row exists
+  // Check if row exists
   const { data: existing } = await supabase
     .from('dashboard_states')
     .select('id')
     .eq('dataset_id', datasetId)
-    .single()
+    .limit(1)
 
-  if (existing) {
-    // Update only insights columns
-    const { data, error } = await supabase
+  if (existing && existing.length > 0) {
+    // Update the first matching row
+    const { error } = await supabase
+      .from('dashboard_states')
+      .update(state)
+      .eq('id', existing[0].id)
+    if (error) throw new Error(error.message)
+  } else {
+    // Insert new row
+    const { error } = await supabase
+      .from('dashboard_states')
+      .insert({ dataset_id: datasetId, ...state })
+    if (error) throw new Error(error.message)
+  }
+  return true
+}
+
+export async function saveInsightsOnly(datasetId, insights, insightsLoaded) {
+  // Check if any dashboard_state rows exist for this dataset
+  const { data: existing, error: checkErr } = await supabase
+    .from('dashboard_states')
+    .select('id')
+    .eq('dataset_id', datasetId)
+    .limit(1)
+
+  if (checkErr) throw new Error(checkErr.message)
+
+  if (existing && existing.length > 0) {
+    // Update ALL rows for this dataset_id
+    const { error } = await supabase
       .from('dashboard_states')
       .update({ insights, insights_loaded: insightsLoaded })
       .eq('dataset_id', datasetId)
-      .select()
-      .single()
     if (error) throw new Error(error.message)
-    return data
   } else {
     // Insert new row
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('dashboard_states')
       .insert({ dataset_id: datasetId, insights, insights_loaded: insightsLoaded })
-      .select()
-      .single()
     if (error) throw new Error(error.message)
-    return data
   }
+  return true
 }
 
 // ============================================================
