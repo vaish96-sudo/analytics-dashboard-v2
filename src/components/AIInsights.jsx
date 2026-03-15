@@ -9,7 +9,7 @@ const IMPACT = { high: 'text-red-600 bg-red-50 border-red-200', medium: 'text-am
 const BORDERS = { opportunity: 'border-l-emerald-500', trend: 'border-l-sky-500', alert: 'border-l-red-500', recommendation: 'border-l-blue-500' }
 
 export default function AIInsights() {
-  const { schema, rawData, aggregateUnfiltered, updateDatasetState, insights, insightsLoaded, flushSave } = useData()
+  const { schema, rawData, aggregateUnfiltered, updateDatasetState, insights, insightsLoaded, activeDatasetId } = useData()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [usedModel, setUsedModel] = useState(null)
@@ -20,10 +20,21 @@ export default function AIInsights() {
       const result = await getInsights(schema, rawData, aggregateUnfiltered)
       const insightsData = result.insights || result
       setUsedModel(result.model || null)
+
+      // Update local state for immediate display
       updateDatasetState('insights', insightsData)
       updateDatasetState('insightsLoaded', true)
-      // Wait for state to settle, then force save to Supabase
-      setTimeout(() => { if (flushSave) flushSave() }, 500)
+
+      // Save directly to Supabase — don't rely on debounce
+      if (activeDatasetId && activeDatasetId !== '__pending__') {
+        try {
+          const { saveInsightsOnly } = await import('../lib/projectService')
+          await saveInsightsOnly(activeDatasetId, insightsData, true)
+          console.log('Insights saved to Supabase directly')
+        } catch (saveErr) {
+          console.error('Failed to save insights to Supabase:', saveErr)
+        }
+      }
     } catch (err) { setError(err.message) } finally { setLoading(false) }
   }
 

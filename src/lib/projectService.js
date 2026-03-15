@@ -148,6 +148,36 @@ export async function saveDashboardState(datasetId, state) {
   return data
 }
 
+export async function saveInsightsOnly(datasetId, insights, insightsLoaded) {
+  // First check if a dashboard_state row exists
+  const { data: existing } = await supabase
+    .from('dashboard_states')
+    .select('id')
+    .eq('dataset_id', datasetId)
+    .single()
+
+  if (existing) {
+    // Update only insights columns
+    const { data, error } = await supabase
+      .from('dashboard_states')
+      .update({ insights, insights_loaded: insightsLoaded })
+      .eq('dataset_id', datasetId)
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    return data
+  } else {
+    // Insert new row
+    const { data, error } = await supabase
+      .from('dashboard_states')
+      .insert({ dataset_id: datasetId, insights, insights_loaded: insightsLoaded })
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    return data
+  }
+}
+
 // ============================================================
 // CONVERSATIONS
 // ============================================================
