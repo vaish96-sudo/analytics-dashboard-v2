@@ -92,6 +92,7 @@ export function DataProvider({ children }) {
         dataTableState: raw.data_table_state || {},
         insights: raw.insights || [],
         insightsLoaded: raw.insights_loaded || false,
+        aiCharts: raw.ai_charts || [],
         chatHistory: [],
       })
       const savedTab = localStorage.getItem('nb_tab')
@@ -120,6 +121,7 @@ export function DataProvider({ children }) {
         chatHistory: [],
         insights: raw.insights || [],
         insightsLoaded: raw.insights_loaded || false,
+        aiCharts: raw.ai_charts || [],
         globalFilters: raw.global_filters || {},
       }
     })
@@ -131,7 +133,7 @@ export function DataProvider({ children }) {
         id: '__pending__', rawData: pendingData, fileName: pendingFileName,
         schema: pendingSchema, rowCount: pendingData.length,
         reportBuilderState: {}, dataTableState: {}, chartsState: {},
-        chatHistory: [], insights: [], insightsLoaded: false, globalFilters: {},
+        chatHistory: [], insights: [], insightsLoaded: false, aiCharts: [], globalFilters: {},
       }
     }
     return datasets.find(d => d.id === activeDatasetId) || null
@@ -213,6 +215,7 @@ export function DataProvider({ children }) {
         dataTableState: ds.dataTableState || {},
         insights: ds.insights || [],
         insightsLoaded: ds.insightsLoaded || false,
+        aiCharts: ds.aiCharts || [],
         chatHistory: ds.chatHistory || [],
       })
     }
@@ -257,6 +260,7 @@ export function DataProvider({ children }) {
         charts_state: localDashboardState.chartsState || {},
         report_builder_state: localDashboardState.reportBuilderState || {},
         data_table_state: localDashboardState.dataTableState || {},
+        ai_charts: localDashboardState.aiCharts || [],
         // DO NOT include insights here — they are saved directly via saveInsightsOnly
         // to avoid race conditions where a debounced save overwrites fresh insights with stale empty array
       }
@@ -323,6 +327,7 @@ export function DataProvider({ children }) {
       charts_state: st.chartsState || {},
       report_builder_state: st.reportBuilderState || {},
       data_table_state: st.dataTableState || {},
+      ai_charts: st.aiCharts || [],
       // DO NOT include insights — saved separately via saveInsightsOnly
     }
 
@@ -360,6 +365,7 @@ export function DataProvider({ children }) {
     chartsState: localDashboardState.chartsState || {},
     reportBuilderState: localDashboardState.reportBuilderState || {},
     dataTableState: localDashboardState.dataTableState || {},
+    aiCharts: localDashboardState.aiCharts || [],
     insights: localDashboardState.insights || [],
     insightsLoaded: localDashboardState.insightsLoaded || false,
     chatHistory: localDashboardState.chatHistory || [],
