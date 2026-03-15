@@ -1,432 +1,465 @@
-// Export AI insights, chat conversations, and full dashboard reports as PDF or Word
+// Northern Bird Analytics — Executive PDF Export
+// Consulting-grade report: KPIs, Insights, Builder Table, Dimension Analysis
+
+const GOLD = [176, 141, 87]
+const DARK = [26, 26, 26]
+const BODY = [82, 82, 82]
+const MUTED = [148, 148, 148]
+const WHITE = [255, 255, 255]
+const CREAM = [250, 249, 247]
+const BORDER = [229, 229, 224]
+const RED = [200, 50, 50]
+const AMBER = [190, 120, 30]
+const SLATE = [100, 116, 139]
 
 export async function exportToPDF(content, title = 'Northern Bird Report') {
   const { default: jsPDF } = await import('jspdf')
-
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-  const pageWidth = doc.internal.pageSize.getWidth()
-  const pageHeight = doc.internal.pageSize.getHeight()
-  const margin = 20
-  const maxWidth = pageWidth - margin * 2
-  let y = margin
+  const pw = doc.internal.pageSize.getWidth()   // 210
+  const ph = doc.internal.pageSize.getHeight()   // 297
+  const m = 16  // margin
+  const mw = pw - m * 2  // max width
 
-  const checkPageBreak = (needed = 15) => {
-    if (y + needed > pageHeight - 20) { doc.addPage(); y = margin }
+  let y = 0
+
+  // === Helpers ===
+  const newPage = () => { doc.addPage(); y = m + 4 }
+  const need = (h) => { if (y + h > ph - 18) newPage() }
+
+  const text = (str, x, yy, size, style, color, opts) => {
+    doc.setFontSize(size)
+    doc.setFont('helvetica', style || 'normal')
+    doc.setTextColor(...(color || DARK))
+    doc.text(String(str || ''), x, yy, opts || {})
   }
 
-  const addText = (text, fontSize, fontStyle = 'normal', color = [15, 23, 42]) => {
-    doc.setFontSize(fontSize)
-    doc.setFont('helvetica', fontStyle)
-    doc.setTextColor(...color)
-    const lines = doc.splitTextToSize(String(text || ''), maxWidth)
-    for (const line of lines) {
-      checkPageBreak()
-      doc.text(line, margin, y)
-      y += fontSize * 0.5
-    }
+  const wrappedText = (str, size, style, color, indent = 0) => {
+    doc.setFontSize(size)
+    doc.setFont('helvetica', style || 'normal')
+    doc.setTextColor(...(color || BODY))
+    const lines = doc.splitTextToSize(String(str || ''), mw - indent)
+    lines.forEach(line => {
+      need(size * 0.42)
+      doc.text(line, m + indent, y)
+      y += size * 0.42
+    })
   }
 
-  const addSpacer = (height = 4) => { y += height }
-
-  const addSectionHeader = (text) => {
-    addSpacer(4)
-    checkPageBreak(20)
-    doc.setDrawColor(176, 141, 87)
-    doc.setLineWidth(0.5)
-    doc.line(margin, y, margin + 30, y)
-    y += 4
-    addText(text, 13, 'bold', [37, 99, 235])
-    addSpacer(3)
+  const sectionHead = (label) => {
+    y += 6
+    need(16)
+    doc.setDrawColor(...GOLD)
+    doc.setLineWidth(0.7)
+    doc.line(m, y, m + 22, y)
+    y += 5
+    text(label, m, y, 13, 'bold', DARK)
+    y += 7
   }
 
-  // ========== HEADER ==========
-  // Blue accent bar at top
-  doc.setFillColor(176, 141, 87)
-  doc.rect(0, 0, pageWidth, 3, 'F')
+  const thinLine = () => {
+    doc.setDrawColor(...BORDER)
+    doc.setLineWidth(0.15)
+    doc.line(m, y, pw - m, y)
+    y += 3
+  }
 
-  y = 12
-  addText('NORTHERN BIRD ANALYTICS', 18, 'bold', [176, 141, 87])
-  addSpacer(1)
-  addText(title, 13, 'normal', [71, 85, 105])
-  addSpacer(1)
+  // === PAGE HEADER (gold bar + logo + title) ===
+  doc.setFillColor(...GOLD)
+  doc.rect(0, 0, pw, 2.5, 'F')
 
-  // Date and meta
+  y = 13
+  text('NORTHERN BIRD', m, y, 9, 'bold', GOLD)
+  text('ANALYTICS', m + 28, y, 7, 'normal', MUTED)
+  y += 10
+
+  doc.setFontSize(20)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...DARK)
+  doc.text(title, m, y)
+  y += 7
+
   const now = new Date()
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-  addText(`Generated: ${dateStr} at ${timeStr}`, 9, 'normal', [148, 163, 184])
-  addSpacer(4)
-
-  // Separator
-  doc.setDrawColor(226, 232, 240)
-  doc.setLineWidth(0.3)
-  doc.line(margin, y, pageWidth - margin, y)
+  text(`Generated ${dateStr}`, m, y, 8, 'normal', MUTED)
   y += 6
+  thinLine()
 
-  // ========== RENDER CONTENT ==========
-
+  // === RENDER BASED ON CONTENT TYPE ===
   if (content.type === 'dashboard_report') {
-    const { projectName, fileName, rowCount, filters, kpis, insights } = content
+    const { projectName, fileName, rowCount, filters, kpis, insights,
+            dataOverview, topBreakdowns, builderSummary, builderData } = content
 
-    // Project info box
-    doc.setFillColor(248, 250, 252)
-    doc.roundedRect(margin, y, maxWidth, 18, 3, 3, 'F')
-    doc.setFontSize(9)
-    doc.setTextColor(71, 85, 105)
-    doc.text(`Project: ${projectName || 'Untitled'}`, margin + 5, y + 6)
-    doc.text(`Dataset: ${fileName || 'N/A'}  ·  ${(rowCount || 0).toLocaleString()} rows`, margin + 5, y + 12)
-    y += 24
+    // Project info block
+    doc.setFillColor(...CREAM)
+    doc.roundedRect(m, y, mw, 12, 1.5, 1.5, 'F')
+    text(projectName || 'Untitled', m + 4, y + 5, 9, 'bold', DARK)
+    text(`${fileName || ''}  ·  ${(rowCount || 0).toLocaleString()} rows`, m + 4, y + 9.5, 7.5, 'normal', MUTED)
+    y += 16
 
     // Active filters
-    if (filters && Object.keys(filters).length > 0) {
-      addSectionHeader('Active filters')
-      Object.entries(filters).forEach(([col, vals]) => {
-        if (vals && vals.length > 0) {
-          addText(`${col}: ${vals.join(', ')}`, 9, 'normal', [71, 85, 105])
-          addSpacer(1)
-        }
-      })
+    if (filters && Object.keys(filters).some(k => filters[k]?.length > 0)) {
+      const parts = Object.entries(filters).filter(([,v]) => v?.length > 0).map(([k,v]) => `${k}: ${v.join(', ')}`)
+      text(`Filters: ${parts.join('  |  ')}`, m, y, 7, 'italic', MUTED)
+      y += 5
     }
 
-    // KPI Summary
-    if (kpis && kpis.length > 0) {
-      addSectionHeader('Key metrics summary')
+    // ─── KPI CARDS ───
+    if (kpis?.length > 0) {
+      sectionHead('Key performance metrics')
+      const cols = Math.min(kpis.length, 3)
+      const gap = 4
+      const bw = (mw - (cols - 1) * gap) / cols
+      const bh = 20
 
-      // Draw KPI boxes in a grid
-      const boxWidth = (maxWidth - 10) / 3
-      const boxHeight = 18
-      let kpiX = margin
-      let kpiRow = 0
+      for (let i = 0; i < kpis.length; i++) {
+        const col = i % cols
+        if (col === 0 && i > 0) y += bh + gap
+        need(bh + 6)
 
-      kpis.forEach((kpi, i) => {
-        if (i > 0 && i % 3 === 0) {
-          kpiRow++
-          kpiX = margin
-          y += boxHeight + 4
-        }
-        checkPageBreak(boxHeight + 10)
-
-        const bx = kpiX
+        const bx = m + col * (bw + gap)
         const by = y
 
-        // Box background
-        doc.setFillColor(248, 250, 252)
-        doc.roundedRect(bx, by, boxWidth - 3, boxHeight, 2, 2, 'F')
-
-        // Border accent
-        const colors = [[37, 99, 235], [14, 165, 233], [249, 115, 22], [16, 185, 129], [139, 92, 246], [236, 72, 153]]
-        doc.setDrawColor(...(colors[i % colors.length]))
-        doc.setLineWidth(0.8)
-        doc.line(bx, by, bx, by + boxHeight)
-
+        doc.setDrawColor(...BORDER)
+        doc.setLineWidth(0.25)
+        doc.roundedRect(bx, by, bw, bh, 1.5, 1.5, 'D')
+        // Gold left accent
+        doc.setFillColor(...GOLD)
+        doc.rect(bx + 0.5, by + 3, 0.8, bh - 6, 'F')
         // Label
-        doc.setFontSize(7)
-        doc.setTextColor(148, 163, 184)
-        doc.setFont('helvetica', 'bold')
-        doc.text(String(kpi.label || '').toUpperCase(), bx + 4, by + 6)
-
+        text(String(kpis[i].label || '').toUpperCase(), bx + 5, by + 6.5, 6.5, 'bold', MUTED)
         // Value
-        doc.setFontSize(13)
-        doc.setTextColor(15, 23, 42)
-        doc.setFont('helvetica', 'bold')
-        doc.text(String(kpi.value || '–'), bx + 4, by + 14)
-
-        kpiX += boxWidth + 2
-      })
-      y += boxHeight + 8
+        text(String(kpis[i].value || '-'), bx + 5, by + 15, 15, 'bold', DARK)
+      }
+      y += bh + 6
     }
 
-    // AI Insights
-    if (insights && insights.length > 0) {
-      addSectionHeader('AI strategic insights')
+    // ─── AI INSIGHTS ───
+    if (insights?.length > 0) {
+      sectionHead('Strategic insights')
 
-      const impactColors = {
-        high: [220, 38, 38],
-        medium: [217, 119, 6],
-        low: [100, 116, 139],
-      }
-      const typeLabels = {
-        opportunity: 'OPPORTUNITY',
-        trend: 'TREND',
-        alert: 'ALERT',
-        recommendation: 'RECOMMENDATION',
-      }
-
-      insights.forEach((insight, i) => {
-        checkPageBreak(25)
-
-        // Impact badge
-        const badgeColor = impactColors[insight.impact] || impactColors.medium
-        doc.setFillColor(...badgeColor)
-        const badgeText = (insight.impact || 'medium').toUpperCase()
-        const badgeWidth = doc.getStringUnitWidth(badgeText) * 7 * 0.35 + 6
-        doc.roundedRect(margin, y, badgeWidth, 5, 1.5, 1.5, 'F')
-        doc.setFontSize(6)
-        doc.setTextColor(255, 255, 255)
-        doc.setFont('helvetica', 'bold')
-        doc.text(badgeText, margin + 3, y + 3.5)
+      insights.forEach((ins, i) => {
+        need(25)
+        // Impact pill
+        const impact = (ins.impact || 'medium').toUpperCase()
+        const pillColor = ins.impact === 'high' ? RED : ins.impact === 'medium' ? AMBER : SLATE
+        const pillW = impact.length * 1.9 + 5
+        doc.setFillColor(...pillColor)
+        doc.roundedRect(m, y - 0.5, pillW, 4, 1.2, 1.2, 'F')
+        text(impact, m + 2.5, y + 2.5, 5.5, 'bold', WHITE)
 
         // Type label
-        const typeText = typeLabels[insight.type] || ''
-        if (typeText) {
-          doc.setFontSize(6)
-          doc.setTextColor(148, 163, 184)
-          doc.text(typeText, margin + badgeWidth + 3, y + 3.5)
-        }
-        y += 8
+        const typeLabel = ins.type ? ` ${ins.type.toUpperCase()}` : ''
+        if (typeLabel) text(typeLabel, m + pillW + 2, y + 2.5, 5.5, 'normal', MUTED)
+        y += 6
 
         // Title
-        addText(insight.title, 11, 'bold', [15, 23, 42])
-        addSpacer(1)
+        wrappedText(ins.title, 10.5, 'bold', DARK)
+        y += 1.5
 
         // Description
-        addText(insight.description, 9, 'normal', [71, 85, 105])
-        addSpacer(5)
+        wrappedText(ins.description, 8.5, 'normal', BODY)
+        y += 4
 
-        // Divider between insights
         if (i < insights.length - 1) {
-          doc.setDrawColor(241, 245, 249)
-          doc.setLineWidth(0.2)
-          doc.line(margin, y, pageWidth - margin, y)
+          doc.setDrawColor(...BORDER)
+          doc.setLineWidth(0.1)
+          doc.line(m, y, m + 35, y)
           y += 4
         }
       })
+    } else {
+      y += 4
+      wrappedText('AI insights have not been generated for this dataset yet.', 8.5, 'italic', MUTED)
     }
 
-    // No insights message
-    if (!insights || insights.length === 0) {
-      addSpacer(4)
-      addText('AI insights have not been generated for this dataset yet.', 9, 'italic', [148, 163, 184])
-    }
+    // ─── BUILDER TABLE ───
+    if (builderData?.headers?.length > 0 && builderData?.rows?.length > 0) {
+      sectionHead('Report builder')
 
-    // Data Overview
-    if (content.dataOverview) {
-      const ov = content.dataOverview
-      addSectionHeader('Data schema overview')
-      addText(`${ov.totalColumns} columns: ${ov.dimCount} dimensions, ${ov.metCount} metrics${ov.dateCount ? ', ' + ov.dateCount + ' dates' : ''}`, 9, 'normal', [71, 85, 105])
-      addSpacer(2)
-      if (ov.dimensions) { addText(`Dimensions: ${ov.dimensions}`, 8, 'normal', [100, 116, 139]); addSpacer(1) }
-      if (ov.metrics) { addText(`Metrics: ${ov.metrics}`, 8, 'normal', [100, 116, 139]); addSpacer(1) }
-      if (ov.dates) { addText(`Date fields: ${ov.dates}`, 8, 'normal', [100, 116, 139]) }
-    }
+      if (builderSummary) {
+        text(`Dimensions: ${builderSummary.dimensions || 'None'}   |   Metrics: ${builderSummary.metrics || 'None'}`, m, y, 7.5, 'italic', MUTED)
+        y += 5
+      }
 
-    // Top Breakdowns
-    if (content.topBreakdowns && content.topBreakdowns.length > 0) {
-      addSectionHeader('Top dimension breakdowns')
-      content.topBreakdowns.forEach(breakdown => {
-        checkPageBreak(30)
-        addText(`${breakdown.dimension} by ${breakdown.metric}`, 10, 'bold', [15, 23, 42])
-        addSpacer(2)
-        breakdown.items.forEach((item, idx) => {
-          const formattedVal = item.value >= 1000000 ? `${(item.value / 1000000).toFixed(1)}M` : item.value >= 1000 ? `${(item.value / 1000).toFixed(1)}K` : item.value.toLocaleString()
-          addText(`${idx + 1}. ${item.name}: ${formattedVal}`, 9, 'normal', [71, 85, 105])
-          addSpacer(0.5)
+      const hdrs = builderData.headers
+      const rows = builderData.rows.slice(0, 30)
+      const colCount = hdrs.length
+
+      // Calculate column widths — dimensions get more space
+      const dimCols = hdrs.filter(h => h.type === 'dimension').length
+      const metCols = hdrs.filter(h => h.type === 'metric').length
+      const dimW = dimCols > 0 ? Math.min(45, (mw * 0.6) / dimCols) : 0
+      const metW = metCols > 0 ? Math.max(20, (mw - dimW * dimCols) / metCols) : 0
+      const colWidths = hdrs.map(h => h.type === 'dimension' ? dimW : metW)
+      // Adjust to fit
+      const totalW = colWidths.reduce((a, b) => a + b, 0)
+      const scale = mw / totalW
+      const finalW = colWidths.map(w => w * scale)
+
+      const rh = 5.5
+
+      need(rh * Math.min(rows.length + 1, 8) + 10)
+
+      // Header row
+      doc.setFillColor(...GOLD)
+      let hx = m
+      doc.rect(m, y, mw, rh + 1, 'F')
+      hdrs.forEach((h, ci) => {
+        text(String(h.label || '').toUpperCase().substring(0, 20), hx + 2, y + 4, 6, 'bold', WHITE)
+        hx += finalW[ci]
+      })
+      y += rh + 1
+
+      // Data rows
+      rows.forEach((row, ri) => {
+        need(rh + 1)
+        if (ri % 2 === 0) {
+          doc.setFillColor(...CREAM)
+          doc.rect(m, y - 0.5, mw, rh, 'F')
+        }
+        let rx = m
+        hdrs.forEach((h, ci) => {
+          const val = row[h.key]
+          const display = val === null || val === undefined ? '-' : String(val).substring(0, 22)
+          const isMetric = h.type === 'metric'
+          text(display, isMetric ? rx + finalW[ci] - 2 : rx + 2, y + 3.5, 7, isMetric ? 'bold' : 'normal', isMetric ? DARK : BODY, isMetric ? { align: 'right' } : {})
+          rx += finalW[ci]
         })
-        addSpacer(4)
+        y += rh
+      })
+
+      // Row count note
+      if (builderData.rows.length > 30) {
+        y += 3
+        text(`Showing 30 of ${builderData.rows.length} rows`, m, y, 6.5, 'italic', MUTED)
+        y += 4
+      }
+
+      // Bottom border
+      doc.setDrawColor(...BORDER)
+      doc.setLineWidth(0.2)
+      doc.line(m, y, pw - m, y)
+      y += 4
+    }
+
+    // ─── DIMENSION ANALYSIS ───
+    if (topBreakdowns?.length > 0) {
+      sectionHead('Dimension analysis')
+
+      topBreakdowns.forEach(bd => {
+        need(30)
+        text(`${bd.dimension} by ${bd.metric}`, m, y, 9, 'bold', DARK)
+        y += 5
+
+        // Mini bar-style rows
+        const maxVal = Math.max(...bd.items.map(i => i.value), 1)
+        bd.items.forEach((item, idx) => {
+          need(6)
+          const barMax = mw * 0.45
+          const barW = (item.value / maxVal) * barMax
+
+          // Bar background
+          doc.setFillColor(240, 238, 233)
+          doc.rect(m + 30, y - 1.5, barMax, 4, 'F')
+          // Bar fill
+          doc.setFillColor(...GOLD)
+          doc.rect(m + 30, y - 1.5, barW, 4, 'F')
+
+          // Label
+          text(`${idx + 1}. ${String(item.name).substring(0, 20)}`, m, y + 1, 7.5, 'normal', BODY)
+
+          // Value
+          const fmt = item.value >= 1e6 ? `${(item.value / 1e6).toFixed(1)}M` : item.value >= 1000 ? `${(item.value / 1000).toFixed(1)}K` : item.value.toLocaleString()
+          text(fmt, m + 32 + barMax, y + 1, 7.5, 'bold', DARK)
+          y += 5.5
+        })
+        y += 5
       })
     }
 
-    // Builder Summary
-    if (content.builderSummary) {
-      addSectionHeader('Report builder configuration')
-      addText(`Chart type: ${content.builderSummary.chartType}`, 9, 'normal', [71, 85, 105])
-      addSpacer(1)
-      if (content.builderSummary.dimensions) { addText(`Dimensions: ${content.builderSummary.dimensions}`, 9, 'normal', [71, 85, 105]); addSpacer(1) }
-      if (content.builderSummary.metrics) { addText(`Metrics: ${content.builderSummary.metrics}`, 9, 'normal', [71, 85, 105]) }
+    // ─── DATA SCHEMA (small, at bottom) ───
+    if (dataOverview) {
+      y += 2
+      need(16)
+      thinLine()
+      text('DATA SCHEMA', m, y, 7, 'bold', MUTED)
+      y += 4
+      text(`${dataOverview.totalColumns} columns: ${dataOverview.dimCount} dimensions, ${dataOverview.metCount} metrics${dataOverview.dateCount ? ', ' + dataOverview.dateCount + ' dates' : ''}`, m, y, 7, 'normal', MUTED)
+      y += 3
+      if (dataOverview.metrics) {
+        text(`Metrics: ${dataOverview.metrics}`, m, y, 6.5, 'normal', MUTED)
+        y += 3
+      }
     }
 
   } else if (content.type === 'insights') {
-    for (const insight of content.items) {
-      addText(`[${(insight.impact || 'medium').toUpperCase()}] ${insight.title}`, 11, 'bold')
-      addSpacer(2)
-      addText(insight.description, 10, 'normal', [71, 85, 105])
-      addSpacer(6)
+    for (const ins of content.items) {
+      wrappedText(`[${(ins.impact || 'medium').toUpperCase()}] ${ins.title}`, 11, 'bold', DARK)
+      y += 2
+      wrappedText(ins.description, 9, 'normal', BODY)
+      y += 6
     }
   } else if (content.type === 'chat') {
     for (const msg of content.messages) {
       const label = msg.role === 'user' ? 'You' : 'AI'
-      addText(`${label}:`, 10, 'bold', msg.role === 'user' ? [37, 99, 235] : [15, 23, 42])
-      addSpacer(1)
-      const cleanText = (msg.content || '').replace(/\*\*/g, '').replace(/#{1,3}\s/g, '').replace(/`/g, '')
-      addText(cleanText, 10, 'normal', [71, 85, 105])
-      addSpacer(5)
+      wrappedText(`${label}:`, 9.5, 'bold', msg.role === 'user' ? GOLD : DARK)
+      y += 1
+      const clean = (msg.content || '').replace(/\*\*/g, '').replace(/#{1,3}\s/g, '').replace(/`/g, '')
+      wrappedText(clean, 9, 'normal', BODY)
+      y += 5
     }
   }
 
-  // ========== FOOTER ==========
-  const totalPages = doc.internal.getNumberOfPages()
-  for (let i = 1; i <= totalPages; i++) {
+  // === FOOTER ON ALL PAGES ===
+  const pages = doc.internal.getNumberOfPages()
+  for (let i = 1; i <= pages; i++) {
     doc.setPage(i)
-
-    // Bottom accent bar
-    doc.setFillColor(248, 250, 252)
-    doc.rect(0, pageHeight - 14, pageWidth, 14, 'F')
-
-    doc.setFontSize(7)
-    doc.setTextColor(148, 163, 184)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Northern Bird Analytics  ·  Confidential`, margin, pageHeight - 7)
-    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 20, pageHeight - 7)
+    // Bottom bar
+    doc.setFillColor(...CREAM)
+    doc.rect(0, ph - 10, pw, 10, 'F')
+    doc.setDrawColor(...BORDER)
+    doc.setLineWidth(0.15)
+    doc.line(0, ph - 10, pw, ph - 10)
+    // Gold accent dot
+    doc.setFillColor(...GOLD)
+    doc.circle(m + 1.5, ph - 5, 0.8, 'F')
+    text('Northern Bird Analytics  |  Confidential', m + 5, ph - 3.5, 6.5, 'normal', MUTED)
+    text(`Page ${i} of ${pages}`, pw - m, ph - 3.5, 6.5, 'normal', MUTED, { align: 'right' })
   }
 
   doc.save(`${title.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}.pdf`)
 }
 
+
+// === MAIN EXPORT FUNCTION ===
 export async function exportDashboardReport({ projectName, fileName, rowCount, schema, rawData, globalFilters, insights, columnsByType, reportBuilderState }) {
-  // Build KPI data from raw data + schema
+  // Build KPIs
   const kpis = []
   if (schema && rawData) {
-    const metrics = Object.entries(schema).filter(([, def]) => def.type === 'metric').slice(0, 6)
-    metrics.forEach(([col, def]) => {
-      const values = rawData.map(r => {
-        const v = r[col]
-        return typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[,$%]/g, ''))
-      }).filter(v => !isNaN(v))
-      const total = values.reduce((a, b) => a + b, 0)
-
-      let formatted
-      if (/cost|spend|revenue|price|amount|budget|profit|sale|earning|income/i.test(col)) {
-        formatted = total >= 1000000 ? `$${(total / 1000000).toFixed(1)}M` : total >= 1000 ? `$${(total / 1000).toFixed(1)}K` : `$${total.toFixed(0)}`
-      } else if (/rate|percent|ctr|cvr|roas|roi|margin/i.test(col)) {
-        formatted = `${total.toFixed(2)}%`
-      } else if (total >= 10000) {
-        formatted = total >= 1000000 ? `${(total / 1000000).toFixed(1)}M` : `${(total / 1000).toFixed(1)}K`
-      } else {
-        formatted = Number.isInteger(total) ? total.toLocaleString() : total.toFixed(2)
-      }
-
-      kpis.push({ label: def.label, value: formatted })
+    Object.entries(schema).filter(([, d]) => d.type === 'metric').slice(0, 6).forEach(([col, def]) => {
+      const vals = rawData.map(r => typeof r[col] === 'number' ? r[col] : parseFloat(String(r[col] ?? '').replace(/[,$%]/g, ''))).filter(v => !isNaN(v))
+      const total = vals.reduce((a, b) => a + b, 0)
+      let fmt
+      if (/cost|spend|revenue|price|amount|budget|profit|sale|earning|income/i.test(col))
+        fmt = total >= 1e6 ? `$${(total/1e6).toFixed(1)}M` : total >= 1000 ? `$${(total/1000).toFixed(1)}K` : `$${total.toFixed(0)}`
+      else if (/rate|percent|ctr|cvr|roas|roi|margin/i.test(col))
+        fmt = `${total.toFixed(2)}%`
+      else
+        fmt = total >= 1e6 ? `${(total/1e6).toFixed(1)}M` : total >= 1e4 ? `${(total/1000).toFixed(1)}K` : Number.isInteger(total) ? total.toLocaleString() : total.toFixed(2)
+      kpis.push({ label: def.label, value: fmt })
     })
   }
 
-  // Build data overview
-  const dataOverview = {}
-  if (schema) {
-    const dims = Object.entries(schema).filter(([, d]) => d.type === 'dimension')
-    const mets = Object.entries(schema).filter(([, d]) => d.type === 'metric')
-    const dates = Object.entries(schema).filter(([, d]) => d.type === 'date')
-    dataOverview.totalColumns = Object.keys(schema).length
-    dataOverview.dimensions = dims.map(([, d]) => d.label).join(', ')
-    dataOverview.metrics = mets.map(([, d]) => d.label).join(', ')
-    dataOverview.dates = dates.map(([, d]) => d.label).join(', ')
-    dataOverview.dimCount = dims.length
-    dataOverview.metCount = mets.length
-    dataOverview.dateCount = dates.length
+  // Data overview
+  const dataOverview = schema ? (() => {
+    const dims = Object.entries(schema).filter(([,d]) => d.type === 'dimension')
+    const mets = Object.entries(schema).filter(([,d]) => d.type === 'metric')
+    const dates = Object.entries(schema).filter(([,d]) => d.type === 'date')
+    return { totalColumns: Object.keys(schema).length, dimensions: dims.map(([,d]) => d.label).join(', '), metrics: mets.map(([,d]) => d.label).join(', '), dimCount: dims.length, metCount: mets.length, dateCount: dates.length }
+  })() : null
+
+  // Top breakdowns
+  const topBreakdowns = []
+  if (schema && rawData && columnsByType?.dimensions?.length > 0 && columnsByType?.metrics?.length > 0) {
+    columnsByType.dimensions.slice(0, 2).forEach(dim => {
+      const groups = {}
+      rawData.forEach(row => {
+        const k = String(row[dim] || '(empty)')
+        if (!groups[k]) groups[k] = 0
+        const v = parseFloat(String(row[columnsByType.metrics[0]] ?? 0).replace(/[,$%]/g, ''))
+        if (!isNaN(v)) groups[k] += v
+      })
+      topBreakdowns.push({
+        dimension: schema[dim]?.label || dim,
+        metric: schema[columnsByType.metrics[0]]?.label || columnsByType.metrics[0],
+        items: Object.entries(groups).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, value]) => ({ name, value })),
+      })
+    })
   }
 
-  // Build top dimension breakdowns
-  const topBreakdowns = []
-  if (schema && rawData && columnsByType) {
-    const dims = columnsByType.dimensions || []
-    const mets = columnsByType.metrics || []
-    if (dims.length > 0 && mets.length > 0) {
-      dims.slice(0, 2).forEach(dim => {
-        const groups = {}
-        rawData.forEach(row => {
-          const key = String(row[dim] || '(empty)')
-          if (!groups[key]) groups[key] = 0
-          const val = parseFloat(String(row[mets[0]] ?? 0).replace(/[,$%]/g, ''))
-          if (!isNaN(val)) groups[key] += val
-        })
-        const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]).slice(0, 5)
-        topBreakdowns.push({
-          dimension: schema[dim]?.label || dim,
-          metric: schema[mets[0]]?.label || mets[0],
-          items: sorted.map(([name, value]) => ({ name, value })),
-        })
-      })
+  // Builder table data
+  let builderSummary = null, builderData = null
+  if (reportBuilderState) {
+    const selDims = reportBuilderState.selectedDims || []
+    const selMets = reportBuilderState.selectedMetrics || []
+    if (selDims.length > 0 || selMets.length > 0) {
+      builderSummary = {
+        dimensions: selDims.map(d => schema?.[d]?.label || d).join(', '),
+        metrics: selMets.map(m => schema?.[m]?.label || m).join(', '),
+        chartType: reportBuilderState.chartType || 'bar',
+      }
+
+      if (rawData && selMets.length > 0) {
+        // Aggregate
+        let d = [...rawData]
+        ;(reportBuilderState.filters || []).forEach(f => { if (f.values?.length > 0) d = d.filter(row => f.values.includes(String(row[f.col]))) })
+
+        let results
+        if (selDims.length === 0) {
+          const totals = {}
+          selMets.forEach(met => { totals[met] = d.reduce((s, r) => { const v = parseFloat(String(r[met] ?? 0).replace(/[,$%]/g, '')); return s + (isNaN(v) ? 0 : v) }, 0) })
+          results = [totals]
+        } else {
+          const groups = {}
+          d.forEach(row => {
+            const key = selDims.map(dim => String(row[dim] ?? '(empty)')).join('|||')
+            if (!groups[key]) { groups[key] = { _rows: [] }; selDims.forEach(dim => { groups[key][dim] = row[dim] ?? '(empty)' }) }
+            groups[key]._rows.push(row)
+          })
+          results = Object.values(groups).map(g => {
+            const r = {}
+            selDims.forEach(dim => { r[dim] = g[dim] })
+            selMets.forEach(met => { r[met] = g._rows.reduce((s, row) => { const v = parseFloat(String(row[met] ?? 0).replace(/[,$%]/g, '')); return s + (isNaN(v) ? 0 : v) }, 0) })
+            return r
+          })
+        }
+        results.sort((a, b) => (b[selMets[0]] || 0) - (a[selMets[0]] || 0))
+
+        builderData = {
+          headers: [...selDims.map(d => ({ key: d, label: schema?.[d]?.label || d, type: 'dimension' })),
+                   ...selMets.map(m => ({ key: m, label: schema?.[m]?.label || m, type: 'metric' }))],
+          rows: results.slice(0, 50),
+        }
+      }
     }
   }
 
-  // Builder state summary
-  const builderSummary = reportBuilderState && (reportBuilderState.selectedDims?.length > 0 || reportBuilderState.selectedMetrics?.length > 0)
-    ? {
-        dimensions: (reportBuilderState.selectedDims || []).map(d => schema?.[d]?.label || d).join(', '),
-        metrics: (reportBuilderState.selectedMetrics || []).map(m => schema?.[m]?.label || m).join(', '),
-        chartType: reportBuilderState.chartType || 'bar',
-      }
-    : null
-
   await exportToPDF({
-    type: 'dashboard_report',
-    projectName,
-    fileName,
-    rowCount,
-    filters: globalFilters,
-    kpis,
-    insights: insights || [],
-    dataOverview,
-    topBreakdowns,
-    builderSummary,
+    type: 'dashboard_report', projectName, fileName, rowCount,
+    filters: globalFilters, kpis, insights: insights || [],
+    dataOverview, topBreakdowns, builderSummary, builderData,
   }, `${projectName || 'Dashboard'} Report`)
 }
 
+
+// === WORD EXPORT ===
 export async function exportToWord(content, title = 'Northern Bird Report') {
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle } = await import('docx')
-
   const children = []
 
-  children.push(new Paragraph({
-    text: 'NORTHERN BIRD ANALYTICS',
-    heading: HeadingLevel.HEADING_1,
-    spacing: { after: 100 },
-  }))
-
-  children.push(new Paragraph({
-    text: title,
-    heading: HeadingLevel.HEADING_2,
-    spacing: { after: 100 },
-  }))
-
-  children.push(new Paragraph({
-    children: [new TextRun({ text: `Generated: ${new Date().toLocaleString()}`, size: 18, color: '94A3B8' })],
-    spacing: { after: 300 },
-  }))
-
-  children.push(new Paragraph({
-    border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' } },
-    spacing: { after: 300 },
-  }))
+  children.push(new Paragraph({ text: 'NORTHERN BIRD ANALYTICS', heading: HeadingLevel.HEADING_1, spacing: { after: 100 } }))
+  children.push(new Paragraph({ text: title, heading: HeadingLevel.HEADING_2, spacing: { after: 100 } }))
+  children.push(new Paragraph({ children: [new TextRun({ text: `Generated: ${new Date().toLocaleString()}`, size: 18, color: '94A3B8' })], spacing: { after: 300 } }))
+  children.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' } }, spacing: { after: 300 } }))
 
   if (content.type === 'insights') {
-    for (const insight of content.items) {
-      children.push(new Paragraph({
-        children: [
-          new TextRun({ text: `[${(insight.impact || 'medium').toUpperCase()}] `, bold: true, size: 22, color: insight.impact === 'high' ? 'DC2626' : insight.impact === 'medium' ? 'D97706' : '64748B' }),
-          new TextRun({ text: insight.title, bold: true, size: 22 }),
-        ],
-        spacing: { after: 100 },
-      }))
-      children.push(new Paragraph({
-        text: insight.description,
-        spacing: { after: 250 },
-      }))
+    for (const ins of content.items) {
+      children.push(new Paragraph({ children: [
+        new TextRun({ text: `[${(ins.impact || 'medium').toUpperCase()}] `, bold: true, size: 22, color: ins.impact === 'high' ? 'DC2626' : ins.impact === 'medium' ? 'D97706' : '64748B' }),
+        new TextRun({ text: ins.title, bold: true, size: 22 }),
+      ], spacing: { after: 100 } }))
+      children.push(new Paragraph({ text: ins.description, spacing: { after: 250 } }))
     }
   } else if (content.type === 'chat') {
     for (const msg of content.messages) {
-      const label = msg.role === 'user' ? 'You' : 'AI'
-      children.push(new Paragraph({
-        children: [
-          new TextRun({ text: `${label}: `, bold: true, size: 22, color: msg.role === 'user' ? '2563EB' : '0F172A' }),
-        ],
-        spacing: { after: 50 },
-      }))
-      const cleanText = (msg.content || '').replace(/\*\*/g, '').replace(/#{1,3}\s/g, '').replace(/`/g, '')
-      children.push(new Paragraph({
-        text: cleanText,
-        spacing: { after: 200 },
-      }))
+      children.push(new Paragraph({ children: [new TextRun({ text: `${msg.role === 'user' ? 'You' : 'AI'}: `, bold: true, size: 22, color: msg.role === 'user' ? 'B08D57' : '1A1A1A' })], spacing: { after: 50 } }))
+      children.push(new Paragraph({ text: (msg.content || '').replace(/\*\*/g, '').replace(/#{1,3}\s/g, '').replace(/`/g, ''), spacing: { after: 200 } }))
     }
   }
 
-  const doc = new Document({ sections: [{ children }] })
-  const blob = await Packer.toBlob(doc)
+  const docx = new Document({ sections: [{ children }] })
+  const blob = await Packer.toBlob(docx)
   const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${title.replace(/\s+/g, '_').toLowerCase()}.docx`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  const a = document.createElement('a'); a.href = url; a.download = `${title.replace(/\s+/g, '_').toLowerCase()}.docx`
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
 }

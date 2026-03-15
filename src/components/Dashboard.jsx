@@ -38,6 +38,30 @@ function ThemeToggleSmall() {
   )
 }
 
+function ThemeToggleFull() {
+  const { mode, setTheme } = useTheme()
+  const opts = [
+    { value: 'light', icon: Sun, label: 'Light' },
+    { value: 'dark', icon: Moon, label: 'Dark' },
+    { value: 'system', icon: Monitor, label: 'System' },
+  ]
+  return (
+    <div className="flex items-center rounded-lg p-0.5" style={{ background: 'var(--bg-overlay)', border: '1px solid var(--border-light)' }}>
+      {opts.map(o => (
+        <button key={o.value} onClick={() => setTheme(o.value)}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium transition-all"
+          style={{
+            background: mode === o.value ? 'var(--bg-surface)' : 'transparent',
+            color: mode === o.value ? 'var(--text-primary)' : 'var(--text-muted)',
+            boxShadow: mode === o.value ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+          }}>
+          <o.icon className="w-3 h-3" />{o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function PremiumBadge() {
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold tracking-wide"
@@ -181,10 +205,10 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome }) {
         </nav>
 
         <div className="p-4" style={{ borderTop: '1px solid var(--border)' }}>
-          <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <ThemeToggleFull />
+          <div className="flex items-center gap-3 text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
             <span>{rowCount.toLocaleString()} rows</span><span>·</span>
             <span>{columnsByType.metrics.length}M {columnsByType.dimensions.length}D</span>
-            <ThemeToggleSmall />
           </div>
           <div className="flex items-center gap-2 mt-3">
             <button onClick={() => setStep('tag')} className="flex items-center gap-1.5 text-xs transition-colors" style={{ color: 'var(--text-muted)' }}>

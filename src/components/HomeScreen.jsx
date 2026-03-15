@@ -68,7 +68,7 @@ function PremiumBadge() {
   )
 }
 
-export default function HomeScreen({ onOpenProject, onNewProject }) {
+export default function HomeScreen({ onOpenProject, onNewProject, onSettings }) {
   const { user, logout } = useAuth()
   const { projects, loading, deleteProject } = useProject()
   const [searchQuery, setSearchQuery] = useState('')
@@ -170,6 +170,9 @@ export default function HomeScreen({ onOpenProject, onNewProject }) {
         </div>
 
         <div className="p-3" style={{ borderTop: '1px solid var(--border)' }}>
+          <button onClick={() => { if (typeof onSettings === 'function') onSettings(); }} className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs font-medium transition-colors hover:opacity-80 mb-2" style={{ color: 'var(--text-secondary)' }}>
+            <Settings className="w-3.5 h-3.5" /> Settings
+          </button>
           <ThemeToggle />
           <div className="flex items-center gap-2.5 mt-3 px-1">
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: 'var(--accent)' }}>
@@ -258,7 +261,7 @@ export default function HomeScreen({ onOpenProject, onNewProject }) {
         <div className="p-6 lg:p-8 max-w-[900px] mx-auto">
           {/* Greeting */}
           <div className="mb-8 animate-fade-in">
-            <h1 className="text-2xl lg:text-3xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>
+            <h1 className="text-2xl lg:text-3xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: "'Lora', 'Georgia', 'Times New Roman', serif" }}>
               {getGreeting()}, {userName}
             </h1>
             <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
