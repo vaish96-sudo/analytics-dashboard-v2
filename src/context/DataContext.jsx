@@ -147,16 +147,34 @@ export function DataProvider({ children }) {
   // Custom metrics — computed columns that appear everywhere
   const customMetrics = localDashboardState.customMetrics || []
 
-  const OPERATIONS_MAP = {
-    divide: (a, b) => b !== 0 ? a / b : 0,
-    multiply: (a, b) => a * b,
-    add: (a, b) => a + b,
-    subtract: (a, b) => a - b,
-    percentage: (a, b) => b !== 0 ? (a / b) * 100 : 0,
-    margin: (a, b) => a !== 0 ? ((a - b) / a) * 100 : 0,
+  // Safe formula evaluator — supports column references, +, -, *, /, parentheses, numbers
+  function evaluateFormula(formula, row, schemaRef) {
+    if (!formula) return 0
+    try {
+      // Replace column names with their numeric values (longest first to avoid partial matches)
+      const metricCols = Object.entries(schemaRef)
+        .filter(([, def]) => def.type === 'metric' && !def.isCustom)
+        .sort((a, b) => b[0].length - a[0].length)
+
+      let expr = formula
+      metricCols.forEach(([col]) => {
+        const val = parseFloat(String(row[col] ?? 0).replace(/[,$%]/g, '')) || 0
+        // Use word boundary matching to avoid partial replacements
+        expr = expr.replaceAll(col, String(val))
+      })
+
+      // Validate: only allow numbers, operators, parentheses, spaces, dots
+      if (!/^[\d\s+\-*/().]+$/.test(expr)) return 0
+
+      // Evaluate safely using Function constructor (no access to globals)
+      const result = new Function(`"use strict"; return (${expr})`)()
+      return isFinite(result) ? result : 0
+    } catch {
+      return 0
+    }
   }
 
-  // Enhanced schema: base schema + custom metric columns
+  // Enhanced schema: base schema + custom metric columns (purple-styled)
   const schema = useMemo(() => {
     if (!baseSchema) return null
     if (customMetrics.length === 0) return baseSchema
@@ -176,19 +194,16 @@ export function DataProvider({ children }) {
   // Enhanced rawData: base data + computed custom metric values per row
   const rawData = useMemo(() => {
     if (!baseRawData) return null
-    if (customMetrics.length === 0) return baseRawData
+    if (customMetrics.length === 0 || !baseSchema) return baseRawData
     return baseRawData.map(row => {
       const enhanced = { ...row }
       customMetrics.forEach((cm, i) => {
         const colKey = `_custom_${i}_${cm.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}`
-        const a = parseFloat(String(row[cm.colA] ?? 0).replace(/[,$%]/g, '')) || 0
-        const b = parseFloat(String(row[cm.colB] ?? 0).replace(/[,$%]/g, '')) || 0
-        const fn = OPERATIONS_MAP[cm.operation] || OPERATIONS_MAP.divide
-        enhanced[colKey] = fn(a, b)
+        enhanced[colKey] = evaluateFormula(cm.formula, row, baseSchema)
       })
       return enhanced
     })
-  }, [baseRawData, customMetrics])
+  }, [baseRawData, baseSchema, customMetrics])
 
   const globalFilters = localDashboardState.global_filters || {}
   const setGlobalFilters = useCallback((valOrFn) => {

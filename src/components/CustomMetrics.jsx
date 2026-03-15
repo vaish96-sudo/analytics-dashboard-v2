@@ -1,125 +1,188 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useData } from '../context/DataContext'
 import {
-  Plus, X, Check, Pencil, Trash2, Calculator, ChevronDown, Sparkles, FlaskConical,
+  Plus, X, Check, Pencil, Trash2, Calculator, Sparkles, FlaskConical,
+  Loader2, Lightbulb, ChevronDown,
 } from 'lucide-react'
 
-const OPERATIONS = [
-  { id: 'divide', label: 'A ÷ B', desc: 'Divide', fn: (a, b) => b !== 0 ? a / b : 0 },
-  { id: 'multiply', label: 'A × B', desc: 'Multiply', fn: (a, b) => a * b },
-  { id: 'add', label: 'A + B', desc: 'Add', fn: (a, b) => a + b },
-  { id: 'subtract', label: 'A − B', desc: 'Subtract', fn: (a, b) => a - b },
-  { id: 'percentage', label: 'A / B × 100', desc: 'Percentage', fn: (a, b) => b !== 0 ? (a / b) * 100 : 0 },
-  { id: 'margin', label: '(A − B) / A × 100', desc: 'Margin %', fn: (a, b) => a !== 0 ? ((a - b) / a) * 100 : 0 },
-]
+const API_URL = '/api/claude'
 
+// ─── Formula display: replace col keys with labels ───────────────
+function formulaToDisplay(formula, schema) {
+  if (!formula) return ''
+  let display = formula
+  const cols = Object.entries(schema)
+    .filter(([, def]) => def.type === 'metric' && !def.isCustom)
+    .sort((a, b) => b[0].length - a[0].length)
+  cols.forEach(([col, def]) => {
+    display = display.replaceAll(col, def.label)
+  })
+  return display
+}
+
+// ─── AI Suggestions ──────────────────────────────────────────────
+async function getAISuggestions(schema, rawData) {
+  const cols = Object.entries(schema)
+    .filter(([, def]) => def.type !== 'ignore' && !def.isCustom)
+    .map(([col, def]) => `- ${col} (${def.type}): "${def.label}"`)
+    .join('\n')
+
+  const sampleRows = rawData.slice(0, 5).map(row => {
+    const obj = {}
+    Object.entries(schema).filter(([, d]) => d.type === 'metric' && !d.isCustom).slice(0, 8).forEach(([col]) => {
+      obj[col] = row[col]
+    })
+    return obj
+  })
+
+  const system = `You are a senior data analyst and industry expert. The user has a dataset with these columns:
+
+${cols}
+
+Sample metric values from first rows:
+${JSON.stringify(sampleRows, null, 2)}
+
+Based on the columns and data, identify the industry/domain and suggest 3-5 custom calculated metrics that would be valuable.
+
+CRITICAL RULES:
+- Use ONLY the exact column names from the schema above in formulas (the raw name before the colon, not the label).
+- Formulas must use only these operators: + - * / ( )
+- Example formula: "cost / (clicks + 1)" or "gold / (equity_market + mutual_funds)"
+- Each formula must use at least 2 columns from the dataset.
+- Do NOT suggest metrics that already exist as columns.
+
+Respond with ONLY a JSON array (no markdown, no backticks):
+[{"name":"Metric Name","formula":"col_a / (col_b + col_c)","description":"What this measures and why it matters.","suffix":"%" or "" or "$"}]`
+
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system,
+      messages: [{ role: 'user', content: 'Suggest custom metrics for this dataset.' }],
+      max_tokens: 800,
+      model: 'claude-sonnet-4-6',
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || 'AI request failed')
+  }
+
+  const data = await res.json()
+  const text = data.content?.map(c => c.text || '').join('') || ''
+  return JSON.parse(text.replace(/```json|```/g, '').trim())
+}
+
+// ─── Column Picker Dropdown ──────────────────────────────────────
+function ColumnPicker({ metrics, schema, onSelect, trigger }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  return (
+    <div className="relative inline-block" ref={ref}>
+      <button onClick={() => setOpen(!open)} className="px-2 py-1 text-[11px] rounded-md transition-colors" style={{ background: 'var(--bg-overlay)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}>
+        {trigger || '+ Column'}
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-48 rounded-xl shadow-lg z-50 overflow-hidden" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+          <div className="max-h-40 overflow-y-auto p-1">
+            {metrics.map(m => (
+              <button key={m} onClick={() => { onSelect(m); setOpen(false) }}
+                className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg transition-colors"
+                style={{ color: 'var(--text-secondary)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                {schema[m]?.label || m}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Metric Form (formula-based) ────────────────────────────────
 function MetricForm({ schema, columnsByType, onSave, onCancel, initial }) {
   const [name, setName] = useState(initial?.name || '')
-  const [colA, setColA] = useState(initial?.colA || '')
-  const [colB, setColB] = useState(initial?.colB || '')
-  const [operation, setOperation] = useState(initial?.operation || 'divide')
+  const [formula, setFormula] = useState(initial?.formula || '')
   const [suffix, setSuffix] = useState(initial?.suffix || '')
   const nameRef = useRef(null)
+  const formulaRef = useRef(null)
 
   const allMetrics = columnsByType.metrics.filter(m => !m.startsWith('_custom_'))
 
-  useEffect(() => {
-    if (!initial && allMetrics.length >= 2) {
-      setColA(allMetrics[0])
-      setColB(allMetrics[1])
-    }
-    nameRef.current?.focus()
-  }, [])
+  useEffect(() => { nameRef.current?.focus() }, [])
 
-  const op = OPERATIONS.find(o => o.id === operation) || OPERATIONS[0]
+  const insertColumn = (col) => {
+    const el = formulaRef.current
+    if (!el) { setFormula(prev => prev + col); return }
+    const start = el.selectionStart
+    const end = el.selectionEnd
+    const before = formula.slice(0, start)
+    const after = formula.slice(end)
+    const newFormula = before + col + after
+    setFormula(newFormula)
+    setTimeout(() => { el.selectionStart = el.selectionEnd = start + col.length; el.focus() }, 0)
+  }
 
-  // Preview value
-  const preview = useMemo(() => {
-    if (!colA || !colB) return null
-    const a = 100, b = 50 // sample values
-    const result = op.fn(a, b)
-    return `e.g. ${a} and ${b} → ${result.toFixed(2)}${suffix}`
-  }, [colA, colB, operation, suffix])
-
-  const canSave = name.trim() && colA && colB
+  const canSave = name.trim() && formula.trim()
 
   return (
-    <div className="rounded-xl overflow-hidden animate-fade-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-accent)' }}>
+    <div className="rounded-xl overflow-hidden animate-fade-in" style={{ background: 'var(--bg-surface)', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
       <div className="p-4 space-y-3">
-        {/* Name */}
-        <div>
-          <label className="text-[10px] font-medium uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>Metric name</label>
-          <input
-            ref={nameRef}
-            type="text"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="e.g. Fill Rate, CPA, Profit Margin"
-            className="w-full px-3 py-2 text-sm rounded-lg nb-input"
-          />
-        </div>
-
-        {/* Formula row */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex-1 min-w-[120px]">
-            <label className="text-[10px] font-medium uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>Column A</label>
-            <select value={colA} onChange={e => setColA(e.target.value)} className="w-full text-xs rounded-lg px-2 py-2 nb-input">
-              <option value="">Select...</option>
-              {allMetrics.map(m => <option key={m} value={m}>{schema[m]?.label || m}</option>)}
-            </select>
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <label className="text-[10px] font-medium uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>Metric name</label>
+            <input ref={nameRef} type="text" value={name} onChange={e => setName(e.target.value)}
+              placeholder="e.g. Fill Rate, CPA, Gold Hedge Ratio"
+              className="w-full px-3 py-2 text-sm rounded-lg nb-input" />
           </div>
-
-          <div className="min-w-[100px]">
-            <label className="text-[10px] font-medium uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>Operation</label>
-            <select value={operation} onChange={e => setOperation(e.target.value)} className="w-full text-xs rounded-lg px-2 py-2 nb-input">
-              {OPERATIONS.map(o => <option key={o.id} value={o.id}>{o.label} ({o.desc})</option>)}
-            </select>
-          </div>
-
-          <div className="flex-1 min-w-[120px]">
-            <label className="text-[10px] font-medium uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>Column B</label>
-            <select value={colB} onChange={e => setColB(e.target.value)} className="w-full text-xs rounded-lg px-2 py-2 nb-input">
-              <option value="">Select...</option>
-              {allMetrics.map(m => <option key={m} value={m}>{schema[m]?.label || m}</option>)}
-            </select>
-          </div>
-
-          <div className="w-16">
+          <div className="w-20">
             <label className="text-[10px] font-medium uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>Suffix</label>
-            <input
-              type="text"
-              value={suffix}
-              onChange={e => setSuffix(e.target.value)}
-              placeholder="%"
-              className="w-full text-xs rounded-lg px-2 py-2 nb-input text-center"
-            />
+            <input type="text" value={suffix} onChange={e => setSuffix(e.target.value)}
+              placeholder="%" className="w-full px-3 py-2 text-sm rounded-lg nb-input text-center" />
           </div>
         </div>
 
-        {/* Formula preview */}
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <Calculator className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-            <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
-              {name || '?'} = {schema[colA]?.label || 'A'} {op.label.replace('A', '').replace('B', '').trim()} {schema[colB]?.label || 'B'}
-              {suffix && ` (${suffix})`}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Formula</label>
+            <ColumnPicker metrics={allMetrics} schema={schema} onSelect={insertColumn} trigger="+ Insert column" />
+          </div>
+          <input ref={formulaRef} type="text" value={formula} onChange={e => setFormula(e.target.value)}
+            placeholder="e.g. cost / (clicks + 1)  or  gold / (equity_market + mutual_funds)"
+            className="w-full px-3 py-2 text-sm font-mono rounded-lg nb-input" />
+          <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+            Use column names with +, -, *, /, and parentheses. Click "Insert column" to add columns.
+          </p>
+        </div>
+
+        {formula && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.15)' }}>
+            <Calculator className="w-3.5 h-3.5 shrink-0" style={{ color: '#8b5cf6' }} />
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              {name || '?'} = {formulaToDisplay(formula, schema)}{suffix && ` (${suffix})`}
             </span>
           </div>
-          {preview && <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{preview}</span>}
-        </div>
+        )}
 
-        {/* Actions */}
         <div className="flex items-center justify-end gap-2 pt-1">
-          <button onClick={onCancel} className="px-3 py-1.5 text-xs rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }}>
-            Cancel
-          </button>
-          <button
-            onClick={() => canSave && onSave({ name: name.trim(), colA, colB, operation, suffix })}
+          <button onClick={onCancel} className="px-3 py-1.5 text-xs rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }}>Cancel</button>
+          <button onClick={() => canSave && onSave({ name: name.trim(), formula: formula.trim(), suffix })}
             disabled={!canSave}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-40"
-            style={{ background: 'var(--accent)', color: '#fff' }}
-          >
-            <Check className="w-3.5 h-3.5" /> {initial ? 'Update' : 'Create Metric'}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-40 text-white"
+            style={{ background: '#8b5cf6' }}>
+            <Check className="w-3.5 h-3.5" /> {initial ? 'Update' : 'Create'}
           </button>
         </div>
       </div>
@@ -127,18 +190,41 @@ function MetricForm({ schema, columnsByType, onSave, onCancel, initial }) {
   )
 }
 
-function MetricPill({ metric, schema, onEdit, onRemove }) {
-  const op = OPERATIONS.find(o => o.id === metric.operation) || OPERATIONS[0]
+// ─── AI Suggestion Card ──────────────────────────────────────────
+function SuggestionCard({ suggestion, schema, onAccept, accepted }) {
   return (
-    <div
-      className="group flex items-center gap-2 px-3 py-2 rounded-lg transition-all"
-      style={{ background: 'var(--bg-overlay)', border: '1px solid var(--border-light)' }}
-    >
-      <FlaskConical className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--accent)' }} />
+    <div className="flex items-start gap-3 p-3 rounded-xl transition-all" style={{ background: accepted ? 'rgba(139, 92, 246, 0.06)' : 'var(--bg-overlay)', border: `1px solid ${accepted ? 'rgba(139, 92, 246, 0.25)' : 'var(--border-light)'}` }}>
+      <Lightbulb className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#8b5cf6' }} />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{suggestion.name}</p>
+        <p className="text-[11px] font-mono mt-0.5" style={{ color: '#8b5cf6' }}>{formulaToDisplay(suggestion.formula, schema)}{suggestion.suffix && ` (${suggestion.suffix})`}</p>
+        <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>{suggestion.description}</p>
+      </div>
+      {accepted ? (
+        <span className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium" style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' }}>
+          <Check className="w-3 h-3" /> Added
+        </span>
+      ) : (
+        <button onClick={onAccept}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all hover:scale-[1.02] shrink-0 text-white"
+          style={{ background: '#8b5cf6' }}>
+          <Plus className="w-3 h-3" /> Add
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─── Metric Pill ─────────────────────────────────────────────────
+function MetricPill({ metric, schema, onEdit, onRemove }) {
+  return (
+    <div className="group flex items-center gap-2 px-3 py-2 rounded-lg transition-all"
+      style={{ background: 'rgba(139, 92, 246, 0.06)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+      <FlaskConical className="w-3.5 h-3.5 shrink-0" style={{ color: '#8b5cf6' }} />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{metric.name}</p>
-        <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
-          {schema[metric.colA]?.label || metric.colA} {op.label.replace('A ', '').replace(' B', '')} {schema[metric.colB]?.label || metric.colB}
+        <p className="text-[10px] font-mono truncate" style={{ color: '#8b5cf6' }}>
+          {formulaToDisplay(metric.formula, schema)}{metric.suffix && ` (${metric.suffix})`}
         </p>
       </div>
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -149,12 +235,17 @@ function MetricPill({ metric, schema, onEdit, onRemove }) {
   )
 }
 
+// ─── Main Component ──────────────────────────────────────────────
 export default function CustomMetrics() {
-  const { schema, columnsByType, updateDatasetState } = useData()
+  const { schema, rawData, columnsByType, updateDatasetState } = useData()
   const customMetrics = useData().localCustomMetrics || []
 
   const [showForm, setShowForm] = useState(false)
   const [editIndex, setEditIndex] = useState(null)
+  const [suggestions, setSuggestions] = useState(null)
+  const [suggestLoading, setSuggestLoading] = useState(false)
+  const [suggestError, setSuggestError] = useState(null)
+  const [acceptedSuggestions, setAcceptedSuggestions] = useState(new Set())
 
   const handleSave = (metric) => {
     let updated
@@ -178,62 +269,104 @@ export default function CustomMetrics() {
     setShowForm(true)
   }
 
+  const handleSuggest = async () => {
+    setSuggestLoading(true)
+    setSuggestError(null)
+    setAcceptedSuggestions(new Set())
+    try {
+      const results = await getAISuggestions(schema, rawData)
+      setSuggestions(results)
+    } catch (err) {
+      setSuggestError(err.message)
+    } finally {
+      setSuggestLoading(false)
+    }
+  }
+
+  const handleAcceptSuggestion = (suggestion, index) => {
+    const metric = { name: suggestion.name, formula: suggestion.formula, suffix: suggestion.suffix || '' }
+    updateDatasetState('customMetrics', [...customMetrics, metric])
+    setAcceptedSuggestions(prev => new Set([...prev, index]))
+  }
+
   if (!schema) return null
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3 rounded-xl p-4" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <FlaskConical className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--accent)' }}>Custom Metrics</span>
+          <FlaskConical className="w-4 h-4" style={{ color: '#8b5cf6' }} />
+          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#8b5cf6' }}>Custom Metrics</span>
           {customMetrics.length > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--border-accent)', color: 'var(--accent)' }}>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' }}>
               {customMetrics.length}
             </span>
           )}
         </div>
-        {!showForm && (
-          <button
-            onClick={() => { setShowForm(true); setEditIndex(null) }}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all hover:scale-[1.02]"
-            style={{ background: 'var(--border-accent)', color: 'var(--accent)' }}
-          >
-            <Plus className="w-3 h-3" /> Add
+        <div className="flex items-center gap-2">
+          <button onClick={handleSuggest} disabled={suggestLoading}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all hover:scale-[1.02] disabled:opacity-50"
+            style={{ background: 'rgba(139, 92, 246, 0.08)', color: '#8b5cf6', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+            {suggestLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            <span className="hidden sm:inline">{suggestLoading ? 'Analyzing...' : 'AI Suggest'}</span>
           </button>
-        )}
+          {!showForm && (
+            <button onClick={() => { setShowForm(true); setEditIndex(null) }}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all hover:scale-[1.02] text-white"
+              style={{ background: '#8b5cf6' }}>
+              <Plus className="w-3 h-3" /> Add
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Existing custom metrics */}
       {customMetrics.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {customMetrics.map((m, i) => (
-            <MetricPill
-              key={`${m.name}-${i}`}
-              metric={m}
-              schema={schema}
-              onEdit={() => handleEdit(i)}
-              onRemove={() => handleRemove(i)}
-            />
+            <MetricPill key={`${m.name}-${i}`} metric={m} schema={schema}
+              onEdit={() => handleEdit(i)} onRemove={() => handleRemove(i)} />
           ))}
         </div>
       )}
 
-      {/* Form */}
+      {/* Manual form */}
       {showForm && (
-        <MetricForm
-          schema={schema}
-          columnsByType={columnsByType}
-          onSave={handleSave}
-          onCancel={() => { setShowForm(false); setEditIndex(null) }}
-          initial={editIndex !== null ? customMetrics[editIndex] : null}
-        />
+        <MetricForm schema={schema} columnsByType={columnsByType}
+          onSave={handleSave} onCancel={() => { setShowForm(false); setEditIndex(null) }}
+          initial={editIndex !== null ? customMetrics[editIndex] : null} />
+      )}
+
+      {/* AI Suggestions */}
+      {suggestError && (
+        <p className="text-xs px-1" style={{ color: '#ef4444' }}>{suggestError}</p>
+      )}
+      {suggestions && suggestions.length > 0 && (
+        <div className="space-y-2 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+              <Sparkles className="w-3 h-3 inline mr-1" style={{ color: '#8b5cf6' }} />
+              AI-Suggested metrics for your data
+            </p>
+            <button onClick={() => setSuggestions(null)} className="p-1 rounded" style={{ color: 'var(--text-muted)' }}>
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+          <div className="space-y-2">
+            {suggestions.map((s, i) => (
+              <SuggestionCard key={i} suggestion={s} schema={schema}
+                onAccept={() => handleAcceptSuggestion(s, i)}
+                accepted={acceptedSuggestions.has(i)} />
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Empty state */}
-      {customMetrics.length === 0 && !showForm && (
-        <p className="text-xs py-2" style={{ color: 'var(--text-muted)' }}>
-          Create calculated metrics like Fill Rate, CPA, Margin % from your existing columns.
+      {customMetrics.length === 0 && !showForm && !suggestions && (
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          Create calculated metrics from your existing columns, or click <strong>AI Suggest</strong> to get industry-specific recommendations.
         </p>
       )}
     </div>
