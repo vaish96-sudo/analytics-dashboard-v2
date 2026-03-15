@@ -135,7 +135,7 @@ export default function ProjectWizard({ onComplete, onCancel }) {
   const sources = [
     { id: 'file', label: 'Upload File', desc: 'CSV, TSV, Excel', icon: Upload, color: 'bg-blue-50 text-blue-600 border-blue-200' },
     { id: 'google_sheets', label: 'Google Sheets', desc: 'Connect your spreadsheet', icon: FileSpreadsheet, color: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
-    { id: 'api', label: 'REST API', desc: 'Enter endpoint URL', icon: Globe, color: 'bg-purple-50 text-purple-600 border-purple-200' },
+    { id: 'api', label: 'API', desc: 'Enter endpoint URL', icon: Globe, color: 'bg-purple-50 text-purple-600 border-purple-200' },
   ]
 
   return (
@@ -150,7 +150,7 @@ export default function ProjectWizard({ onComplete, onCancel }) {
             {wizardStep === 'name' ? 'Create New Project' : wizardStep === 'source' ? 'Connect Data' : 'API Connector'}
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            {wizardStep === 'name' ? 'Give your project a name' : wizardStep === 'source' ? 'Choose how to bring in your data' : 'Enter your REST API details'}
+            {wizardStep === 'name' ? 'Give your project a name' : wizardStep === 'source' ? 'Choose how to bring in your data' : 'Enter your API details'}
           </p>
         </div>
 

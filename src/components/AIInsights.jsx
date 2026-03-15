@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { useData } from '../context/DataContext'
 import { getInsights } from '../utils/aiService'
 import { exportToPDF, exportToWord } from '../utils/exportService'
-import LogoMark from './LogoMark'
 import { Lightbulb, TrendingUp, AlertTriangle, Target, Loader2, RefreshCw, FileText, File } from 'lucide-react'
 
 const ICONS = { opportunity: Target, trend: TrendingUp, alert: AlertTriangle, recommendation: Lightbulb }
@@ -39,7 +38,7 @@ export default function AIInsights() {
     <div className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden animate-fade-in">
       <div className="p-3 sm:p-4 border-b border-slate-100 flex items-center justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><LogoMark className="w-5 h-5 object-contain" alt="NB" /></div>
+          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><img src="/logo_mark.png" alt="NB" className="w-5 h-5 object-contain" /></div>
           <div className="min-w-0">
             <h3 className="text-sm font-display font-semibold text-slate-800">AI Insights</h3>
             <p className="text-xs text-slate-400 truncate">

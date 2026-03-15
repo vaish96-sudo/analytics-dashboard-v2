@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react'
 import { Upload, FileSpreadsheet, AlertCircle, Plus } from 'lucide-react'
 import { useData } from '../context/DataContext'
-import LogoMark from './LogoMark'
 
 export default function FileUpload() {
   const { loadData, datasets, switchDataset } = useData()
@@ -43,7 +42,7 @@ export default function FileUpload() {
         <div className="text-center mb-8 sm:mb-10">
           <div className="inline-flex items-center gap-3 sm:gap-4 mb-4">
             <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-200">
-              <LogoMark className="w-8 h-8 sm:w-10 sm:h-10 object-contain" alt="NB" />
+              <img src="/logo_mark.png" alt="NB" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
             </div>
             <div className="text-left">
               <h1 className="text-xl sm:text-2xl font-display font-bold tracking-tight text-slate-900">NORTHERN BIRD</h1>
@@ -63,14 +62,14 @@ export default function FileUpload() {
           <div className="flex flex-col items-center gap-4 sm:gap-5">
             {parsing ? (
               <><div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-blue-50 flex items-center justify-center animate-pulse"><FileSpreadsheet className="w-6 h-6 sm:w-7 sm:h-7 text-accent" /></div>
-              <p className="text-base sm:text-lg font-display font-medium text-slate-800 text-center">Parsing your dataâ€¦</p></>
+              <p className="text-base sm:text-lg font-display font-medium text-slate-800 text-center">Parsing your data...</p></>
             ) : (
               <><div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${dragging ? 'bg-blue-100 scale-110' : 'bg-slate-100 group-hover:bg-slate-200'}`}>
                 <Upload className={`w-6 h-6 sm:w-7 sm:h-7 transition-colors ${dragging ? 'text-accent' : 'text-slate-400 group-hover:text-slate-500'}`} />
               </div>
               <div>
                 <p className="text-base sm:text-lg font-display font-medium text-slate-800 text-center">Drop your file here</p>
-                <p className="text-sm text-slate-400 mt-1 text-center">or click to browse â€” CSV, TSV, Excel</p>
+                <p className="text-sm text-slate-400 mt-1 text-center">or click to browse - CSV, TSV, Excel</p>
               </div></>
             )}
           </div>

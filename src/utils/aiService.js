@@ -203,7 +203,7 @@ Be specific with numbers. Think like a senior strategist presenting to a C-suite
     { role: 'user', content: `Data summary (${rawData.length} total rows):\n${summaryParts.join('\n')}\n\nProvide 4-5 strategic insights.` }
   ], 1500, MODEL_OPUS)
 
-  const modelLabel = call.model === MODEL_OPUS ? 'Claude Opus 4' : 'Claude Sonnet 4'
+  const modelLabel = call.model === MODEL_OPUS ? 'Claude Opus 4.6' : 'Claude Sonnet 4.6'
 
   try {
     const cleaned = call.text.replace(/```json|```/g, '').trim()
