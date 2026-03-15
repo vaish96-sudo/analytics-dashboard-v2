@@ -34,28 +34,28 @@
    DARK MODE — Claude Console inspired dark warm tones
    ============================================================ */
 .dark {
-  --bg-primary: #191919;
-  --bg-surface: #222222;
-  --bg-raised: #2a2a2a;
-  --bg-overlay: #2a2a2a;
-  --accent: #3b82f6;
-  --accent-light: #60a5fa;
-  --accent-dark: #2563eb;
+  --bg-primary: #0f111a;
+  --bg-surface: #141828;
+  --bg-raised: #1b1f2b;
+  --bg-overlay: #1b1f2b;
+  --accent: #7c3aed;
+  --accent-light: #a78bfa;
+  --accent-dark: #5b21b6;
   --text-primary: #e5e5e0;
   --text-secondary: #a3a3a0;
-  --text-muted: #6b6b68;
-  --border: #333333;
-  --border-light: #2d2d2d;
-  --border-accent: rgba(59, 130, 246, 0.15);
-  --sidebar-bg: #1f1f1f;
-  --sidebar-border: #2d2d2d;
-  --card-bg: #222222;
-  --card-border: #333333;
-  --card-shadow: 0 1px 3px rgba(0,0,0,0.2);
-  --input-bg: #2a2a2a;
-  --input-border: #3a3a3a;
-  --scrollbar-thumb: #444444;
-  --scrollbar-hover: #555555;
+  --text-muted: #7a7a85;
+  --border: #1f2132;
+  --border-light: #181b2b;
+  --border-accent: rgba(124, 58, 237, 0.15);
+  --sidebar-bg: #121523;
+  --sidebar-border: #1b1f2b;
+  --card-bg: #171a2b;
+  --card-border: #1f2132;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  --input-bg: #171a2b;
+  --input-border: #2a2e4d;
+  --scrollbar-thumb: #2e3150;
+  --scrollbar-hover: #3b3f60;
 }
 
 /* ============================================================
@@ -116,12 +116,12 @@ body {
 .dark .bg-white { background-color: var(--card-bg) !important; }
 .dark .bg-slate-50 { background-color: var(--bg-overlay) !important; }
 .dark .bg-slate-100 { background-color: var(--bg-overlay) !important; }
-.dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.1) !important; }
-.dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.1) !important; }
-.dark .bg-purple-50 { background-color: rgba(139, 92, 246, 0.1) !important; }
+.dark .bg-blue-50 { background-color: rgba(124, 58, 237, 0.1) !important; }
+.dark .bg-emerald-50 { background-color: rgba(52, 211, 153, 0.1) !important; }
+.dark .bg-purple-50 { background-color: rgba(124, 58, 237, 0.1) !important; }
 .dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.1) !important; }
 .dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.1) !important; }
-.dark .bg-sky-50 { background-color: rgba(14, 165, 233, 0.1) !important; }
+.dark .bg-sky-50 { background-color: rgba(124, 58, 237, 0.1) !important; }
 
 /* Text colors in dark mode */
 .dark .text-slate-800, .dark .text-slate-900, .dark .text-slate-700 { color: var(--text-primary) !important; }
