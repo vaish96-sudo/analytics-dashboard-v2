@@ -89,8 +89,7 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
     import('../lib/projectService').then(ps => {
       ps.listAllConversations(user.id).then(c => setChatCount(c.length)).catch(() => setChatCount(0))
       ps.listAllInsights(user.id).then(data => {
-        const total = data.reduce((sum, p) => sum + p.insights.length, 0)
-        setInsightCount(total)
+        setInsightCount(data.length)
       }).catch(() => setInsightCount(0))
     })
   }, [user?.id, projects])
