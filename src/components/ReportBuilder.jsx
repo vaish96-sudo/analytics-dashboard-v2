@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, PieChart, Pie, Cell } from 'recharts'
 import { useData } from '../context/DataContext'
 import { CHART_COLORS, smartFormat, truncate } from '../utils/formatters'
-import { Tag, Hash, X, BarChart3, TrendingUp, PieChart as PieIcon, Table2, Plus, Filter, Trash2, Download, Check, RotateCcw } from 'lucide-react'
+import { Tag, Hash, X, BarChart3, TrendingUp, PieChart as PieIcon, Table2, Plus, Filter, Trash2, Download, Check, RotateCcw, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 
 function TogglePill({ col, label, type, isSelected, onToggle }) {
   const baseColors = type === 'dimension'
@@ -91,6 +91,10 @@ export default function ReportBuilder() {
   const [selectedMetrics, setSelectedMetrics] = useState(saved.selectedMetrics || [])
   const [chartType, setChartType] = useState(saved.chartType || 'bar')
   const [filters, setFilters] = useState(saved.filters || [])
+  const [dimSearch, setDimSearch] = useState('')
+  const [metSearch, setMetSearch] = useState('')
+  const [tableSortCol, setTableSortCol] = useState(null)
+  const [tableSortDir, setTableSortDir] = useState('desc')
 
   useEffect(() => { updateDatasetState('reportBuilderState', { selectedDims, selectedMetrics, chartType, filters }) }, [selectedDims, selectedMetrics, chartType, filters])
   useEffect(() => { const s = reportBuilderState || {}; setSelectedDims(s.selectedDims || []); setSelectedMetrics(s.selectedMetrics || []); setChartType(s.chartType || 'bar'); setFilters(s.filters || []) }, [activeDatasetId])
@@ -101,7 +105,7 @@ export default function ReportBuilder() {
   const addMetric = useCallback((col) => { if (!selectedMetrics.includes(col)) setSelectedMetrics(p => [...p, col]) }, [selectedMetrics])
   const removeDim = useCallback((col) => setSelectedDims(p => p.filter(c => c !== col)), [])
   const removeMetric = useCallback((col) => setSelectedMetrics(p => p.filter(c => c !== col)), [])
-  const clearAllSelections = () => { setSelectedDims([]); setSelectedMetrics([]); setFilters([]) }
+  const clearAllSelections = () => { setSelectedDims([]); setSelectedMetrics([]); setFilters([]); setTableSortCol(null) }
 
   const addFilter = () => { const available = columnsByType.dimensions.filter(d => !filters.some(f => f.col === d)); if (available.length > 0) setFilters(prev => [...prev, { col: available[0], values: [] }]) }
   const removeFilter = (idx) => setFilters(prev => prev.filter((_, i) => i !== idx))
@@ -110,6 +114,19 @@ export default function ReportBuilder() {
 
   const hasSelections = selectedDims.length > 0 || selectedMetrics.length > 0
 
+  // Filter dimensions and metrics by search
+  const filteredDims = useMemo(() => {
+    if (!dimSearch.trim()) return columnsByType.dimensions
+    const q = dimSearch.toLowerCase()
+    return columnsByType.dimensions.filter(col => (schema[col]?.label || col).toLowerCase().includes(q))
+  }, [columnsByType.dimensions, dimSearch, schema])
+
+  const filteredMets = useMemo(() => {
+    if (!metSearch.trim()) return columnsByType.metrics
+    const q = metSearch.toLowerCase()
+    return columnsByType.metrics.filter(col => (schema[col]?.label || col).toLowerCase().includes(q))
+  }, [columnsByType.metrics, metSearch, schema])
+
   const reportData = useMemo(() => {
     if (selectedMetrics.length === 0) return []
     const filterObj = {}; filters.forEach(f => { if (f.values.length > 0) filterObj[f.col] = f.values })
@@ -117,6 +134,23 @@ export default function ReportBuilder() {
   }, [selectedDims, selectedMetrics, filters, aggregate])
 
   const displayData = reportData.map((row, i) => ({ ...row, _label: selectedDims.length > 0 ? selectedDims.map(d => truncate(String(row[d] ?? ''), 20)).join(' / ') : `Row ${i + 1}` }))
+
+  // Sortable table data
+  const sortedTableData = useMemo(() => {
+    if (!tableSortCol || chartType !== 'table') return displayData
+    return [...displayData].sort((a, b) => {
+      const va = a[tableSortCol]; const vb = b[tableSortCol]
+      const na = typeof va === 'number' ? va : parseFloat(String(va ?? '').replace(/[,$%]/g, ''))
+      const nb = typeof vb === 'number' ? vb : parseFloat(String(vb ?? '').replace(/[,$%]/g, ''))
+      if (!isNaN(na) && !isNaN(nb)) return tableSortDir === 'asc' ? na - nb : nb - na
+      return tableSortDir === 'asc' ? String(va ?? '').localeCompare(String(vb ?? '')) : String(vb ?? '').localeCompare(String(va ?? ''))
+    })
+  }, [displayData, tableSortCol, tableSortDir, chartType])
+
+  const handleTableSort = (col) => {
+    if (tableSortCol === col) setTableSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setTableSortCol(col); setTableSortDir('desc') }
+  }
 
   const pieData = useMemo(() => {
     if (selectedMetrics.length === 0 || displayData.length === 0) return []
@@ -133,6 +167,9 @@ export default function ReportBuilder() {
     const ws = XLSX.utils.json_to_sheet(exportRows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Report'); XLSX.writeFile(wb, 'report_export.xlsx')
   }
 
+  const showDimSearch = columnsByType.dimensions.length > 8
+  const showMetSearch = columnsByType.metrics.length > 8
+
   return (
     <div className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden animate-fade-in">
       <div className="p-4 sm:p-5">
@@ -146,15 +183,35 @@ export default function ReportBuilder() {
         </div>
         <div className="space-y-4">
           <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Dimensions <span className="normal-case text-slate-400 font-normal">(tap to add/remove)</span></p>
-            <div className="flex flex-wrap gap-1.5">
-              {columnsByType.dimensions.map(col => <TogglePill key={col} col={col} label={schema[col].label} type="dimension" isSelected={selectedDims.includes(col)} onToggle={() => toggleDim(col)} />)}
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Dimensions <span className="normal-case text-slate-400 font-normal">({columnsByType.dimensions.length})</span></p>
+              {showDimSearch && (
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                  <input type="text" value={dimSearch} onChange={e => setDimSearch(e.target.value)} placeholder="Search dimensions…"
+                    className="pl-7 pr-3 py-1 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-600 focus:outline-none focus:border-accent w-48" />
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+              {filteredDims.map(col => <TogglePill key={col} col={col} label={schema[col].label} type="dimension" isSelected={selectedDims.includes(col)} onToggle={() => toggleDim(col)} />)}
+              {filteredDims.length === 0 && <span className="text-xs text-slate-400">No dimensions match "{dimSearch}"</span>}
             </div>
           </div>
           <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Metrics <span className="normal-case text-slate-400 font-normal">(tap to add/remove)</span></p>
-            <div className="flex flex-wrap gap-1.5">
-              {columnsByType.metrics.map(col => <TogglePill key={col} col={col} label={schema[col].label} type="metric" isSelected={selectedMetrics.includes(col)} onToggle={() => toggleMetric(col)} />)}
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Metrics <span className="normal-case text-slate-400 font-normal">({columnsByType.metrics.length})</span></p>
+              {showMetSearch && (
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                  <input type="text" value={metSearch} onChange={e => setMetSearch(e.target.value)} placeholder="Search metrics…"
+                    className="pl-7 pr-3 py-1 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-600 focus:outline-none focus:border-accent w-48" />
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+              {filteredMets.map(col => <TogglePill key={col} col={col} label={schema[col].label} type="metric" isSelected={selectedMetrics.includes(col)} onToggle={() => toggleMetric(col)} />)}
+              {filteredMets.length === 0 && <span className="text-xs text-slate-400">No metrics match "{metSearch}"</span>}
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -194,11 +251,25 @@ export default function ReportBuilder() {
                   <div className="overflow-x-auto rounded-lg border border-slate-200" style={{ minHeight: '200px' }}>
                     <table className="w-full">
                       <thead><tr className="bg-slate-50">
-                        {selectedDims.map(d => <th key={d} className="px-4 py-2.5 text-left text-xs font-medium text-slate-500 uppercase">{schema[d]?.label}</th>)}
-                        {selectedMetrics.map(m => <th key={m} className="px-4 py-2.5 text-right text-xs font-medium text-slate-500 uppercase">{schema[m]?.label}</th>)}
+                        {selectedDims.map(d => (
+                          <th key={d} className="px-4 py-2.5 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:text-slate-700" onClick={() => handleTableSort(d)}>
+                            <div className="flex items-center gap-1">
+                              {schema[d]?.label}
+                              {tableSortCol === d ? (tableSortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                            </div>
+                          </th>
+                        ))}
+                        {selectedMetrics.map(m => (
+                          <th key={m} className="px-4 py-2.5 text-right text-xs font-medium text-slate-500 uppercase cursor-pointer hover:text-slate-700" onClick={() => handleTableSort(m)}>
+                            <div className="flex items-center gap-1 justify-end">
+                              {schema[m]?.label}
+                              {tableSortCol === m ? (tableSortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                            </div>
+                          </th>
+                        ))}
                       </tr></thead>
                       <tbody className="divide-y divide-slate-100">
-                        {displayData.map((row, i) => (<tr key={i} className="hover:bg-slate-50">
+                        {sortedTableData.map((row, i) => (<tr key={i} className="hover:bg-slate-50">
                           {selectedDims.map(d => <td key={d} className="px-4 py-2 text-sm text-slate-600">{truncate(String(row[d] ?? '–'), 40)}</td>)}
                           {selectedMetrics.map(m => <td key={m} className="px-4 py-2 text-sm text-right font-mono text-slate-800">{smartFormat(row[m], m)}</td>)}
                         </tr>))}
