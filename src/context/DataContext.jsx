@@ -254,19 +254,18 @@ export function DataProvider({ children }) {
         charts_state: localDashboardState.chartsState || {},
         report_builder_state: localDashboardState.reportBuilderState || {},
         data_table_state: localDashboardState.dataTableState || {},
-        insights: localDashboardState.insights || [],
-        insights_loaded: localDashboardState.insightsLoaded || false,
+        // DO NOT include insights here — they are saved directly via saveInsightsOnly
+        // to avoid race conditions where a debounced save overwrites fresh insights with stale empty array
       }
 
       const stateStr = JSON.stringify(stateToSave)
       if (stateStr === lastSavedRef.current) return
       lastSavedRef.current = stateStr
 
-      console.log('Debounced save — insights count:', (localDashboardState.insights || []).length, 'for dataset:', activeDatasetId)
+      console.log('Debounced save (no insights) for dataset:', activeDatasetId)
 
       try {
         await projectService.saveDashboardState(activeDatasetId, stateToSave)
-        console.log('Debounced save complete')
       } catch (err) {
         console.error('Failed to save dashboard state:', err)
       }
@@ -321,14 +320,13 @@ export function DataProvider({ children }) {
       charts_state: st.chartsState || {},
       report_builder_state: st.reportBuilderState || {},
       data_table_state: st.dataTableState || {},
-      insights: st.insights || [],
-      insights_loaded: st.insightsLoaded || false,
+      // DO NOT include insights — saved separately via saveInsightsOnly
     }
 
     try {
       await projectService.saveDashboardState(dsId, stateToSave)
       lastSavedRef.current = JSON.stringify(stateToSave)
-      console.log('Flush saved dashboard state')
+      console.log('Flush saved dashboard state (no insights)')
     } catch (err) {
       console.error('Failed to flush save:', err)
     }
