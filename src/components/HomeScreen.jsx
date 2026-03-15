@@ -68,18 +68,32 @@ function PremiumBadge() {
   )
 }
 
-export default function HomeScreen({ onOpenProject, onNewProject, onSettings }) {
+export default function HomeScreen({ onOpenProject, onNewProject, onSettings, onShowChats, onShowInsights }) {
   const { user, logout } = useAuth()
   const { projects, loading, deleteProject } = useProject()
   const [searchQuery, setSearchQuery] = useState('')
   const [activeView, setActiveView] = useState(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [chatCount, setChatCount] = useState(null)
+  const [insightCount, setInsightCount] = useState(null)
   const projectsRef = useRef(null)
   const menuRef = useRef(null)
 
   const userName = user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'there'
   const initials = (user?.name || user?.email || '?')[0].toUpperCase()
   const totalDatasets = projects.reduce((sum, p) => sum + (p.datasets?.length || 0), 0)
+
+  // Load chat and insight counts
+  useEffect(() => {
+    if (!user?.id) return
+    import('../lib/projectService').then(ps => {
+      ps.listAllConversations(user.id).then(c => setChatCount(c.length)).catch(() => setChatCount(0))
+      ps.listAllInsights(user.id).then(data => {
+        const total = data.reduce((sum, p) => sum + p.insights.length, 0)
+        setInsightCount(total)
+      }).catch(() => setInsightCount(0))
+    })
+  }, [user?.id, projects])
 
   const filteredProjects = searchQuery
     ? projects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -104,9 +118,8 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings }) 
   const handleCardClick = (type) => {
     if (type === 'projects') { setActiveView('projects'); scrollToProjects() }
     else if (type === 'datasets') { setActiveView('datasets'); scrollToProjects() }
-    else if (type === 'chats' || type === 'insights') {
-      // Coming soon — will be a dedicated page
-    }
+    else if (type === 'chats' && typeof onShowChats === 'function') { onShowChats() }
+    else if (type === 'insights' && typeof onShowInsights === 'function') { onShowInsights() }
   }
 
   const handleLogout = () => { setMobileMenuOpen(false); logout() }
@@ -295,8 +308,8 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings }) 
                 <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>AI chats</span>
                 <MessageSquare className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" style={{ color: '#8b5cf6' }} />
               </div>
-              <p className="text-2xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>—</p>
-              <p className="text-[10px] mt-1" style={{ color: '#8b5cf6' }}>Coming soon →</p>
+              <p className="text-2xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>{chatCount === null ? '...' : chatCount}</p>
+              <p className="text-[10px] mt-1 group-hover:underline" style={{ color: '#8b5cf6' }}>{chatCount > 0 ? 'View all →' : 'Start chatting →'}</p>
             </button>
             <button className="rounded-xl p-4 text-left transition-all hover:scale-[1.02] hover:shadow-md nb-card group"
               onClick={() => handleCardClick('insights')}>
@@ -304,8 +317,8 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings }) 
                 <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Insights</span>
                 <Lightbulb className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" style={{ color: '#f59e0b' }} />
               </div>
-              <p className="text-2xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>—</p>
-              <p className="text-[10px] mt-1" style={{ color: '#f59e0b' }}>Coming soon →</p>
+              <p className="text-2xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>{insightCount === null ? '...' : insightCount}</p>
+              <p className="text-[10px] mt-1 group-hover:underline" style={{ color: '#f59e0b' }}>{insightCount > 0 ? 'View all →' : 'Generate insights →'}</p>
             </button>
           </div>
 

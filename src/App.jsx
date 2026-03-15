@@ -10,7 +10,8 @@ import FileUpload from './components/FileUpload'
 import ColumnTagger from './components/ColumnTagger'
 import Dashboard from './components/Dashboard'
 import GoogleSheetsPicker from './components/GoogleSheetsPicker'
-import LogoMark from './components/LogoMark'
+import AllChats from './components/AllChats'
+import AllInsights from './components/AllInsights'
 import { Loader2 } from 'lucide-react'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
@@ -36,10 +37,10 @@ function GoogleAuthCallback({ onToken, onError }) {
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
       <div className="text-center">
-        <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-4 animate-pulse">
-          <LogoMark className="w-8 h-8 object-contain" />
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 animate-pulse" style={{ background: 'var(--border-accent)' }}>
+          <img src="/logo_mark.png" alt="NB" className="w-8 h-8 object-contain" />
         </div>
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Connecting to Google Sheets…</p>
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Connecting to Google Sheets...</p>
       </div>
     </div>
   )
@@ -48,22 +49,23 @@ function GoogleAuthCallback({ onToken, onError }) {
 function AppContent() {
   const { user, logout, loading: authLoading } = useAuth()
   const { activeProject, activeProjectId, loading: projectsLoading, projectLoading, selectProject } = useProject()
-  const { step, setStep, confirmTagging, clearAll, goHome, openProject } = useData()
+  const { step, setStep, activeTab, setActiveTab, confirmTagging, clearAll, goHome, openProject } = useData()
 
   const [googleToken, setGoogleToken] = useState(loadGoogleToken)
   const [showSheetsPicker, setShowSheetsPicker] = useState(false)
   const [showProjectWizard, setShowProjectWizard] = useState(false)
+  const [showAllChats, setShowAllChats] = useState(false)
+  const [showAllInsights, setShowAllInsights] = useState(false)
 
   const isGoogleCallback = window.location.pathname === '/auth/callback'
 
-  // On refresh: if step is dashboard but no project loaded, restore the last project
+  // On refresh: if step is dashboard but no project loaded, restore last project
   useEffect(() => {
     if (user && !projectsLoading && step === 'dashboard' && !activeProjectId) {
       const savedProjectId = localStorage.getItem('nb_active_project')
       if (savedProjectId) {
         selectProject(savedProjectId)
       } else {
-        // No saved project, go home
         goHome()
       }
     }
@@ -89,9 +91,12 @@ function AppContent() {
 
   const handleLogout = () => { clearAll(); clearGoogleToken(); selectProject(null); logout() }
 
-  const handleOpenProject = async (projectId) => {
+  const handleOpenProject = async (projectId, tab, conversationId) => {
     await selectProject(projectId)
     setShowProjectWizard(false)
+    setShowAllChats(false)
+    setShowAllInsights(false)
+    if (tab) setActiveTab(tab)
     openProject()
   }
 
@@ -102,8 +107,8 @@ function AppContent() {
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
-        <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center animate-pulse">
-          <LogoMark className="w-6 h-6 object-contain" />
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center animate-pulse" style={{ background: 'var(--border-accent)' }}>
+          <img src="/logo_mark.png" alt="NB" className="w-6 h-6 object-contain" />
         </div>
       </div>
     )
@@ -111,13 +116,12 @@ function AppContent() {
 
   if (!user) return <AuthScreen />
 
-  // Show loading while projects load OR while a specific project is being fetched
   if (projectsLoading || (step === 'dashboard' && !activeProject && projectLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3" style={{ color: 'var(--accent)' }} />
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Loading your projects…</p>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Loading your projects...</p>
         </div>
       </div>
     )
@@ -131,14 +135,32 @@ function AppContent() {
     return <GoogleSheetsPicker accessToken={googleToken} onBack={() => setShowSheetsPicker(false)} />
   }
 
+  // All Chats page
+  if (showAllChats) {
+    return <AllChats onBack={() => setShowAllChats(false)} onOpenProject={handleOpenProject} />
+  }
+
+  // All Insights page
+  if (showAllInsights) {
+    return <AllInsights onBack={() => setShowAllInsights(false)} onOpenProject={handleOpenProject} />
+  }
+
+  // Home screen
   if (step === 'home') {
-    return <HomeScreen onOpenProject={handleOpenProject} onNewProject={handleNewProject} />
+    return (
+      <HomeScreen
+        onOpenProject={handleOpenProject}
+        onNewProject={handleNewProject}
+        onShowChats={() => setShowAllChats(true)}
+        onShowInsights={() => setShowAllInsights(true)}
+      />
+    )
   }
 
   if (step === 'tag') return <ColumnTagger onConfirm={confirmTagging} />
   if (step === 'upload') return <FileUpload />
 
-  // Dashboard — wait for project to be loaded
+  // Dashboard
   if (step === 'dashboard' && activeProject) {
     return (
       <Dashboard
@@ -150,8 +172,15 @@ function AppContent() {
     )
   }
 
-  // Fallback — step is dashboard but project not loaded yet, or unknown step
-  return <HomeScreen onOpenProject={handleOpenProject} onNewProject={handleNewProject} />
+  // Fallback
+  return (
+    <HomeScreen
+      onOpenProject={handleOpenProject}
+      onNewProject={handleNewProject}
+      onShowChats={() => setShowAllChats(true)}
+      onShowInsights={() => setShowAllInsights(true)}
+    />
+  )
 }
 
 export default function App() {

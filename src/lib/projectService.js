@@ -163,19 +163,6 @@ export async function listConversations(projectId) {
   return data || []
 }
 
-export async function listAllConversations(projectIds) {
-  if (!projectIds || projectIds.length === 0) return []
-  const { data, error } = await supabase
-    .from('conversations')
-    .select('id, title, project_id, dataset_id, created_at, updated_at')
-    .in('project_id', projectIds)
-    .order('updated_at', { ascending: false })
-    .limit(50)
-
-  if (error) throw new Error(error.message)
-  return data || []
-}
-
 export async function createConversation(projectId, datasetId) {
   const { data, error } = await supabase
     .from('conversations')
@@ -248,4 +235,67 @@ export async function addMessage(conversationId, { role, content, sqlPlan, meta 
     .eq('id', conversationId)
 
   return data
+}
+
+// ============================================================
+// CROSS-PROJECT QUERIES (for home screen)
+// ============================================================
+
+export async function listAllConversations(userId) {
+  // Get all projects for this user, then all conversations
+  const { data: projects, error: pErr } = await supabase
+    .from('projects')
+    .select('id, name')
+    .eq('user_id', userId)
+
+  if (pErr) throw new Error(pErr.message)
+  if (!projects || projects.length === 0) return []
+
+  const projectIds = projects.map(p => p.id)
+  const projectMap = Object.fromEntries(projects.map(p => [p.id, p.name]))
+
+  const { data: convos, error: cErr } = await supabase
+    .from('conversations')
+    .select('id, title, project_id, dataset_id, created_at, updated_at')
+    .in('project_id', projectIds)
+    .order('updated_at', { ascending: false })
+
+  if (cErr) throw new Error(cErr.message)
+  return (convos || []).map(c => ({ ...c, projectName: projectMap[c.project_id] || 'Unknown' }))
+}
+
+export async function listAllInsights(userId) {
+  // Get all projects with their datasets and dashboard states
+  const { data: projects, error } = await supabase
+    .from('projects')
+    .select(`
+      id, name, updated_at,
+      datasets(id, file_name, row_count,
+        dashboard_states(insights, insights_loaded)
+      )
+    `)
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+  if (!projects) return []
+
+  const results = []
+  for (const project of projects) {
+    for (const ds of (project.datasets || [])) {
+      const state = ds.dashboard_states?.[0]
+      if (state?.insights?.length > 0) {
+        results.push({
+          projectId: project.id,
+          projectName: project.name,
+          datasetId: ds.id,
+          fileName: ds.file_name,
+          rowCount: ds.row_count,
+          insights: state.insights,
+          updatedAt: project.updated_at,
+        })
+      }
+    }
+  }
+  return results
 }
