@@ -3,22 +3,22 @@
 @tailwind utilities;
 
 /* ============================================================
-   LIGHT MODE — Claude Console inspired warm neutrals
+   LIGHT MODE — Warm neutrals + gold accent
    ============================================================ */
 :root {
   --bg-primary: #f5f5f0;
   --bg-surface: #ffffff;
   --bg-raised: #ffffff;
   --bg-overlay: #eeeee8;
-  --accent: #2563eb;
-  --accent-light: #3b82f6;
-  --accent-dark: #1d4ed8;
+  --accent: #b08d57;
+  --accent-light: #c4a069;
+  --accent-dark: #96783f;
   --text-primary: #1a1a1a;
   --text-secondary: #525252;
   --text-muted: #a3a3a3;
   --border: #e5e5e0;
   --border-light: #ececea;
-  --border-accent: rgba(37, 99, 235, 0.12);
+  --border-accent: rgba(176, 141, 87, 0.15);
   --sidebar-bg: #ffffff;
   --sidebar-border: #e5e5e0;
   --card-bg: #ffffff;
@@ -31,31 +31,31 @@
 }
 
 /* ============================================================
-   DARK MODE — Claude Console inspired dark warm tones
+   DARK MODE — Warm charcoal + gold accent
    ============================================================ */
 .dark {
-  --bg-primary: #191919;
-  --bg-surface: #222222;
-  --bg-raised: #2a2a2a;
-  --bg-overlay: #2a2a2a;
-  --accent: #3b82f6;
-  --accent-light: #60a5fa;
-  --accent-dark: #2563eb;
+  --bg-primary: #171714;
+  --bg-surface: #1e1e1b;
+  --bg-raised: #262622;
+  --bg-overlay: #262622;
+  --accent: #c4a069;
+  --accent-light: #d4b07a;
+  --accent-dark: #b08d57;
   --text-primary: #e5e5e0;
   --text-secondary: #a3a3a0;
   --text-muted: #6b6b68;
-  --border: #333333;
-  --border-light: #2d2d2d;
-  --border-accent: rgba(59, 130, 246, 0.15);
-  --sidebar-bg: #1f1f1f;
-  --sidebar-border: #2d2d2d;
-  --card-bg: #222222;
-  --card-border: #333333;
-  --card-shadow: 0 1px 3px rgba(0,0,0,0.2);
-  --input-bg: #2a2a2a;
-  --input-border: #3a3a3a;
-  --scrollbar-thumb: #444444;
-  --scrollbar-hover: #555555;
+  --border: #2f2f2b;
+  --border-light: #282825;
+  --border-accent: rgba(196, 160, 105, 0.15);
+  --sidebar-bg: #1a1a17;
+  --sidebar-border: #2a2a26;
+  --card-bg: #1e1e1b;
+  --card-border: #2f2f2b;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  --input-bg: #262622;
+  --input-border: #363632;
+  --scrollbar-thumb: #3a3a36;
+  --scrollbar-hover: #4a4a46;
 }
 
 /* ============================================================
@@ -79,21 +79,17 @@ body {
 /* ============================================================
    COMPONENT CLASSES
    ============================================================ */
-
-/* Sidebar — used on HomeScreen and Dashboard */
 .nb-sidebar {
   background: var(--sidebar-bg);
   border-right: 1px solid var(--sidebar-border);
 }
 
-/* Card — general content card */
 .nb-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   box-shadow: var(--card-shadow);
 }
 
-/* Input fields */
 .nb-input {
   background: var(--input-bg);
   border: 1px solid var(--input-border);
@@ -108,20 +104,30 @@ body {
   box-shadow: 0 0 0 2px var(--border-accent);
 }
 
-/* ============================================================
-   DARK MODE OVERRIDES FOR TAILWIND COMPONENTS
-   ============================================================ */
+/* Accent button override for Tailwind bg-accent */
+.bg-accent { background-color: var(--accent) !important; }
+.hover\:bg-accent-dark:hover { background-color: var(--accent-dark) !important; }
+.text-accent { color: var(--accent) !important; }
+.hover\:text-accent-dark:hover { color: var(--accent-dark) !important; }
+.border-accent { border-color: var(--accent) !important; }
+.focus\:border-accent:focus { border-color: var(--accent) !important; }
+.ring-accent\/20 { --tw-ring-color: var(--border-accent) !important; }
+.focus\:ring-accent\/20:focus { --tw-ring-color: var(--border-accent) !important; }
 
-/* Override white backgrounds in dark mode */
+/* ============================================================
+   DARK MODE OVERRIDES FOR TAILWIND
+   ============================================================ */
 .dark .bg-white { background-color: var(--card-bg) !important; }
 .dark .bg-slate-50 { background-color: var(--bg-overlay) !important; }
 .dark .bg-slate-100 { background-color: var(--bg-overlay) !important; }
-.dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.1) !important; }
+.dark .bg-blue-50 { background-color: rgba(196, 160, 105, 0.08) !important; }
 .dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.1) !important; }
 .dark .bg-purple-50 { background-color: rgba(139, 92, 246, 0.1) !important; }
 .dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.1) !important; }
 .dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.1) !important; }
 .dark .bg-sky-50 { background-color: rgba(14, 165, 233, 0.1) !important; }
+.dark .bg-sky-100 { background-color: rgba(196, 160, 105, 0.12) !important; }
+.dark .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.12) !important; }
 
 /* Text colors in dark mode */
 .dark .text-slate-800, .dark .text-slate-900, .dark .text-slate-700 { color: var(--text-primary) !important; }
@@ -129,6 +135,16 @@ body {
 .dark .text-slate-500 { color: var(--text-secondary) !important; }
 .dark .text-slate-400 { color: var(--text-muted) !important; }
 .dark .text-slate-300 { color: var(--text-muted) !important; }
+
+/* Override blue accent classes to use gold in dark mode */
+.dark .text-blue-600 { color: var(--accent) !important; }
+.dark .text-blue-400 { color: var(--accent-light) !important; }
+.dark .bg-blue-600 { background-color: var(--accent) !important; }
+.dark .text-sky-800 { color: var(--accent) !important; }
+.dark .text-sky-600 { color: var(--accent-light) !important; }
+.dark .border-sky-300 { border-color: rgba(196, 160, 105, 0.3) !important; }
+.dark .border-sky-200 { border-color: rgba(196, 160, 105, 0.2) !important; }
+.dark .border-blue-200 { border-color: rgba(196, 160, 105, 0.2) !important; }
 
 /* Border colors in dark mode */
 .dark .border-slate-200, .dark .border-slate-100 { border-color: var(--border) !important; }
@@ -138,11 +154,7 @@ body {
 .dark .hover\:bg-slate-50:hover { background-color: var(--bg-overlay) !important; }
 .dark .hover\:bg-slate-100:hover { background-color: var(--bg-overlay) !important; }
 .dark .hover\:bg-red-50:hover { background-color: rgba(239, 68, 68, 0.15) !important; }
-.dark .hover\:bg-blue-50:hover { background-color: rgba(59, 130, 246, 0.15) !important; }
-
-/* Focus rings */
-.dark .focus\:border-accent:focus { border-color: var(--accent) !important; }
-.dark .focus\:ring-accent\/20:focus { --tw-ring-color: rgba(59, 130, 246, 0.2); }
+.dark .hover\:bg-blue-50:hover { background-color: rgba(196, 160, 105, 0.12) !important; }
 
 /* ============================================================
    DATA TABLE
@@ -175,7 +187,7 @@ body {
     border: 1px solid var(--border);
   }
   .dark .glass {
-    background: rgba(34,34,34,0.9);
+    background: rgba(30,30,27,0.9);
   }
   .glass-raised {
     background: var(--card-bg);
@@ -186,7 +198,7 @@ body {
     box-shadow: 0 0 0 1px var(--border-accent), 0 1px 3px rgba(0,0,0,0.06);
   }
   .text-gradient {
-    background: linear-gradient(135deg, #1e40af, #2563eb);
+    background: linear-gradient(135deg, #96783f, #c4a069);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
