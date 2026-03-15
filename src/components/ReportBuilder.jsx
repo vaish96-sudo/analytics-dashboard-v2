@@ -8,7 +8,7 @@ function TogglePill({ col, label, type, isSelected, onToggle, isCustom }) {
   const baseColors = type === 'dimension'
     ? (isSelected ? 'bg-sky-100 text-sky-800 border-sky-300' : 'bg-sky-50 text-sky-600 border-sky-200 opacity-70')
     : isCustom
-      ? (isSelected ? 'bg-violet-100 text-violet-800 border-violet-300' : 'bg-violet-50 text-violet-600 border-violet-200 opacity-70')
+      ? (isSelected ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-amber-50 text-amber-600 border-amber-200 opacity-70')
       : (isSelected ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-50 text-emerald-600 border-emerald-200 opacity-70')
   const Icon = type === 'dimension' ? Tag : Hash
   return (
@@ -30,7 +30,7 @@ function DropZone({ label, items, onDrop, onRemove, accept }) {
       <div className="flex items-center gap-1.5 flex-wrap">
         {items.length === 0 && <span className="text-xs text-slate-400 flex items-center gap-1"><Plus className="w-3 h-3" />{label}</span>}
         {items.map(item => (
-          <span key={item.col} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium ${item.type === 'dimension' ? 'bg-sky-50 text-sky-700 border-sky-200' : item.isCustom ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+          <span key={item.col} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium ${item.type === 'dimension' ? 'bg-sky-50 text-sky-700 border-sky-200' : item.isCustom ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
             {item.type === 'dimension' ? <Tag className="w-2.5 h-2.5" /> : <Hash className="w-2.5 h-2.5" />}
             {item.label}
             <button onClick={() => onRemove(item.col)} className="ml-0.5 hover:opacity-70"><X className="w-2.5 h-2.5" /></button>

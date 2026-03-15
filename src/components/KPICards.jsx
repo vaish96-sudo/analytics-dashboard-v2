@@ -19,8 +19,8 @@ export default function KPICards() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
       {kpis.map((kpi, i) => (
-        <div key={kpi.col} className={`p-4 rounded-xl bg-white border-2 ${kpi.isCustom ? 'border-violet-400' : BORDER_COLORS[i % BORDER_COLORS.length]} hover:shadow-md transition-all duration-300 animate-slide-up`} style={{ animationDelay: `${i * 60}ms` }}>
-          <span className={`text-[10px] font-bold uppercase tracking-wider ${kpi.isCustom ? 'text-violet-600' : LABEL_COLORS[i % LABEL_COLORS.length]}`}>{kpi.label}</span>
+        <div key={kpi.col} className={`p-4 rounded-xl bg-white border-2 ${kpi.isCustom ? 'border-amber-400' : BORDER_COLORS[i % BORDER_COLORS.length]} hover:shadow-md transition-all duration-300 animate-slide-up`} style={{ animationDelay: `${i * 60}ms` }}>
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${kpi.isCustom ? 'text-amber-600' : LABEL_COLORS[i % LABEL_COLORS.length]}`}>{kpi.label}</span>
           <div className="text-2xl font-display font-bold text-slate-900 mt-1">{smartFormat(kpi.total, kpi.col)}</div>
           <div className="text-xs text-slate-400 mt-1">{kpi.isCustom ? 'calculated' : 'total'}</div>
         </div>
