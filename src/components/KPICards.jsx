@@ -9,9 +9,9 @@ export default function KPICards() {
   const { filteredRawData, schema, columnsByType } = useData()
   const kpis = useMemo(() => {
     if (!filteredRawData || !schema) return []
-    return columnsByType.metrics.slice(0, 6).map(col => {
+    return columnsByType.metrics.slice(0, 8).map(col => {
       const values = filteredRawData.map(r => { const v = r[col]; return typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[,$%]/g, '')) }).filter(v => !isNaN(v))
-      return { col, label: schema[col].label, total: values.reduce((a, b) => a + b, 0) }
+      return { col, label: schema[col].label, total: values.reduce((a, b) => a + b, 0), isCustom: !!schema[col]?.isCustom }
     })
   }, [filteredRawData, schema, columnsByType.metrics])
 
@@ -19,10 +19,10 @@ export default function KPICards() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
       {kpis.map((kpi, i) => (
-        <div key={kpi.col} className={`p-4 rounded-xl bg-white border-2 ${BORDER_COLORS[i % BORDER_COLORS.length]} hover:shadow-md transition-all duration-300 animate-slide-up`} style={{ animationDelay: `${i * 60}ms` }}>
-          <span className={`text-[10px] font-bold uppercase tracking-wider ${LABEL_COLORS[i % LABEL_COLORS.length]}`}>{kpi.label}</span>
+        <div key={kpi.col} className={`p-4 rounded-xl bg-white border-2 ${kpi.isCustom ? 'border-violet-400' : BORDER_COLORS[i % BORDER_COLORS.length]} hover:shadow-md transition-all duration-300 animate-slide-up`} style={{ animationDelay: `${i * 60}ms` }}>
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${kpi.isCustom ? 'text-violet-600' : LABEL_COLORS[i % LABEL_COLORS.length]}`}>{kpi.label}</span>
           <div className="text-2xl font-display font-bold text-slate-900 mt-1">{smartFormat(kpi.total, kpi.col)}</div>
-          <div className="text-xs text-slate-400 mt-1">total</div>
+          <div className="text-xs text-slate-400 mt-1">{kpi.isCustom ? 'calculated' : 'total'}</div>
         </div>
       ))}
     </div>
