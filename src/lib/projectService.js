@@ -135,6 +135,10 @@ export async function getDashboardState(datasetId) {
 }
 
 export async function saveDashboardState(datasetId, state) {
+  // CRITICAL: Strip insights fields — they must ONLY be written by saveInsightsOnly()
+  // This prevents any caller from accidentally overwriting insights with stale data
+  const { insights, insights_loaded, ...safeState } = state
+
   // Check if row exists
   const { data: existing } = await supabase
     .from('dashboard_states')
@@ -143,17 +147,17 @@ export async function saveDashboardState(datasetId, state) {
     .limit(1)
 
   if (existing && existing.length > 0) {
-    // Update the first matching row
+    // Update the first matching row — insights fields are guaranteed excluded
     const { error } = await supabase
       .from('dashboard_states')
-      .update(state)
+      .update({ ...safeState, updated_at: new Date().toISOString() })
       .eq('id', existing[0].id)
     if (error) throw new Error(error.message)
   } else {
-    // Insert new row
+    // Insert new row — no insights fields, Supabase defaults apply ([] and false)
     const { error } = await supabase
       .from('dashboard_states')
-      .insert({ dataset_id: datasetId, ...state })
+      .insert({ dataset_id: datasetId, ...safeState })
     if (error) throw new Error(error.message)
   }
   return true

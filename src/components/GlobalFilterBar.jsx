@@ -27,7 +27,7 @@ function FilterDropdown({ col, label, values, selected, onChange }) {
       {open && (
         <div className="absolute top-full left-0 mt-1 w-60 bg-white border border-slate-200 rounded-xl shadow-lg z-50 animate-fade-in">
           <div className="p-2 border-b border-slate-100">
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Searchâ€¦"
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..."
               className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-accent" />
           </div>
           <div className="p-1 border-b border-slate-100 flex gap-1">

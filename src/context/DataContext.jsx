@@ -69,7 +69,10 @@ export function DataProvider({ children }) {
   useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
   useEffect(() => { datasetIdRef.current = activeDatasetId }, [activeDatasetId])
 
-  // When project changes, load its data BUT don't auto-navigate to dashboard
+  // When project changes (or is re-fetched), load its data from Supabase
+  // CRITICAL: Depend on activeProject (the object ref), not just activeProject?.id
+  // This ensures that when selectProject() fetches fresh data (e.g. returning from home),
+  // we always pick up the latest insights/state from DB — even for the same project.
   useEffect(() => {
     if (!activeProject) {
       setActiveDatasetId(null)
@@ -79,7 +82,7 @@ export function DataProvider({ children }) {
     if (datasets.length > 0) {
       const firstDs = datasets[0]
       setActiveDatasetId(firstDs.id)
-      // Load dashboard state with proper key normalization
+      // Load dashboard state from the fresh Supabase data
       const raw = firstDs.dashboard_states?.[0] || {}
       console.log('Loading project dashboard state — insights count:', (raw.insights || []).length, 'insights_loaded:', raw.insights_loaded)
       setLocalDashboardState({
@@ -98,7 +101,7 @@ export function DataProvider({ children }) {
       // Only go to dashboard if we're not on home
       if (step !== 'home') setStep('dashboard')
     }
-  }, [activeProject?.id])
+  }, [activeProject])
 
   // Datasets from project — normalize keys to camelCase for components
   const datasets = useMemo(() => {

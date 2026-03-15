@@ -96,7 +96,7 @@ export default function GoogleSheetsPicker({ accessToken, onBack }) {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search spreadsheetsâ€¦"
+                placeholder="Search spreadsheets..."
                 className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20" />
             </div>
           </div>
@@ -105,7 +105,7 @@ export default function GoogleSheetsPicker({ accessToken, onBack }) {
             {loading ? (
               <div className="flex items-center justify-center gap-3 py-16">
                 <Loader2 className="w-5 h-5 text-accent animate-spin" />
-                <span className="text-sm text-slate-400">Loading your spreadsheetsâ€¦</span>
+                <span className="text-sm text-slate-400">Loading your spreadsheets...</span>
               </div>
             ) : error ? (
               <div className="text-center py-12 px-4">
