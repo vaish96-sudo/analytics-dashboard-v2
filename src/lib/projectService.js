@@ -48,6 +48,18 @@ export async function getProject(projectId) {
 
   if (error) throw new Error(error.message)
 
+  // Diagnostic: log what Supabase returned for dashboard state
+  if (data?.datasets) {
+    for (const ds of data.datasets) {
+      const st = ds.dashboard_states?.[0]
+      if (st) {
+        console.log('DB READ for dataset', ds.id, '→ filters:', Object.keys(st.global_filters || {}).length, 'insights:', (st.insights || []).length, 'ai_charts:', (st.ai_charts || []).length, 'charts_state keys:', Object.keys(st.charts_state || {}).length)
+      } else {
+        console.log('DB READ for dataset', ds.id, '→ NO dashboard_states row!')
+      }
+    }
+  }
+
   // If any dataset has multiple dashboard_states rows, merge insights into the first
   // and clean up duplicates so this never happens again
   if (data?.datasets) {
@@ -174,6 +186,8 @@ export async function getDashboardState(datasetId) {
 export async function saveDashboardState(datasetId, state) {
   // CRITICAL: Strip insights fields — they must ONLY be written by saveInsightsOnly()
   const { insights, insights_loaded, ...safeState } = state
+
+  console.log('DB WRITE for dataset', datasetId, '→ filters:', Object.keys(safeState.global_filters || {}).length, 'ai_charts:', (safeState.ai_charts || []).length, 'charts_state keys:', Object.keys(safeState.charts_state || {}).length)
 
   // Update by dataset_id (same targeting as saveInsightsOnly)
   // Only updates columns present in safeState — leaves insights untouched
