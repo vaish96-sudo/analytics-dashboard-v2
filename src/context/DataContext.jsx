@@ -60,6 +60,14 @@ export function DataProvider({ children }) {
   const [localDashboardState, setLocalDashboardState] = useState({})
   const saveTimeout = useRef(null)
   const lastSavedRef = useRef(null)
+  const stateRef = useRef(localDashboardState)
+  const activeTabRef = useRef(activeTab)
+  const datasetIdRef = useRef(null)
+
+  // Keep refs in sync
+  useEffect(() => { stateRef.current = localDashboardState }, [localDashboardState])
+  useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
+  useEffect(() => { datasetIdRef.current = activeDatasetId }, [activeDatasetId])
 
   // When project changes, load its data BUT don't auto-navigate to dashboard
   useEffect(() => {
@@ -296,28 +304,31 @@ export function DataProvider({ children }) {
     return [...new Set(rawData.map(row => row[colName]).filter(v => v !== null && v !== undefined && v !== ''))].sort()
   }, [rawData])
 
-  // Immediate save — bypass debounce
+  // Immediate save — reads from refs so it always gets latest state
   const flushSave = useCallback(async () => {
-    if (!activeDatasetId || activeDatasetId === '__pending__') return
+    const dsId = datasetIdRef.current
+    if (!dsId || dsId === '__pending__') return
     if (saveTimeout.current) clearTimeout(saveTimeout.current)
 
+    const st = stateRef.current
     const stateToSave = {
-      active_tab: activeTab,
-      global_filters: localDashboardState.global_filters || {},
-      charts_state: localDashboardState.chartsState || {},
-      report_builder_state: localDashboardState.reportBuilderState || {},
-      data_table_state: localDashboardState.dataTableState || {},
-      insights: localDashboardState.insights || [],
-      insights_loaded: localDashboardState.insightsLoaded || false,
+      active_tab: activeTabRef.current,
+      global_filters: st.global_filters || {},
+      charts_state: st.chartsState || {},
+      report_builder_state: st.reportBuilderState || {},
+      data_table_state: st.dataTableState || {},
+      insights: st.insights || [],
+      insights_loaded: st.insightsLoaded || false,
     }
 
     try {
-      await projectService.saveDashboardState(activeDatasetId, stateToSave)
+      await projectService.saveDashboardState(dsId, stateToSave)
       lastSavedRef.current = JSON.stringify(stateToSave)
+      console.log('Flush saved dashboard state')
     } catch (err) {
       console.error('Failed to flush save:', err)
     }
-  }, [activeDatasetId, activeTab, localDashboardState])
+  }, [])  // No dependencies — reads from refs
 
   const clearAll = useCallback(() => {
     setPendingData(null); setPendingFileName(null); setPendingSchema(null)

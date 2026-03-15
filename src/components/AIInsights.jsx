@@ -22,8 +22,8 @@ export default function AIInsights() {
       setUsedModel(result.model || null)
       updateDatasetState('insights', insightsData)
       updateDatasetState('insightsLoaded', true)
-      // Force immediate save to Supabase so insights persist
-      setTimeout(() => { if (flushSave) flushSave() }, 200)
+      // Wait for state to settle, then force save to Supabase
+      setTimeout(() => { if (flushSave) flushSave() }, 500)
     } catch (err) { setError(err.message) } finally { setLoading(false) }
   }
 
