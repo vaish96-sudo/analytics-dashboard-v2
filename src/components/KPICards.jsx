@@ -9,7 +9,7 @@ export default function KPICards() {
   const { filteredRawData, schema, columnsByType } = useData()
   const kpis = useMemo(() => {
     if (!filteredRawData || !schema) return []
-    return columnsByType.metrics.slice(0, 8).map(col => {
+    return columnsByType.metrics.slice(0, 6).map(col => {
       const values = filteredRawData.map(r => { const v = r[col]; return typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[,$%]/g, '')) }).filter(v => !isNaN(v))
       return { col, label: schema[col].label, total: values.reduce((a, b) => a + b, 0), isCustom: !!schema[col]?.isCustom }
     })
