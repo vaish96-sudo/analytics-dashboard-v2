@@ -58,6 +58,7 @@ function AppContent() {
   const [showAllChats, setShowAllChats] = useState(false)
   const [showAllInsights, setShowAllInsights] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [pendingConversationId, setPendingConversationId] = useState(null)
 
   const isGoogleCallback = window.location.pathname === '/auth/callback'
 
@@ -99,6 +100,7 @@ function AppContent() {
     setShowAllChats(false)
     setShowAllInsights(false)
     if (tab) setActiveTab(tab)
+    setPendingConversationId(conversationId || null)
     openProject()
   }
 
@@ -188,6 +190,8 @@ function AppContent() {
         onLogout={handleLogout}
         onNewProject={handleNewProject}
         onGoHome={goHome}
+        initialConversationId={pendingConversationId}
+        onConversationConsumed={() => setPendingConversationId(null)}
       />
     )
   }

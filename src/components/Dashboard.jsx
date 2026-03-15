@@ -9,13 +9,12 @@ import DataTable from './DataTable'
 import ReportBuilder from './ReportBuilder'
 import AskAI from './AskAI'
 import AIInsights from './AIInsights'
-import AIChartBuilder from './AIChartBuilder'
 import GlobalFilterBar from './GlobalFilterBar'
 import UserProfile from './UserProfile'
 import {
   LayoutDashboard, BarChart3, Table2, Wand2, MessageSquare, Lightbulb,
   FileSpreadsheet, Upload, ChevronRight, Settings, Menu, X, ChevronDown,
-  Plus, Trash2, LogOut, Home, Sun, Moon, Monitor, FileDown, Crown, Loader2
+  Plus, Trash2, LogOut, Home, Sun, Moon, Monitor, FileDown, Crown, Loader2, FolderOpen
 } from 'lucide-react'
 
 const TABS = [
@@ -72,13 +71,20 @@ function PremiumBadge() {
   )
 }
 
-function DatasetSwitcher() {
+function ProjectSwitcher({ onGoHome }) {
   const { datasets, activeDatasetId, switchDataset, removeDataset, setStep } = useData()
+  const { projects, activeProject, selectProject } = useProject()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   useEffect(() => { const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h) }, [])
   const active = datasets.find(d => d.id === activeDatasetId)
-  if (datasets.length === 0) return null
+
+  const handleSelectProject = async (projectId) => {
+    setOpen(false)
+    if (projectId === activeProject?.id) return
+    await selectProject(projectId)
+  }
+
   return (
     <div className="relative" ref={ref}>
       <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-left nb-input">
@@ -87,14 +93,44 @@ function DatasetSwitcher() {
         <ChevronDown className="w-3 h-3 shrink-0" style={{ color: 'var(--text-muted)' }} />
       </button>
       {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 rounded-xl shadow-lg z-50 overflow-hidden nb-card">
-          <div className="max-h-48 overflow-y-auto">
-            {datasets.map(ds => (
-              <div key={ds.id} className="flex items-center gap-2 px-3 py-2 text-xs cursor-pointer" style={{ color: ds.id === activeDatasetId ? 'var(--accent)' : 'var(--text-secondary)', background: ds.id === activeDatasetId ? 'var(--border-accent)' : 'transparent' }}>
-                <button onClick={() => { switchDataset(ds.id); setOpen(false) }} className="flex-1 text-left truncate">{ds.fileName}</button>
-                {datasets.length > 1 && <button onClick={(e) => { e.stopPropagation(); removeDataset(ds.id) }} className="p-1 shrink-0 hover:text-red-500" style={{ color: 'var(--text-muted)' }}><Trash2 className="w-3 h-3" /></button>}
+        <div className="absolute top-full left-0 right-0 mt-1 rounded-xl shadow-lg z-50 overflow-hidden nb-card" style={{ width: '240px' }}>
+          <div className="max-h-64 overflow-y-auto">
+            {/* Current project datasets */}
+            {datasets.length > 0 && (
+              <div style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <p className="text-[10px] font-medium uppercase tracking-wider px-3 pt-2 pb-1" style={{ color: 'var(--text-muted)' }}>
+                  {activeProject?.name || 'Current project'}
+                </p>
+                {datasets.map(ds => (
+                  <div key={ds.id} className="flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer" style={{ color: ds.id === activeDatasetId ? 'var(--accent)' : 'var(--text-secondary)', background: ds.id === activeDatasetId ? 'var(--border-accent)' : 'transparent' }}>
+                    <button onClick={() => { switchDataset(ds.id); setOpen(false) }} className="flex-1 text-left truncate">{ds.fileName}</button>
+                    {datasets.length > 1 && <button onClick={(e) => { e.stopPropagation(); removeDataset(ds.id) }} className="p-1 shrink-0 hover:text-red-500" style={{ color: 'var(--text-muted)' }}><Trash2 className="w-3 h-3" /></button>}
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+            {/* Other projects */}
+            {projects.filter(p => p.id !== activeProject?.id).length > 0 && (
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wider px-3 pt-2 pb-1" style={{ color: 'var(--text-muted)' }}>
+                  Switch project
+                </p>
+                {projects.filter(p => p.id !== activeProject?.id).map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleSelectProject(p.id)}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors"
+                    style={{ color: 'var(--text-secondary)' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <FolderOpen className="w-3 h-3 shrink-0" style={{ color: 'var(--text-muted)' }} />
+                    <span className="truncate">{p.name}</span>
+                    <span className="text-[10px] shrink-0 ml-auto" style={{ color: 'var(--text-muted)' }}>{p.datasets?.length || 0}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <button onClick={() => { setStep('upload'); setOpen(false) }} className="w-full flex items-center gap-2 px-3 py-2 text-xs" style={{ color: 'var(--accent)', borderTop: '1px solid var(--border)' }}>
             <Plus className="w-3 h-3" /> Add new dataset
@@ -105,13 +141,21 @@ function DatasetSwitcher() {
   )
 }
 
-export default function Dashboard({ user, onLogout, onNewProject, onGoHome }) {
+export default function Dashboard({ user, onLogout, onNewProject, onGoHome, initialConversationId, onConversationConsumed }) {
   const { rowCount, columnsByType, setStep, datasets, activeTab, setActiveTab, rawData, schema, fileName, globalFilters, insights, reportBuilderState } = useData()
-  const { activeProject } = useProject()
+  const { activeProject, projects, selectProject } = useProject()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activeConversationId, setActiveConversationId] = useState(null)
   const [exporting, setExporting] = useState(false)
   const menuRef = useRef(null)
+
+  // When navigating from AllChats with a specific conversation
+  useEffect(() => {
+    if (initialConversationId) {
+      setActiveConversationId(initialConversationId)
+      if (onConversationConsumed) onConversationConsumed()
+    }
+  }, [initialConversationId])
 
   useEffect(() => { window.scrollTo(0, 0) }, [])
   useEffect(() => { setMobileMenuOpen(false) }, [activeTab])
@@ -175,7 +219,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome }) {
           )}
         </div>
 
-        {datasets.length > 0 && <div className="p-3" style={{ borderBottom: '1px solid var(--border-light)' }}><DatasetSwitcher /></div>}
+        {datasets.length > 0 && <div className="p-3" style={{ borderBottom: '1px solid var(--border-light)' }}><ProjectSwitcher onGoHome={onGoHome} /></div>}
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {TABS.map(tab => (
@@ -268,7 +312,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome }) {
                 {onLogout && <button onClick={() => { setMobileMenuOpen(false); onLogout() }} className="flex items-center gap-1 text-xs text-red-500"><LogOut className="w-3 h-3" /> Sign out</button>}
               </div>
             )}
-            {datasets.length > 1 && <div className="p-3" style={{ borderBottom: '1px solid var(--border-light)' }}><DatasetSwitcher /></div>}
+            {datasets.length > 1 && <div className="p-3" style={{ borderBottom: '1px solid var(--border-light)' }}><ProjectSwitcher onGoHome={onGoHome} /></div>}
             <div className="p-2">
               {TABS.map(tab => (
                 <button key={tab.id} onClick={() => { setActiveTab(tab.id); setMobileMenuOpen(false) }}
@@ -299,8 +343,8 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome }) {
           </div>
           {showFilterBar && <GlobalFilterBar />}
           <div className="space-y-4 lg:space-y-6">
-            {activeTab === 'overview' && <><KPICards /><AIChartBuilder /><AutoCharts /></>}
-            {activeTab === 'charts' && <><AIChartBuilder /><AutoCharts /></>}
+            {activeTab === 'overview' && <><KPICards /><AutoCharts /></>}
+            {activeTab === 'charts' && <AutoCharts />}
             {activeTab === 'builder' && <ReportBuilder />}
             {activeTab === 'data' && <DataTable />}
             {activeTab === 'ask' && <AskAI conversationId={activeConversationId} onConversationChange={setActiveConversationId} />}
