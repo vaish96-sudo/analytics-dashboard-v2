@@ -127,7 +127,16 @@ body {
 .dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.1) !important; }
 .dark .bg-sky-50 { background-color: rgba(14, 165, 233, 0.1) !important; }
 .dark .bg-sky-100 { background-color: rgba(196, 160, 105, 0.12) !important; }
-.dark .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.12) !important; }
+.dark .bg-emerald-100 { background-color: rgba(196, 160, 105, 0.12) !important; }
+
+/* Metrics: warm amber in dark mode instead of green */
+.dark .text-emerald-800 { color: #d4a574 !important; }
+.dark .text-emerald-700 { color: #c4a069 !important; }
+.dark .text-emerald-600 { color: #c4a069 !important; }
+.dark .border-emerald-300 { border-color: rgba(196, 160, 105, 0.3) !important; }
+.dark .border-emerald-200 { border-color: rgba(196, 160, 105, 0.2) !important; }
+.dark .bg-emerald-100 { background-color: rgba(196, 160, 105, 0.12) !important; }
+.dark .bg-emerald-50 { background-color: rgba(196, 160, 105, 0.08) !important; }
 
 /* Text colors in dark mode */
 .dark .text-slate-800, .dark .text-slate-900, .dark .text-slate-700 { color: var(--text-primary) !important; }

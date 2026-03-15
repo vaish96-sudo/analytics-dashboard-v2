@@ -5,7 +5,7 @@ import { useTheme } from '../context/ThemeContext'
 import {
   FolderOpen, FolderPlus, Upload, FileSpreadsheet, Globe, LogOut,
   ChevronRight, Loader2, Search, Database, MessageSquare, Lightbulb, Sun, Moon, Monitor,
-  Crown, Sparkles, Menu, X, User, Settings, Trash2
+  Crown, Menu, X, User, Settings, Trash2
 } from 'lucide-react'
 
 function getGreeting() {
@@ -258,13 +258,10 @@ export default function HomeScreen({ onOpenProject, onNewProject }) {
         <div className="p-6 lg:p-8 max-w-[900px] mx-auto">
           {/* Greeting */}
           <div className="mb-8 animate-fade-in">
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl lg:text-3xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>
-                {getGreeting()}, {userName}
-              </h1>
-              <Sparkles className="w-6 h-6 text-amber-400" />
-            </div>
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <h1 className="text-2xl lg:text-3xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>
+              {getGreeting()}, {userName}
+            </h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
               Here's your analytics overview.
             </p>
           </div>

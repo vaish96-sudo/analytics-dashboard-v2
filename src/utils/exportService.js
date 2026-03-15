@@ -31,7 +31,7 @@ export async function exportToPDF(content, title = 'Northern Bird Report') {
   const addSectionHeader = (text) => {
     addSpacer(4)
     checkPageBreak(20)
-    doc.setDrawColor(37, 99, 235)
+    doc.setDrawColor(176, 141, 87)
     doc.setLineWidth(0.5)
     doc.line(margin, y, margin + 30, y)
     y += 4
@@ -41,11 +41,11 @@ export async function exportToPDF(content, title = 'Northern Bird Report') {
 
   // ========== HEADER ==========
   // Blue accent bar at top
-  doc.setFillColor(37, 99, 235)
+  doc.setFillColor(176, 141, 87)
   doc.rect(0, 0, pageWidth, 3, 'F')
 
   y = 12
-  addText('NORTHERN BIRD ANALYTICS', 18, 'bold', [37, 99, 235])
+  addText('NORTHERN BIRD ANALYTICS', 18, 'bold', [176, 141, 87])
   addSpacer(1)
   addText(title, 13, 'normal', [71, 85, 105])
   addSpacer(1)
@@ -199,6 +199,42 @@ export async function exportToPDF(content, title = 'Northern Bird Report') {
       addText('AI insights have not been generated for this dataset yet.', 9, 'italic', [148, 163, 184])
     }
 
+    // Data Overview
+    if (content.dataOverview) {
+      const ov = content.dataOverview
+      addSectionHeader('Data schema overview')
+      addText(`${ov.totalColumns} columns: ${ov.dimCount} dimensions, ${ov.metCount} metrics${ov.dateCount ? ', ' + ov.dateCount + ' dates' : ''}`, 9, 'normal', [71, 85, 105])
+      addSpacer(2)
+      if (ov.dimensions) { addText(`Dimensions: ${ov.dimensions}`, 8, 'normal', [100, 116, 139]); addSpacer(1) }
+      if (ov.metrics) { addText(`Metrics: ${ov.metrics}`, 8, 'normal', [100, 116, 139]); addSpacer(1) }
+      if (ov.dates) { addText(`Date fields: ${ov.dates}`, 8, 'normal', [100, 116, 139]) }
+    }
+
+    // Top Breakdowns
+    if (content.topBreakdowns && content.topBreakdowns.length > 0) {
+      addSectionHeader('Top dimension breakdowns')
+      content.topBreakdowns.forEach(breakdown => {
+        checkPageBreak(30)
+        addText(`${breakdown.dimension} by ${breakdown.metric}`, 10, 'bold', [15, 23, 42])
+        addSpacer(2)
+        breakdown.items.forEach((item, idx) => {
+          const formattedVal = item.value >= 1000000 ? `${(item.value / 1000000).toFixed(1)}M` : item.value >= 1000 ? `${(item.value / 1000).toFixed(1)}K` : item.value.toLocaleString()
+          addText(`${idx + 1}. ${item.name}: ${formattedVal}`, 9, 'normal', [71, 85, 105])
+          addSpacer(0.5)
+        })
+        addSpacer(4)
+      })
+    }
+
+    // Builder Summary
+    if (content.builderSummary) {
+      addSectionHeader('Report builder configuration')
+      addText(`Chart type: ${content.builderSummary.chartType}`, 9, 'normal', [71, 85, 105])
+      addSpacer(1)
+      if (content.builderSummary.dimensions) { addText(`Dimensions: ${content.builderSummary.dimensions}`, 9, 'normal', [71, 85, 105]); addSpacer(1) }
+      if (content.builderSummary.metrics) { addText(`Metrics: ${content.builderSummary.metrics}`, 9, 'normal', [71, 85, 105]) }
+    }
+
   } else if (content.type === 'insights') {
     for (const insight of content.items) {
       addText(`[${(insight.impact || 'medium').toUpperCase()}] ${insight.title}`, 11, 'bold')
@@ -236,7 +272,7 @@ export async function exportToPDF(content, title = 'Northern Bird Report') {
   doc.save(`${title.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}.pdf`)
 }
 
-export async function exportDashboardReport({ projectName, fileName, rowCount, schema, rawData, globalFilters, insights }) {
+export async function exportDashboardReport({ projectName, fileName, rowCount, schema, rawData, globalFilters, insights, columnsByType, reportBuilderState }) {
   // Build KPI data from raw data + schema
   const kpis = []
   if (schema && rawData) {
@@ -248,7 +284,6 @@ export async function exportDashboardReport({ projectName, fileName, rowCount, s
       }).filter(v => !isNaN(v))
       const total = values.reduce((a, b) => a + b, 0)
 
-      // Smart format
       let formatted
       if (/cost|spend|revenue|price|amount|budget|profit|sale|earning|income/i.test(col)) {
         formatted = total >= 1000000 ? `$${(total / 1000000).toFixed(1)}M` : total >= 1000 ? `$${(total / 1000).toFixed(1)}K` : `$${total.toFixed(0)}`
@@ -264,6 +299,54 @@ export async function exportDashboardReport({ projectName, fileName, rowCount, s
     })
   }
 
+  // Build data overview
+  const dataOverview = {}
+  if (schema) {
+    const dims = Object.entries(schema).filter(([, d]) => d.type === 'dimension')
+    const mets = Object.entries(schema).filter(([, d]) => d.type === 'metric')
+    const dates = Object.entries(schema).filter(([, d]) => d.type === 'date')
+    dataOverview.totalColumns = Object.keys(schema).length
+    dataOverview.dimensions = dims.map(([, d]) => d.label).join(', ')
+    dataOverview.metrics = mets.map(([, d]) => d.label).join(', ')
+    dataOverview.dates = dates.map(([, d]) => d.label).join(', ')
+    dataOverview.dimCount = dims.length
+    dataOverview.metCount = mets.length
+    dataOverview.dateCount = dates.length
+  }
+
+  // Build top dimension breakdowns
+  const topBreakdowns = []
+  if (schema && rawData && columnsByType) {
+    const dims = columnsByType.dimensions || []
+    const mets = columnsByType.metrics || []
+    if (dims.length > 0 && mets.length > 0) {
+      dims.slice(0, 2).forEach(dim => {
+        const groups = {}
+        rawData.forEach(row => {
+          const key = String(row[dim] || '(empty)')
+          if (!groups[key]) groups[key] = 0
+          const val = parseFloat(String(row[mets[0]] ?? 0).replace(/[,$%]/g, ''))
+          if (!isNaN(val)) groups[key] += val
+        })
+        const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]).slice(0, 5)
+        topBreakdowns.push({
+          dimension: schema[dim]?.label || dim,
+          metric: schema[mets[0]]?.label || mets[0],
+          items: sorted.map(([name, value]) => ({ name, value })),
+        })
+      })
+    }
+  }
+
+  // Builder state summary
+  const builderSummary = reportBuilderState && (reportBuilderState.selectedDims?.length > 0 || reportBuilderState.selectedMetrics?.length > 0)
+    ? {
+        dimensions: (reportBuilderState.selectedDims || []).map(d => schema?.[d]?.label || d).join(', '),
+        metrics: (reportBuilderState.selectedMetrics || []).map(m => schema?.[m]?.label || m).join(', '),
+        chartType: reportBuilderState.chartType || 'bar',
+      }
+    : null
+
   await exportToPDF({
     type: 'dashboard_report',
     projectName,
@@ -272,6 +355,9 @@ export async function exportDashboardReport({ projectName, fileName, rowCount, s
     filters: globalFilters,
     kpis,
     insights: insights || [],
+    dataOverview,
+    topBreakdowns,
+    builderSummary,
   }, `${projectName || 'Dashboard'} Report`)
 }
 
