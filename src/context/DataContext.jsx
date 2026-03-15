@@ -92,6 +92,7 @@ export function DataProvider({ children }) {
         insights: raw.insights || [],
         insightsLoaded: raw.insights_loaded || false,
         aiCharts: raw.ai_charts || [],
+        customMetrics: raw.custom_metrics || [],
         chatHistory: [],
       })
       const savedTab = localStorage.getItem('nb_tab')
@@ -121,6 +122,7 @@ export function DataProvider({ children }) {
         insights: raw.insights || [],
         insightsLoaded: raw.insights_loaded || false,
         aiCharts: raw.ai_charts || [],
+        customMetrics: raw.custom_metrics || [],
         globalFilters: raw.global_filters || {},
       }
     })
@@ -132,15 +134,61 @@ export function DataProvider({ children }) {
         id: '__pending__', rawData: pendingData, fileName: pendingFileName,
         schema: pendingSchema, rowCount: pendingData.length,
         reportBuilderState: {}, dataTableState: {}, chartsState: {},
-        chatHistory: [], insights: [], insightsLoaded: false, aiCharts: [], globalFilters: {},
+        chatHistory: [], insights: [], insightsLoaded: false, aiCharts: [], customMetrics: [], globalFilters: {},
       }
     }
     return datasets.find(d => d.id === activeDatasetId) || null
   }, [datasets, activeDatasetId, pendingData, pendingSchema, pendingFileName])
 
-  const rawData = activeDataset?.rawData || null
+  const baseRawData = activeDataset?.rawData || null
   const fileName = activeDataset?.fileName || null
-  const schema = activeDataset?.schema || null
+  const baseSchema = activeDataset?.schema || null
+
+  // Custom metrics — computed columns that appear everywhere
+  const customMetrics = localDashboardState.customMetrics || []
+
+  const OPERATIONS_MAP = {
+    divide: (a, b) => b !== 0 ? a / b : 0,
+    multiply: (a, b) => a * b,
+    add: (a, b) => a + b,
+    subtract: (a, b) => a - b,
+    percentage: (a, b) => b !== 0 ? (a / b) * 100 : 0,
+    margin: (a, b) => a !== 0 ? ((a - b) / a) * 100 : 0,
+  }
+
+  // Enhanced schema: base schema + custom metric columns
+  const schema = useMemo(() => {
+    if (!baseSchema) return null
+    if (customMetrics.length === 0) return baseSchema
+    const enhanced = { ...baseSchema }
+    customMetrics.forEach((cm, i) => {
+      const colKey = `_custom_${i}_${cm.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}`
+      enhanced[colKey] = {
+        type: 'metric',
+        label: cm.name,
+        isCustom: true,
+        formula: cm,
+      }
+    })
+    return enhanced
+  }, [baseSchema, customMetrics])
+
+  // Enhanced rawData: base data + computed custom metric values per row
+  const rawData = useMemo(() => {
+    if (!baseRawData) return null
+    if (customMetrics.length === 0) return baseRawData
+    return baseRawData.map(row => {
+      const enhanced = { ...row }
+      customMetrics.forEach((cm, i) => {
+        const colKey = `_custom_${i}_${cm.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}`
+        const a = parseFloat(String(row[cm.colA] ?? 0).replace(/[,$%]/g, '')) || 0
+        const b = parseFloat(String(row[cm.colB] ?? 0).replace(/[,$%]/g, '')) || 0
+        const fn = OPERATIONS_MAP[cm.operation] || OPERATIONS_MAP.divide
+        enhanced[colKey] = fn(a, b)
+      })
+      return enhanced
+    })
+  }, [baseRawData, customMetrics])
 
   const globalFilters = localDashboardState.global_filters || {}
   const setGlobalFilters = useCallback((valOrFn) => {
@@ -214,6 +262,7 @@ export function DataProvider({ children }) {
         insights: ds.insights || [],
         insightsLoaded: ds.insightsLoaded || false,
         aiCharts: ds.aiCharts || [],
+        customMetrics: ds.customMetrics || [],
         chatHistory: ds.chatHistory || [],
       })
     }
@@ -263,6 +312,7 @@ export function DataProvider({ children }) {
         report_builder_state: localDashboardState.reportBuilderState || {},
         data_table_state: localDashboardState.dataTableState || {},
         ai_charts: localDashboardState.aiCharts || [],
+        custom_metrics: localDashboardState.customMetrics || [],
         // DO NOT include insights — saved separately via saveInsightsOnly
       }
 
@@ -329,6 +379,7 @@ export function DataProvider({ children }) {
       report_builder_state: st.reportBuilderState || {},
       data_table_state: st.dataTableState || {},
       ai_charts: st.aiCharts || [],
+      custom_metrics: st.customMetrics || [],
       // DO NOT include insights — saved separately via saveInsightsOnly
     }
 
@@ -366,6 +417,7 @@ export function DataProvider({ children }) {
     reportBuilderState: localDashboardState.reportBuilderState || {},
     dataTableState: localDashboardState.dataTableState || {},
     aiCharts: localDashboardState.aiCharts || [],
+    localCustomMetrics: localDashboardState.customMetrics || [],
     insights: localDashboardState.insights || [],
     insightsLoaded: localDashboardState.insightsLoaded || false,
     chatHistory: localDashboardState.chatHistory || [],
