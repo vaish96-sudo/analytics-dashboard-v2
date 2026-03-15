@@ -35,34 +35,42 @@ function buildAutoSchema(data) {
 export function DataProvider({ children }) {
   const { activeProject, activeProjectId, addDatasetToProject, removeDatasetFromProject, selectProject } = useProject()
 
-  // Local state derived from project
   const [activeDatasetId, setActiveDatasetId] = useState(null)
-  const [step, setStep] = useState('upload')
-  const [activeTab, setActiveTab] = useState('overview')
+  const [step, setStep] = useState(() => {
+    try { return localStorage.getItem('nb_step') || 'home' } catch { return 'home' }
+  })
+  const [activeTab, setActiveTab] = useState(() => {
+    try { return localStorage.getItem('nb_tab') || 'overview' } catch { return 'overview' }
+  })
 
-  // Temporary data for new uploads (before saving to DB)
+  // Persist step and tab to localStorage
+  useEffect(() => {
+    try { localStorage.setItem('nb_step', step) } catch {}
+  }, [step])
+  useEffect(() => {
+    try { localStorage.setItem('nb_tab', activeTab) } catch {}
+  }, [activeTab])
+
+  // Pending upload state
   const [pendingData, setPendingData] = useState(null)
   const [pendingFileName, setPendingFileName] = useState(null)
   const [pendingSchema, setPendingSchema] = useState(null)
 
-  // Local overrides for dashboard state (debounced save)
+  // Dashboard state — local mirror, synced to Supabase
   const [localDashboardState, setLocalDashboardState] = useState({})
   const saveTimeout = useRef(null)
+  const lastSavedRef = useRef(null)
 
-  // Initialize from project
+  // When project changes, load its data BUT don't auto-navigate to dashboard
   useEffect(() => {
     if (!activeProject) {
       setActiveDatasetId(null)
-      setLocalDashboardState({})
-      setStep('upload')
       return
     }
-
     const datasets = activeProject.datasets || []
     if (datasets.length > 0) {
       const firstDs = datasets[0]
       setActiveDatasetId(firstDs.id)
-
       // Load dashboard state with proper key normalization
       const raw = firstDs.dashboard_states?.[0] || {}
       setLocalDashboardState({
@@ -78,34 +86,40 @@ export function DataProvider({ children }) {
       if (!savedTab || savedTab === 'overview') {
         setActiveTab(raw.active_tab || 'overview')
       }
+      // Only go to dashboard if we're not on home
       if (step !== 'home') setStep('dashboard')
-    } else {
-      setLocalDashboardState({})
-      setStep('upload')
     }
   }, [activeProject?.id])
 
-  // Datasets from project
+  // Datasets from project — normalize keys to camelCase for components
   const datasets = useMemo(() => {
     if (!activeProject?.datasets) return []
-    return activeProject.datasets.map(ds => ({
-      id: ds.id,
-      rawData: ds.raw_data || [],
-      fileName: ds.file_name,
-      schema: ds.schema_def || {},
-      rowCount: ds.row_count || 0,
-      dashboardState: ds.dashboard_states?.[0] || {},
-    }))
+    return activeProject.datasets.map(ds => {
+      const raw = ds.dashboard_states?.[0] || {}
+      return {
+        id: ds.id,
+        rawData: ds.raw_data || [],
+        fileName: ds.file_name,
+        schema: ds.schema_def || {},
+        rowCount: ds.row_count || 0,
+        reportBuilderState: raw.report_builder_state || {},
+        dataTableState: raw.data_table_state || {},
+        chartsState: raw.charts_state || {},
+        chatHistory: [],
+        insights: raw.insights || [],
+        insightsLoaded: raw.insights_loaded || false,
+        globalFilters: raw.global_filters || {},
+      }
+    })
   }, [activeProject])
 
   const activeDataset = useMemo(() => {
     if (pendingData && pendingSchema) {
       return {
-        id: '__pending__',
-        rawData: pendingData,
-        fileName: pendingFileName,
-        schema: pendingSchema,
-        rowCount: pendingData.length,
+        id: '__pending__', rawData: pendingData, fileName: pendingFileName,
+        schema: pendingSchema, rowCount: pendingData.length,
+        reportBuilderState: {}, dataTableState: {}, chartsState: {},
+        chatHistory: [], insights: [], insightsLoaded: false, globalFilters: {},
       }
     }
     return datasets.find(d => d.id === activeDatasetId) || null
@@ -115,7 +129,6 @@ export function DataProvider({ children }) {
   const fileName = activeDataset?.fileName || null
   const schema = activeDataset?.schema || null
 
-  // Global filters
   const globalFilters = localDashboardState.global_filters || {}
   const setGlobalFilters = useCallback((valOrFn) => {
     setLocalDashboardState(prev => {
@@ -123,10 +136,8 @@ export function DataProvider({ children }) {
       return { ...prev, global_filters: newFilters }
     })
   }, [])
-
   const hasGlobalFilters = Object.values(globalFilters).some(v => v && v.length > 0)
 
-  // Filtered data
   const filteredRawData = useMemo(() => {
     if (!rawData) return rawData
     const activeFilters = Object.entries(globalFilters).filter(([, vals]) => vals && vals.length > 0)
@@ -149,59 +160,49 @@ export function DataProvider({ children }) {
   const rowCount = rawData ? rawData.length : 0
   const filteredRowCount = filteredRawData ? filteredRawData.length : 0
 
-  // Load data (file upload) - stores temporarily until user tags and confirms
   const loadData = useCallback((data, name) => {
     if (!data || data.length === 0) return
-    const autoSchema = buildAutoSchema(data)
     setPendingData(data)
     setPendingFileName(name)
-    setPendingSchema(autoSchema)
+    setPendingSchema(buildAutoSchema(data))
     setStep('tag')
   }, [])
 
   const cancelTagging = useCallback(() => {
-    setPendingData(null)
-    setPendingFileName(null)
-    setPendingSchema(null)
-    if (datasets.length > 0) {
-      setActiveDatasetId(datasets[0].id)
-      setStep('dashboard')
-    } else {
-      setStep('upload')
-    }
+    setPendingData(null); setPendingFileName(null); setPendingSchema(null)
+    if (datasets.length > 0) { setActiveDatasetId(datasets[0].id); setStep('dashboard') }
+    else setStep('home')
   }, [datasets])
 
-  // Confirm tagging and save to database
   const confirmTagging = useCallback(async () => {
     if (!pendingData || !pendingSchema || !activeProjectId) return
-
     try {
       const dataset = await addDatasetToProject({
-        fileName: pendingFileName,
-        schemaDef: pendingSchema,
-        rowCount: pendingData.length,
-        rawData: pendingData,
+        fileName: pendingFileName, schemaDef: pendingSchema,
+        rowCount: pendingData.length, rawData: pendingData,
       })
-
-      setPendingData(null)
-      setPendingFileName(null)
-      setPendingSchema(null)
+      setPendingData(null); setPendingFileName(null); setPendingSchema(null)
       setActiveDatasetId(dataset.id)
-      // Reset dashboard state for new dataset
+      // Reset dashboard state for new dataset and open overview
       setLocalDashboardState({})
       setActiveTab('overview')
       setStep('dashboard')
-    } catch (err) {
-      console.error('Failed to save dataset:', err)
-    }
+    } catch (err) { console.error('Failed to save dataset:', err) }
   }, [pendingData, pendingSchema, pendingFileName, activeProjectId, addDatasetToProject])
 
   const switchDataset = useCallback((id) => {
     setActiveDatasetId(id)
     const ds = datasets.find(d => d.id === id)
-    if (ds?.dashboardState) {
-      setLocalDashboardState(ds.dashboardState)
-      setActiveTab(ds.dashboardState.active_tab || 'overview')
+    if (ds) {
+      setLocalDashboardState({
+        global_filters: ds.globalFilters || {},
+        chartsState: ds.chartsState || {},
+        reportBuilderState: ds.reportBuilderState || {},
+        dataTableState: ds.dataTableState || {},
+        insights: ds.insights || [],
+        insightsLoaded: ds.insightsLoaded || false,
+        chatHistory: ds.chatHistory || [],
+      })
     }
     setStep('dashboard')
   }, [datasets])
@@ -211,60 +212,53 @@ export function DataProvider({ children }) {
       await removeDatasetFromProject(id)
       if (activeDatasetId === id) {
         const remaining = datasets.filter(d => d.id !== id)
-        if (remaining.length > 0) {
-          setActiveDatasetId(remaining[0].id)
-          setStep('dashboard')
-        } else {
-          setActiveDatasetId(null)
-          setStep('upload')
-        }
+        if (remaining.length > 0) { setActiveDatasetId(remaining[0].id); setStep('dashboard') }
+        else { setActiveDatasetId(null); setStep('home') }
       }
-    } catch (err) {
-      console.error('Failed to remove dataset:', err)
-    }
+    } catch (err) { console.error('Failed to remove dataset:', err) }
   }, [activeDatasetId, datasets, removeDatasetFromProject])
 
   const updateColumnSchema = useCallback((colName, updates) => {
-    if (pendingSchema) {
-      setPendingSchema(prev => ({ ...prev, [colName]: { ...prev[colName], ...updates } }))
-    }
-    // For saved datasets, update via Supabase
-    // (This happens when editing schema from dashboard)
+    if (pendingSchema) setPendingSchema(prev => ({ ...prev, [colName]: { ...prev[colName], ...updates } }))
   }, [pendingSchema])
 
   const removeColumn = useCallback((colName) => {
-    if (pendingSchema) {
-      setPendingSchema(prev => { const s = { ...prev }; delete s[colName]; return s })
-    }
+    if (pendingSchema) setPendingSchema(prev => { const s = { ...prev }; delete s[colName]; return s })
   }, [pendingSchema])
 
   const updateDatasetState = useCallback((key, value) => {
-    setLocalDashboardState(prev => ({
-      ...prev,
-      [key]: typeof value === 'function' ? value(prev[key]) : value,
-    }))
+    setLocalDashboardState(prev => {
+      const newVal = typeof value === 'function' ? value(prev[key]) : value
+      return { ...prev, [key]: newVal }
+    })
   }, [])
 
-  // Debounced save of dashboard state to Supabase
+  // Debounced save — map camelCase back to snake_case for Supabase
   useEffect(() => {
     if (!activeDatasetId || activeDatasetId === '__pending__') return
     if (saveTimeout.current) clearTimeout(saveTimeout.current)
 
     saveTimeout.current = setTimeout(async () => {
+      const stateToSave = {
+        active_tab: activeTab,
+        global_filters: localDashboardState.global_filters || {},
+        charts_state: localDashboardState.chartsState || {},
+        report_builder_state: localDashboardState.reportBuilderState || {},
+        data_table_state: localDashboardState.dataTableState || {},
+        insights: localDashboardState.insights || [],
+        insights_loaded: localDashboardState.insightsLoaded || false,
+      }
+
+      const stateStr = JSON.stringify(stateToSave)
+      if (stateStr === lastSavedRef.current) return
+      lastSavedRef.current = stateStr
+
       try {
-        await projectService.saveDashboardState(activeDatasetId, {
-          active_tab: activeTab,
-          global_filters: localDashboardState.global_filters || {},
-          charts_state: localDashboardState.charts_state || localDashboardState.chartsState || {},
-          report_builder_state: localDashboardState.report_builder_state || localDashboardState.reportBuilderState || {},
-          data_table_state: localDashboardState.data_table_state || localDashboardState.dataTableState || {},
-          insights: localDashboardState.insights || [],
-          insights_loaded: localDashboardState.insights_loaded || localDashboardState.insightsLoaded || false,
-        })
+        await projectService.saveDashboardState(activeDatasetId, stateToSave)
       } catch (err) {
         console.error('Failed to save dashboard state:', err)
       }
-    }, 1000)
+    }, 1500)
 
     return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current) }
   }, [localDashboardState, activeDatasetId, activeTab])
@@ -303,27 +297,28 @@ export function DataProvider({ children }) {
   }, [rawData])
 
   const clearAll = useCallback(() => {
-    setPendingData(null)
-    setPendingFileName(null)
-    setPendingSchema(null)
-    setActiveDatasetId(null)
-    setStep('upload')
-    setActiveTab('overview')
+    setPendingData(null); setPendingFileName(null); setPendingSchema(null)
+    setActiveDatasetId(null); setStep('home'); setActiveTab('overview')
     setLocalDashboardState({})
+    try { localStorage.removeItem('nb_step'); localStorage.removeItem('nb_tab') } catch {}
   }, [])
+
+  const goHome = useCallback(() => { setStep('home') }, [])
+
+  const openProject = useCallback(() => { setStep('dashboard') }, [])
 
   return <DataContext.Provider value={{
     rawData, filteredRawData, fileName, schema, step, setStep, activeTab, setActiveTab,
     globalFilters, setGlobalFilters, hasGlobalFilters,
     loadData, cancelTagging, confirmTagging, updateColumnSchema, removeColumn, columnsByType,
     aggregate, aggregateUnfiltered, getUniqueValues, rowCount, filteredRowCount,
-    datasets, activeDatasetId, activeDataset, switchDataset, removeDataset, updateDatasetState, clearAll,
-    // Expose for components that check state keys
-    chartsState: localDashboardState.charts_state || localDashboardState.chartsState || {},
-    reportBuilderState: localDashboardState.report_builder_state || localDashboardState.reportBuilderState || {},
-    dataTableState: localDashboardState.data_table_state || localDashboardState.dataTableState || {},
+    datasets, activeDatasetId, activeDataset, switchDataset, removeDataset, updateDatasetState,
+    clearAll, goHome, openProject,
+    chartsState: localDashboardState.chartsState || {},
+    reportBuilderState: localDashboardState.reportBuilderState || {},
+    dataTableState: localDashboardState.dataTableState || {},
     insights: localDashboardState.insights || [],
-    insightsLoaded: localDashboardState.insights_loaded || localDashboardState.insightsLoaded || false,
+    insightsLoaded: localDashboardState.insightsLoaded || false,
     chatHistory: localDashboardState.chatHistory || [],
   }}>{children}</DataContext.Provider>
 }
