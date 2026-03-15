@@ -12,6 +12,7 @@ import Dashboard from './components/Dashboard'
 import GoogleSheetsPicker from './components/GoogleSheetsPicker'
 import AllChats from './components/AllChats'
 import AllInsights from './components/AllInsights'
+import UserProfile from './components/UserProfile'
 import { Loader2 } from 'lucide-react'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
@@ -56,6 +57,7 @@ function AppContent() {
   const [showProjectWizard, setShowProjectWizard] = useState(false)
   const [showAllChats, setShowAllChats] = useState(false)
   const [showAllInsights, setShowAllInsights] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   const isGoogleCallback = window.location.pathname === '/auth/callback'
 
@@ -145,6 +147,23 @@ function AppContent() {
     return <AllInsights onBack={() => setShowAllInsights(false)} onOpenProject={handleOpenProject} />
   }
 
+  // Settings page (standalone from home)
+  if (showSettings) {
+    return (
+      <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
+          <div className="flex items-center gap-3 mb-6">
+            <button onClick={() => setShowSettings(false)} className="p-2 rounded-lg transition-colors hover:opacity-80" style={{ color: 'var(--text-muted)' }}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <h1 className="text-xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>Settings</h1>
+          </div>
+          <UserProfile />
+        </div>
+      </div>
+    )
+  }
+
   // Home screen
   if (step === 'home') {
     return (
@@ -153,6 +172,7 @@ function AppContent() {
         onNewProject={handleNewProject}
         onShowChats={() => setShowAllChats(true)}
         onShowInsights={() => setShowAllInsights(true)}
+        onSettings={() => setShowSettings(true)}
       />
     )
   }
@@ -179,6 +199,7 @@ function AppContent() {
       onNewProject={handleNewProject}
       onShowChats={() => setShowAllChats(true)}
       onShowInsights={() => setShowAllInsights(true)}
+      onSettings={() => setShowSettings(true)}
     />
   )
 }

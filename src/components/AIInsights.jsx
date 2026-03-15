@@ -9,7 +9,7 @@ const IMPACT = { high: 'text-red-600 bg-red-50 border-red-200', medium: 'text-am
 const BORDERS = { opportunity: 'border-l-emerald-500', trend: 'border-l-sky-500', alert: 'border-l-red-500', recommendation: 'border-l-blue-500' }
 
 export default function AIInsights() {
-  const { schema, rawData, aggregateUnfiltered, updateDatasetState, insights, insightsLoaded } = useData()
+  const { schema, rawData, aggregateUnfiltered, updateDatasetState, insights, insightsLoaded, flushSave } = useData()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [usedModel, setUsedModel] = useState(null)
@@ -21,8 +21,9 @@ export default function AIInsights() {
       const insightsData = result.insights || result
       setUsedModel(result.model || null)
       updateDatasetState('insights', insightsData)
-      updateDatasetState('insights_loaded', true)
       updateDatasetState('insightsLoaded', true)
+      // Force immediate save to Supabase so insights persist
+      setTimeout(() => { if (flushSave) flushSave() }, 200)
     } catch (err) { setError(err.message) } finally { setLoading(false) }
   }
 

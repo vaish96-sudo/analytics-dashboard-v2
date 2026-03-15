@@ -296,6 +296,29 @@ export function DataProvider({ children }) {
     return [...new Set(rawData.map(row => row[colName]).filter(v => v !== null && v !== undefined && v !== ''))].sort()
   }, [rawData])
 
+  // Immediate save — bypass debounce
+  const flushSave = useCallback(async () => {
+    if (!activeDatasetId || activeDatasetId === '__pending__') return
+    if (saveTimeout.current) clearTimeout(saveTimeout.current)
+
+    const stateToSave = {
+      active_tab: activeTab,
+      global_filters: localDashboardState.global_filters || {},
+      charts_state: localDashboardState.chartsState || {},
+      report_builder_state: localDashboardState.reportBuilderState || {},
+      data_table_state: localDashboardState.dataTableState || {},
+      insights: localDashboardState.insights || [],
+      insights_loaded: localDashboardState.insightsLoaded || false,
+    }
+
+    try {
+      await projectService.saveDashboardState(activeDatasetId, stateToSave)
+      lastSavedRef.current = JSON.stringify(stateToSave)
+    } catch (err) {
+      console.error('Failed to flush save:', err)
+    }
+  }, [activeDatasetId, activeTab, localDashboardState])
+
   const clearAll = useCallback(() => {
     setPendingData(null); setPendingFileName(null); setPendingSchema(null)
     setActiveDatasetId(null); setStep('home'); setActiveTab('overview')
@@ -303,7 +326,11 @@ export function DataProvider({ children }) {
     try { localStorage.removeItem('nb_step'); localStorage.removeItem('nb_tab') } catch {}
   }, [])
 
-  const goHome = useCallback(() => { setStep('home') }, [])
+  const goHome = useCallback(async () => {
+    // Flush any pending saves before navigating away
+    await flushSave()
+    setStep('home')
+  }, [flushSave])
 
   const openProject = useCallback(() => { setStep('dashboard') }, [])
 
@@ -313,7 +340,7 @@ export function DataProvider({ children }) {
     loadData, cancelTagging, confirmTagging, updateColumnSchema, removeColumn, columnsByType,
     aggregate, aggregateUnfiltered, getUniqueValues, rowCount, filteredRowCount,
     datasets, activeDatasetId, activeDataset, switchDataset, removeDataset, updateDatasetState,
-    clearAll, goHome, openProject,
+    clearAll, goHome, openProject, flushSave,
     chartsState: localDashboardState.chartsState || {},
     reportBuilderState: localDashboardState.reportBuilderState || {},
     dataTableState: localDashboardState.dataTableState || {},
