@@ -35,44 +35,44 @@ export async function listProjects(userId) {
 }
 
 export async function getProject(projectId) {
+  // Step 1: Fetch project + datasets (without nested dashboard_states — nested select is unreliable)
   const { data, error } = await supabase
     .from('projects')
     .select(`
       id, name, data_source_type, data_source_meta, created_at, updated_at,
-      datasets(id, file_name, schema_def, row_count, raw_data, created_at,
-        dashboard_states(id, active_tab, global_filters, charts_state, report_builder_state, data_table_state, insights, insights_loaded, ai_charts, updated_at)
-      )
+      datasets(id, file_name, schema_def, row_count, raw_data, created_at)
     `)
     .eq('id', projectId)
     .single()
 
   if (error) throw new Error(error.message)
 
-  // Diagnostic: log what Supabase returned for dashboard state
-  if (data?.datasets) {
-    for (const ds of data.datasets) {
-      const st = ds.dashboard_states?.[0]
-      if (st) {
-        console.log('DB READ for dataset', ds.id, '→ filters:', Object.keys(st.global_filters || {}).length, 'insights:', (st.insights || []).length, 'ai_charts:', (st.ai_charts || []).length, 'charts_state keys:', Object.keys(st.charts_state || {}).length)
-      } else {
-        console.log('DB READ for dataset', ds.id, '→ NO dashboard_states row!')
-      }
-    }
-  }
+  // Step 2: Fetch dashboard_states directly for all datasets in this project
+  if (data?.datasets && data.datasets.length > 0) {
+    const datasetIds = data.datasets.map(ds => ds.id)
 
-  // Ensure every dataset has a dashboard_states row
-  if (data?.datasets) {
+    const { data: allStates, error: stErr } = await supabase
+      .from('dashboard_states')
+      .select('id, dataset_id, active_tab, global_filters, charts_state, report_builder_state, data_table_state, insights, insights_loaded, ai_charts, updated_at')
+      .in('dataset_id', datasetIds)
+
+    if (stErr) console.error('Failed to fetch dashboard_states:', stErr.message)
+
+    // Step 3: Attach states to their datasets, auto-create if missing
     for (const ds of data.datasets) {
-      const states = ds.dashboard_states || []
-      if (states.length === 0) {
+      const matched = (allStates || []).filter(s => s.dataset_id === ds.id)
+
+      if (matched.length > 0) {
+        ds.dashboard_states = matched
+        const st = matched[0]
+        console.log('DB READ for dataset', ds.id, '→ filters:', Object.keys(st.global_filters || {}).length, 'insights:', (st.insights || []).length, 'ai_charts:', (st.ai_charts || []).length)
+      } else {
         console.log('No dashboard_states row for dataset', ds.id, '— creating one')
         const { data: newRow } = await supabase
           .from('dashboard_states')
           .insert({ dataset_id: ds.id })
-          .select('id, active_tab, global_filters, charts_state, report_builder_state, data_table_state, insights, insights_loaded, ai_charts, updated_at')
-        if (newRow && newRow.length > 0) {
-          ds.dashboard_states = newRow
-        }
+          .select('id, dataset_id, active_tab, global_filters, charts_state, report_builder_state, data_table_state, insights, insights_loaded, ai_charts, updated_at')
+        ds.dashboard_states = newRow || []
       }
     }
   }
@@ -353,25 +353,29 @@ export async function listAllConversations(userId) {
 }
 
 export async function listAllInsights(userId) {
-  // Get all projects with their datasets and dashboard states
   const { data: projects, error } = await supabase
     .from('projects')
-    .select(`
-      id, name, updated_at,
-      datasets(id, file_name, row_count,
-        dashboard_states(insights, insights_loaded)
-      )
-    `)
+    .select('id, name, updated_at, datasets(id, file_name, row_count)')
     .eq('user_id', userId)
     .order('updated_at', { ascending: false })
 
   if (error) throw new Error(error.message)
   if (!projects) return []
 
+  const allDatasetIds = projects.flatMap(p => (p.datasets || []).map(d => d.id))
+  if (allDatasetIds.length === 0) return []
+
+  const { data: states } = await supabase
+    .from('dashboard_states')
+    .select('dataset_id, insights, insights_loaded')
+    .in('dataset_id', allDatasetIds)
+
+  const stateMap = Object.fromEntries((states || []).map(s => [s.dataset_id, s]))
+
   const results = []
   for (const project of projects) {
     for (const ds of (project.datasets || [])) {
-      const state = ds.dashboard_states?.[0]
+      const state = stateMap[ds.id]
       if (state?.insights?.length > 0) {
         results.push({
           projectId: project.id,
