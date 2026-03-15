@@ -69,6 +69,9 @@ export function DataProvider({ children }) {
   useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
   useEffect(() => { datasetIdRef.current = activeDatasetId }, [activeDatasetId])
 
+  // Track whether state was just loaded from DB (skip saving it back immediately)
+  const justLoadedRef = useRef(false)
+
   // When project changes (or is re-fetched), load its data from Supabase
   // CRITICAL: Depend on activeProject (the object ref), not just activeProject?.id
   // This ensures that when selectProject() fetches fresh data (e.g. returning from home),
@@ -82,9 +85,12 @@ export function DataProvider({ children }) {
     if (datasets.length > 0) {
       const firstDs = datasets[0]
       setActiveDatasetId(firstDs.id)
+      // Update ref immediately so any in-flight saves target the correct dataset
+      datasetIdRef.current = firstDs.id
       // Load dashboard state from the fresh Supabase data
       const raw = firstDs.dashboard_states?.[0] || {}
-      console.log('Loading project dashboard state — insights count:', (raw.insights || []).length, 'insights_loaded:', raw.insights_loaded)
+      console.log('Loading project dashboard state — insights:', (raw.insights || []).length, 'ai_charts:', (raw.ai_charts || []).length)
+      justLoadedRef.current = true
       setLocalDashboardState({
         global_filters: raw.global_filters || {},
         chartsState: raw.charts_state || {},
@@ -206,8 +212,10 @@ export function DataProvider({ children }) {
 
   const switchDataset = useCallback((id) => {
     setActiveDatasetId(id)
+    datasetIdRef.current = id
     const ds = datasets.find(d => d.id === id)
     if (ds) {
+      justLoadedRef.current = true
       setLocalDashboardState({
         global_filters: ds.globalFilters || {},
         chartsState: ds.chartsState || {},
@@ -251,28 +259,41 @@ export function DataProvider({ children }) {
   // Debounced save — map camelCase back to snake_case for Supabase
   useEffect(() => {
     if (!activeDatasetId || activeDatasetId === '__pending__') return
+
+    // Skip saving state that was just loaded from DB — avoids writing stale data
+    // during project switches where the new state + old dataset ID overlap briefly
+    if (justLoadedRef.current) {
+      justLoadedRef.current = false
+      return
+    }
+
     if (saveTimeout.current) clearTimeout(saveTimeout.current)
 
     saveTimeout.current = setTimeout(async () => {
+      // CRITICAL: Use ref for dataset ID, not closure value.
+      // During project switches, the closure might capture the OLD dataset ID
+      // while localDashboardState already has the NEW project's data.
+      const dsId = datasetIdRef.current
+      if (!dsId || dsId === '__pending__') return
+
       const stateToSave = {
-        active_tab: activeTab,
+        active_tab: activeTabRef.current,
         global_filters: localDashboardState.global_filters || {},
         charts_state: localDashboardState.chartsState || {},
         report_builder_state: localDashboardState.reportBuilderState || {},
         data_table_state: localDashboardState.dataTableState || {},
         ai_charts: localDashboardState.aiCharts || [],
         // DO NOT include insights here — they are saved directly via saveInsightsOnly
-        // to avoid race conditions where a debounced save overwrites fresh insights with stale empty array
       }
 
       const stateStr = JSON.stringify(stateToSave)
       if (stateStr === lastSavedRef.current) return
       lastSavedRef.current = stateStr
 
-      console.log('Debounced save (no insights) for dataset:', activeDatasetId)
+      console.log('Debounced save for dataset:', dsId, 'ai_charts:', (localDashboardState.aiCharts || []).length)
 
       try {
-        await projectService.saveDashboardState(activeDatasetId, stateToSave)
+        await projectService.saveDashboardState(dsId, stateToSave)
       } catch (err) {
         console.error('Failed to save dashboard state:', err)
       }
