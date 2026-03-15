@@ -31,31 +31,31 @@
 }
 
 /* ============================================================
-   DARK MODE — Claude-inspired (deep slate + purple accents)
+   DARK MODE — Claude Console inspired dark warm tones
    ============================================================ */
 .dark {
-  --bg-primary: #0a0e1a;
-  --bg-surface: #11172a;
-  --bg-raised: #161c2f;
-  --bg-overlay: #161c2f;
-  --accent: #7c3aed;
-  --accent-light: #a78bfa;
-  --accent-dark: #5b21b6;
+  --bg-primary: #191919;
+  --bg-surface: #222222;
+  --bg-raised: #2a2a2a;
+  --bg-overlay: #2a2a2a;
+  --accent: #3b82f6;
+  --accent-light: #60a5fa;
+  --accent-dark: #2563eb;
   --text-primary: #e5e5e0;
-  --text-secondary: #a8a8b5;
-  --text-muted: #7a7a8c;
-  --border: #1c1f33;
-  --border-light: #14172b;
-  --border-accent: rgba(124, 58, 237, 0.15);
-  --sidebar-bg: #0d1122;
-  --sidebar-border: #14172b;
-  --card-bg: #121a2c;
-  --card-border: #1b1f33;
-  --card-shadow: 0 1px 3px rgba(0,0,0,0.28);
-  --input-bg: #121a2c;
-  --input-border: #242b4b;
-  --scrollbar-thumb: #2c2f51;
-  --scrollbar-hover: #353773;
+  --text-secondary: #a3a3a0;
+  --text-muted: #6b6b68;
+  --border: #333333;
+  --border-light: #2d2d2d;
+  --border-accent: rgba(59, 130, 246, 0.15);
+  --sidebar-bg: #1f1f1f;
+  --sidebar-border: #2d2d2d;
+  --card-bg: #222222;
+  --card-border: #333333;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  --input-bg: #2a2a2a;
+  --input-border: #3a3a3a;
+  --scrollbar-thumb: #444444;
+  --scrollbar-hover: #555555;
 }
 
 /* ============================================================
@@ -116,12 +116,12 @@ body {
 .dark .bg-white { background-color: var(--card-bg) !important; }
 .dark .bg-slate-50 { background-color: var(--bg-overlay) !important; }
 .dark .bg-slate-100 { background-color: var(--bg-overlay) !important; }
-.dark .bg-blue-50 { background-color: rgba(124, 58, 237, 0.06) !important; }
-.dark .bg-emerald-50 { background-color: rgba(52, 211, 153, 0.08) !important; }
-.dark .bg-purple-50 { background-color: rgba(124, 58, 237, 0.06) !important; }
-.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.08) !important; }
+.dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.1) !important; }
+.dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.1) !important; }
+.dark .bg-purple-50 { background-color: rgba(139, 92, 246, 0.1) !important; }
+.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.1) !important; }
 .dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.1) !important; }
-.dark .bg-sky-50 { background-color: rgba(124, 58, 237, 0.06) !important; }
+.dark .bg-sky-50 { background-color: rgba(14, 165, 233, 0.1) !important; }
 
 /* Text colors in dark mode */
 .dark .text-slate-800, .dark .text-slate-900, .dark .text-slate-700 { color: var(--text-primary) !important; }
