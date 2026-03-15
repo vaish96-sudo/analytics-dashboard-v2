@@ -160,29 +160,39 @@ export async function saveDashboardState(datasetId, state) {
 }
 
 export async function saveInsightsOnly(datasetId, insights, insightsLoaded) {
-  // Check if any dashboard_state rows exist for this dataset
-  const { data: existing, error: checkErr } = await supabase
+  console.log('saveInsightsOnly called with datasetId:', datasetId, 'insights count:', insights?.length)
+  
+  // Just do a direct update — we know the row exists from the JOIN query
+  const { data, error, count } = await supabase
     .from('dashboard_states')
-    .select('id')
+    .update({ 
+      insights: JSON.parse(JSON.stringify(insights)),  // Force clean JSON
+      insights_loaded: insightsLoaded 
+    })
     .eq('dataset_id', datasetId)
-    .limit(1)
+    .select('id, insights_loaded')
 
-  if (checkErr) throw new Error(checkErr.message)
-
-  if (existing && existing.length > 0) {
-    // Update ALL rows for this dataset_id
-    const { error } = await supabase
-      .from('dashboard_states')
-      .update({ insights, insights_loaded: insightsLoaded })
-      .eq('dataset_id', datasetId)
-    if (error) throw new Error(error.message)
-  } else {
-    // Insert new row
-    const { error } = await supabase
-      .from('dashboard_states')
-      .insert({ dataset_id: datasetId, insights, insights_loaded: insightsLoaded })
-    if (error) throw new Error(error.message)
+  console.log('saveInsightsOnly result:', { data, error, count })
+  
+  if (error) {
+    console.error('saveInsightsOnly error:', error)
+    throw new Error(error.message)
   }
+  
+  if (!data || data.length === 0) {
+    console.warn('saveInsightsOnly: no rows matched dataset_id', datasetId)
+    // Try insert instead
+    const { error: insertErr } = await supabase
+      .from('dashboard_states')
+      .insert({ 
+        dataset_id: datasetId, 
+        insights: JSON.parse(JSON.stringify(insights)), 
+        insights_loaded: insightsLoaded 
+      })
+    if (insertErr) console.error('saveInsightsOnly insert error:', insertErr)
+    else console.log('saveInsightsOnly: inserted new row')
+  }
+  
   return true
 }
 
