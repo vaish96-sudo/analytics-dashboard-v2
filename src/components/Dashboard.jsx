@@ -9,6 +9,7 @@ import DataTable from './DataTable'
 import ReportBuilder from './ReportBuilder'
 import AskAI from './AskAI'
 import AIInsights from './AIInsights'
+import AIChartBuilder from './AIChartBuilder'
 import GlobalFilterBar from './GlobalFilterBar'
 import UserProfile from './UserProfile'
 import {
@@ -298,8 +299,8 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome }) {
           </div>
           {showFilterBar && <GlobalFilterBar />}
           <div className="space-y-4 lg:space-y-6">
-            {activeTab === 'overview' && <><KPICards /><AutoCharts /></>}
-            {activeTab === 'charts' && <AutoCharts />}
+            {activeTab === 'overview' && <><KPICards /><AIChartBuilder /><AutoCharts /></>}
+            {activeTab === 'charts' && <><AIChartBuilder /><AutoCharts /></>}
             {activeTab === 'builder' && <ReportBuilder />}
             {activeTab === 'data' && <DataTable />}
             {activeTab === 'ask' && <AskAI conversationId={activeConversationId} onConversationChange={setActiveConversationId} />}
