@@ -1,6 +1,6 @@
 const API_URL = '/api/claude'
-const MODEL_SONNET = 'claude-sonnet-4-20250514'
-const MODEL_OPUS = 'claude-opus-4-20250514'
+const MODEL_SONNET = 'claude-sonnet-4-6'
+const MODEL_OPUS = 'claude-opus-4-6'
 
 function buildSchemaPrompt(schema) {
   const cols = Object.entries(schema)
