@@ -236,12 +236,81 @@ export function DataProvider({ children }) {
   const rowCount = rawData ? rawData.length : 0
   const filteredRowCount = filteredRawData ? filteredRawData.length : 0
 
-  const loadData = useCallback((data, name) => {
+  const [schemaLoading, setSchemaLoading] = useState(false)
+
+  const loadData = useCallback(async (data, name) => {
     if (!data || data.length === 0) return
     setPendingData(data)
     setPendingFileName(name)
+    // Use basic heuristic first for instant feedback
     setPendingSchema(buildAutoSchema(data))
     setStep('tag')
+
+    // Then run AI tagging in background for better accuracy
+    setSchemaLoading(true)
+    try {
+      const columns = Object.keys(data[0])
+      const samples = {}
+      columns.forEach(col => {
+        samples[col] = data.map(r => r[col]).filter(v => v !== null && v !== undefined && v !== '').slice(0, 8)
+      })
+
+      const colList = columns.map(col => `- "${col}": ${samples[col].slice(0, 5).map(v => JSON.stringify(v)).join(', ')}`).join('\n')
+
+      const system = `You are a data classification expert. The user uploaded a dataset. For each column, determine:
+1. type: "dimension" (text/categories for grouping — names, regions, ranges like "20-30%", IDs, labels), "metric" (numeric values you would SUM or AVERAGE — revenue, counts, amounts, rates as raw numbers), "date" (dates/timestamps), or "ignore" (irrelevant columns like row IDs)
+2. label: A clean, human-readable display name
+
+CRITICAL RULES:
+- Columns with ranges like "20-30%", "25-34", "100-200" are DIMENSIONS not metrics — they are categories
+- Columns with names/text that happen to contain numbers (IDs, codes, zip codes) are DIMENSIONS
+- Only classify as "metric" if the values are actual numbers that make sense to sum or average
+- Column names like "age" with categorical values (age ranges) should be DIMENSION
+- Column names like "amount", "total", "count", "revenue", "cost", "price" with raw numbers should be METRIC
+
+Respond with ONLY a JSON object (no markdown, no backticks) mapping column names to {type, label}:
+{"column_name": {"type": "dimension", "label": "Column Name"}, ...}`
+
+      const res = await fetch('/api/claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system,
+          messages: [{ role: 'user', content: `Classify these columns:\n${colList}` }],
+          max_tokens: 1500,
+          model: 'claude-sonnet-4-6',
+        }),
+      })
+
+      if (res.ok) {
+        const result = await res.json()
+        const text = result.content?.map(c => c.text || '').join('') || ''
+        const aiSchema = JSON.parse(text.replace(/```json|```/g, '').trim())
+
+        // Validate and merge — only update if AI returned valid types for all columns
+        const validTypes = ['dimension', 'metric', 'date', 'ignore']
+        const isValid = columns.every(col => aiSchema[col] && validTypes.includes(aiSchema[col].type))
+
+        if (isValid) {
+          setPendingSchema(prev => {
+            if (!prev) return prev
+            const updated = {}
+            columns.forEach(col => {
+              updated[col] = {
+                type: aiSchema[col]?.type || prev[col]?.type || 'dimension',
+                label: aiSchema[col]?.label || prev[col]?.label || col,
+              }
+            })
+            return updated
+          })
+          console.log('AI schema tagging complete')
+        }
+      }
+    } catch (err) {
+      console.log('AI tagging failed, using basic heuristic:', err.message)
+    } finally {
+      setSchemaLoading(false)
+    }
   }, [])
 
   const cancelTagging = useCallback(() => {
@@ -424,7 +493,7 @@ export function DataProvider({ children }) {
   return <DataContext.Provider value={{
     rawData, filteredRawData, fileName, schema, step, setStep, activeTab, setActiveTab,
     globalFilters, setGlobalFilters, hasGlobalFilters,
-    loadData, cancelTagging, confirmTagging, updateColumnSchema, removeColumn, columnsByType,
+    loadData, cancelTagging, confirmTagging, updateColumnSchema, removeColumn, columnsByType, schemaLoading,
     aggregate, aggregateUnfiltered, getUniqueValues, rowCount, filteredRowCount,
     datasets, activeDatasetId, activeDataset, switchDataset, removeDataset, updateDatasetState,
     clearAll, goHome, openProject, flushSave,
