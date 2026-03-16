@@ -1,12 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-  LineChart, Line, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis,
-  FunnelChart, Funnel, LabelList, ComposedChart, Area,
-} from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, PieChart, Pie, Cell } from 'recharts'
 import { useData } from '../context/DataContext'
 import { CHART_COLORS, smartFormat, truncate } from '../utils/formatters'
-import { Tag, Hash, X, BarChart3, TrendingUp, PieChart as PieIcon, Table2, Plus, Filter, Trash2, Download, Check, RotateCcw, Search, ArrowUp, ArrowDown, ArrowUpDown, Layers, GitCommitHorizontal, Triangle, BarChart2, Droplets } from 'lucide-react'
+import { Tag, Hash, X, BarChart3, TrendingUp, PieChart as PieIcon, Table2, Plus, Filter, Trash2, Download, Check, RotateCcw, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 
 function TogglePill({ col, label, type, isSelected, onToggle, isCustom }) {
   const baseColors = type === 'dimension'
@@ -79,17 +75,7 @@ function MultiSelectFilter({ col, schema, uniqueValues, selected, onChange }) {
   )
 }
 
-const CHART_TYPES = [
-  { value: 'bar', icon: BarChart3 },
-  { value: 'stacked', icon: Layers },
-  { value: 'line', icon: TrendingUp },
-  { value: 'combo', icon: BarChart2 },
-  { value: 'scatter', icon: GitCommitHorizontal },
-  { value: 'waterfall', icon: Droplets },
-  { value: 'funnel', icon: Triangle },
-  { value: 'pie', icon: PieIcon },
-  { value: 'table', icon: Table2 },
-]
+const CHART_TYPES = [{ value: 'bar', icon: BarChart3 }, { value: 'line', icon: TrendingUp }, { value: 'pie', icon: PieIcon }, { value: 'table', icon: Table2 }]
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (<div className="bg-white border border-slate-200 rounded-lg p-3 shadow-lg">
@@ -176,31 +162,6 @@ export default function ReportBuilder() {
     return [...top.map(d => ({ name: d._label, value: d[metric] || 0 })), { name: `Other (${rest.length})`, value: rest.reduce((s, d) => s + (d[metric] || 0), 0) }]
   }, [displayData, selectedMetrics])
 
-  // Waterfall chart data — shows cumulative build-up
-  const waterfallData = useMemo(() => {
-    if (selectedMetrics.length === 0 || displayData.length === 0) return []
-    const metric = selectedMetrics[0]
-    let cumulative = 0
-    const items = displayData.map(d => {
-      const val = d[metric] || 0
-      const item = { name: d._label, value: val, base: cumulative, fill: val >= 0 ? CHART_COLORS[0] : '#ef4444' }
-      cumulative += val
-      return item
-    })
-    items.push({ name: 'Total', value: cumulative, base: 0, fill: CHART_COLORS[2] })
-    return items
-  }, [displayData, selectedMetrics])
-
-  // Funnel chart data — sorted descending by first metric
-  const funnelData = useMemo(() => {
-    if (selectedMetrics.length === 0 || displayData.length === 0) return []
-    const metric = selectedMetrics[0]
-    return [...displayData]
-      .sort((a, b) => (b[metric] || 0) - (a[metric] || 0))
-      .slice(0, 8)
-      .map((d, i) => ({ name: d._label, value: d[metric] || 0, fill: CHART_COLORS[i % CHART_COLORS.length] }))
-  }, [displayData, selectedMetrics])
-
   const handleExportExcel = async () => {
     if (displayData.length === 0) return
     const XLSX = await import('xlsx')
@@ -263,7 +224,7 @@ export default function ReportBuilder() {
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-              {CHART_TYPES.map(ct => (<button key={ct.value} onClick={() => setChartType(ct.value)} title={ct.value.charAt(0).toUpperCase() + ct.value.slice(1)}
+              {CHART_TYPES.map(ct => (<button key={ct.value} onClick={() => setChartType(ct.value)}
                 className={`p-2 rounded-md transition-colors ${chartType === ct.value ? 'bg-accent text-white' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200'}`}><ct.icon className="w-4 h-4" /></button>))}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -328,13 +289,6 @@ export default function ReportBuilder() {
                         <YAxis tick={{ fill: '#64748b', fontSize: 11 }} /><Tooltip content={<CustomTooltip />} /><Legend />
                         {selectedMetrics.map((m, i) => <Bar key={m} dataKey={m} name={schema[m]?.label} fill={CHART_COLORS[i]} radius={[4, 4, 0, 0]} />)}
                       </BarChart>
-                    ) : chartType === 'stacked' ? (
-                      <BarChart data={displayData} margin={{ top: 8, right: 8, left: 0, bottom: 60 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis dataKey="_label" tick={{ fill: '#64748b', fontSize: 11 }} angle={-35} textAnchor="end" height={80} />
-                        <YAxis tick={{ fill: '#64748b', fontSize: 11 }} /><Tooltip content={<CustomTooltip />} /><Legend />
-                        {selectedMetrics.map((m, i) => <Bar key={m} dataKey={m} name={schema[m]?.label} fill={CHART_COLORS[i]} stackId="stack" />)}
-                      </BarChart>
                     ) : chartType === 'line' ? (
                       <LineChart data={displayData} margin={{ top: 8, right: 8, left: 0, bottom: 60 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -342,47 +296,6 @@ export default function ReportBuilder() {
                         <YAxis tick={{ fill: '#64748b', fontSize: 11 }} /><Tooltip content={<CustomTooltip />} /><Legend />
                         {selectedMetrics.map((m, i) => <Line key={m} type="monotone" dataKey={m} name={schema[m]?.label} stroke={CHART_COLORS[i]} strokeWidth={2} dot={{ r: 3 }} />)}
                       </LineChart>
-                    ) : chartType === 'combo' ? (
-                      <ComposedChart data={displayData} margin={{ top: 8, right: 8, left: 0, bottom: 60 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis dataKey="_label" tick={{ fill: '#64748b', fontSize: 11 }} angle={-35} textAnchor="end" height={80} />
-                        <YAxis tick={{ fill: '#64748b', fontSize: 11 }} /><Tooltip content={<CustomTooltip />} /><Legend />
-                        {selectedMetrics.map((m, i) => 
-                          i === 0
-                            ? <Bar key={m} dataKey={m} name={schema[m]?.label} fill={CHART_COLORS[i]} radius={[4, 4, 0, 0]} />
-                            : <Line key={m} type="monotone" dataKey={m} name={schema[m]?.label} stroke={CHART_COLORS[i]} strokeWidth={2.5} dot={{ r: 4 }} />
-                        )}
-                      </ComposedChart>
-                    ) : chartType === 'scatter' ? (
-                      <ScatterChart margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis dataKey={selectedMetrics[0]} name={schema[selectedMetrics[0]]?.label} tick={{ fill: '#64748b', fontSize: 11 }} type="number" />
-                        <YAxis dataKey={selectedMetrics[1] || selectedMetrics[0]} name={schema[selectedMetrics[1] || selectedMetrics[0]]?.label} tick={{ fill: '#64748b', fontSize: 11 }} type="number" />
-                        <ZAxis range={[40, 400]} />
-                        <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip />} />
-                        <Legend />
-                        <Scatter name={selectedDims[0] ? schema[selectedDims[0]]?.label : 'Data'} data={displayData} fill={CHART_COLORS[0]}>
-                          {displayData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                        </Scatter>
-                      </ScatterChart>
-                    ) : chartType === 'waterfall' ? (
-                      <BarChart data={waterfallData} margin={{ top: 8, right: 8, left: 0, bottom: 60 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} angle={-35} textAnchor="end" height={80} />
-                        <YAxis tick={{ fill: '#64748b', fontSize: 11 }} /><Tooltip content={<CustomTooltip />} />
-                        <Bar dataKey="base" stackId="waterfall" fill="transparent" />
-                        <Bar dataKey="value" stackId="waterfall" name={schema[selectedMetrics[0]]?.label} radius={[4, 4, 0, 0]}>
-                          {waterfallData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                        </Bar>
-                      </BarChart>
-                    ) : chartType === 'funnel' ? (
-                      <FunnelChart margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-                        <Tooltip content={<CustomTooltip />} />
-                        <Funnel dataKey="value" data={funnelData} isAnimationActive>
-                          {funnelData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                          <LabelList position="center" fill="#fff" fontSize={11} dataKey="name" />
-                        </Funnel>
-                      </FunnelChart>
                     ) : (
                       <PieChart>
                         <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="70%" innerRadius="35%" paddingAngle={2}
