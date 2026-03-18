@@ -153,13 +153,12 @@ export function DataProvider({ children }) {
   }, [activeProject?.id])
 
   // Datasets from project — normalize keys to camelCase for components
-  // Raw data comes from fullDataCacheRef (downloaded from Storage or cached from upload)
+  // Priority: in-memory cache (uploaded/downloaded this session) → DB raw_data → empty
   const datasets = useMemo(() => {
     if (!activeProject?.datasets) return []
     return activeProject.datasets.map(ds => {
       const raw = ds.dashboard_states?.[0] || {}
-      // Data comes from cache (uploaded this session or downloaded from Storage)
-      const rawData = fullDataCacheRef.current[ds.id] || []
+      const rawData = fullDataCacheRef.current[ds.id] || ds.raw_data || []
       return {
         id: ds.id,
         rawData,
