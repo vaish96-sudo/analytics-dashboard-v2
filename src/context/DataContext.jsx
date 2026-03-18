@@ -63,8 +63,12 @@ export function DataProvider({ children }) {
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [confirmError, setConfirmError] = useState(null)
 
-  // Cache for full raw data when DB only stores a sample (large datasets > 5K rows)
+  // Cache for full raw data — either uploaded this session or downloaded from Storage
   const fullDataCacheRef = useRef({})
+
+  // Tick to force datasets memo to recalculate after async download
+  const [dataDownloadTick, setDataDownloadTick] = useState(0)
+  const [dataLoading, setDataLoading] = useState(false)
 
   // Dashboard state — local mirror, synced to Supabase
   const [localDashboardState, setLocalDashboardState] = useState({})
@@ -114,16 +118,52 @@ export function DataProvider({ children }) {
     }
   }, [activeProject?.id])
 
+  // Download raw data from Storage for datasets that aren't cached yet
+  useEffect(() => {
+    if (!activeProject?.datasets) return
+    const toDownload = activeProject.datasets.filter(
+      ds => ds.raw_data_path && !fullDataCacheRef.current[ds.id]
+    )
+    if (toDownload.length === 0) return
+
+    setDataLoading(true)
+    let mounted = true
+
+    Promise.all(
+      toDownload.map(async (ds) => {
+        try {
+          const { downloadRawData } = await import('../lib/projectService')
+          const data = await downloadRawData(ds.raw_data_path)
+          if (mounted && data.length > 0) {
+            fullDataCacheRef.current[ds.id] = data
+            console.log('Downloaded raw data for', ds.file_name, '→', data.length, 'rows')
+          }
+        } catch (err) {
+          console.error('Failed to download raw data for', ds.file_name, ':', err.message)
+        }
+      })
+    ).then(() => {
+      if (mounted) {
+        setDataDownloadTick(t => t + 1) // Trigger datasets memo recalc
+        setDataLoading(false)
+      }
+    })
+
+    return () => { mounted = false }
+  }, [activeProject?.id])
+
   // Datasets from project — normalize keys to camelCase for components
+  // Raw data comes from fullDataCacheRef (downloaded from Storage or cached from upload)
   const datasets = useMemo(() => {
     if (!activeProject?.datasets) return []
     return activeProject.datasets.map(ds => {
       const raw = ds.dashboard_states?.[0] || {}
-      // Use cached full data if available (large datasets where DB has only a sample)
-      const rawData = fullDataCacheRef.current[ds.id] || ds.raw_data || []
+      // Data comes from cache (uploaded this session or downloaded from Storage)
+      const rawData = fullDataCacheRef.current[ds.id] || []
       return {
         id: ds.id,
         rawData,
+        rawDataPath: ds.raw_data_path || null,
         fileName: ds.file_name,
         schema: ds.schema_def || {},
         rowCount: ds.row_count || rawData.length,
@@ -138,7 +178,7 @@ export function DataProvider({ children }) {
         globalFilters: raw.global_filters || {},
       }
     })
-  }, [activeProject])
+  }, [activeProject, dataDownloadTick])
 
   const activeDataset = useMemo(() => {
     if (pendingData && pendingSchema) {
@@ -340,12 +380,11 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
         fileName: pendingFileName, schemaDef: pendingSchema,
         rowCount: pendingData.length, rawData: pendingData,
       })
-      // If the dataset was truncated for DB storage, cache full data in memory
-      if (dataset._isTruncated || dataset._fullRawData) {
-        fullDataCacheRef.current[dataset.id] = pendingData
-      }
+      // Cache full data in memory (Storage has the file, DB has metadata only)
+      fullDataCacheRef.current[dataset.id] = pendingData
       setPendingData(null); setPendingFileName(null); setPendingSchema(null)
       setActiveDatasetId(dataset.id)
+      setDataDownloadTick(t => t + 1) // Force datasets memo recalc
       setLocalDashboardState({})
       setActiveTab('overview')
       setStep('dashboard')
@@ -517,7 +556,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
     rawData, filteredRawData, fileName, schema, step, setStep, activeTab, setActiveTab,
     globalFilters, setGlobalFilters, hasGlobalFilters,
     loadData, cancelTagging, confirmTagging, updateColumnSchema, removeColumn, columnsByType, schemaLoading,
-    confirmLoading, confirmError,
+    confirmLoading, confirmError, dataLoading,
     aggregate, aggregateUnfiltered, getUniqueValues, rowCount, filteredRowCount,
     datasets, activeDatasetId, activeDataset, switchDataset, removeDataset, updateDatasetState,
     clearAll, goHome, openProject, flushSave,
@@ -528,6 +567,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
     localCustomMetrics: localDashboardState.customMetrics || [],
     insights: localDashboardState.insights || [],
     insightsLoaded: localDashboardState.insightsLoaded || false,
+    recommendations: localDashboardState.recommendations || [],
     chatHistory: localDashboardState.chatHistory || [],
   }}>{children}</DataContext.Provider>
 }

@@ -12,8 +12,7 @@ const PRIORITY_STYLES = {
 }
 
 export default function AIRecommendations() {
-  const { schema, rawData, aggregateUnfiltered, activeDatasetId, updateDatasetState } = useData()
-  const [recommendations, setRecommendations] = useState([])
+  const { schema, rawData, aggregateUnfiltered, activeDatasetId, updateDatasetState, recommendations } = useData()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [usedModel, setUsedModel] = useState(null)
@@ -88,9 +87,9 @@ Provide exactly 4-5 recommendations ordered by priority. Be specific — referen
       try {
         const cleaned = text.replace(/```json|```/g, '').trim()
         const parsed = JSON.parse(cleaned)
-        setRecommendations(parsed)
+        updateDatasetState('recommendations', parsed)
       } catch {
-        setRecommendations([{ title: 'Analysis', description: text, steps: [], timeline: '', expected_impact: '', priority: 'medium' }])
+        updateDatasetState('recommendations', [{ title: 'Analysis', description: text, steps: [], timeline: '', expected_impact: '', priority: 'medium' }])
       }
     } catch (err) {
       setError(err.message)
