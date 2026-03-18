@@ -6,7 +6,7 @@ import { useTheme } from '../context/ThemeContext'
 import {
   FolderOpen, FolderPlus, Upload, FileSpreadsheet, Globe, LogOut,
   ChevronRight, Loader2, Search, Database, MessageSquare, Lightbulb, Sun, Moon, Monitor,
-  Crown, Menu, X, User, Settings, Trash2
+  Crown, Menu, X, User, Settings, Trash2, ChevronDown, Plus
 } from 'lucide-react'
 
 function getGreeting() {
@@ -32,6 +32,7 @@ function timeAgo(dateStr) {
 }
 
 const PROJECT_COLORS = ['bg-blue-500', 'bg-emerald-500', 'bg-orange-500', 'bg-purple-500', 'bg-pink-500', 'bg-teal-500']
+const FOLDER_COLORS = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899', '#14b8a6']
 
 function ThemeToggle() {
   const { mode, setTheme } = useTheme()
@@ -77,8 +78,13 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [chatCount, setChatCount] = useState(null)
   const [insightCount, setInsightCount] = useState(null)
+  const [expandedProjects, setExpandedProjects] = useState({})
   const projectsRef = useRef(null)
   const menuRef = useRef(null)
+
+  const toggleProject = (id) => {
+    setExpandedProjects(prev => ({ ...prev, [id]: !prev[id] }))
+  }
 
   const userName = user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'there'
   const initials = (user?.name || user?.email || '?')[0].toUpperCase()
@@ -151,7 +157,7 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
         </div>
 
         <div className="flex-1 overflow-y-auto p-3">
-          <p className="text-[10px] font-medium uppercase tracking-wider px-2 mb-2" style={{ color: 'var(--text-muted)' }}>Recents</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider px-2 mb-2" style={{ color: 'var(--text-muted)' }}>Projects</p>
           <div className="space-y-0.5">
             {loading ? (
               <div className="flex items-center justify-center py-8">
@@ -160,25 +166,56 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
             ) : projects.length === 0 ? (
               <p className="text-xs px-2 py-4" style={{ color: 'var(--text-muted)' }}>No projects yet</p>
             ) : (
-              projects.slice(0, 15).map((p, i) => (
-                <div key={p.id} className="group flex items-center gap-0.5 rounded-lg transition-colors hover:opacity-90"
-                  style={{ color: 'var(--text-secondary)' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <button onClick={() => onOpenProject(p.id)}
-                    className="flex-1 flex items-center gap-2.5 px-2.5 py-2 text-left min-w-0">
-                    <div className={`w-2 h-2 rounded-full ${PROJECT_COLORS[i % PROJECT_COLORS.length]} shrink-0`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</p>
-                      <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{timeAgo(p.updated_at)}</p>
+              projects.slice(0, 15).map((p, i) => {
+                const ds = p.datasets || []
+                const isExpanded = expandedProjects[p.id]
+                return (
+                  <div key={p.id}>
+                    {/* Project folder row */}
+                    <div className="group flex items-center gap-0.5 rounded-lg transition-colors"
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <button onClick={() => toggleProject(p.id)}
+                        className="p-1.5 pl-2 shrink-0 transition-transform" style={{ color: 'var(--text-muted)' }}>
+                        <ChevronRight className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                      </button>
+                      <button onClick={() => onOpenProject(p.id)}
+                        className="flex-1 flex items-center gap-2 py-2 pr-1 text-left min-w-0">
+                        <FolderOpen className="w-3.5 h-3.5 shrink-0" style={{ color: FOLDER_COLORS[i % FOLDER_COLORS.length] }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</p>
+                          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{ds.length} {ds.length === 1 ? 'file' : 'files'} · {timeAgo(p.updated_at)}</p>
+                        </div>
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this project?')) deleteProject(p.id) }}
+                        className="p-1 mr-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0" style={{ color: 'var(--text-muted)' }}>
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     </div>
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this project?')) deleteProject(p.id) }}
-                    className="p-1 mr-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0" style={{ color: 'var(--text-muted)' }}>
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              ))
+                    {/* Expanded datasets */}
+                    {isExpanded && (
+                      <div className="ml-5 pl-2 space-y-0.5" style={{ borderLeft: '1px solid var(--border-light)' }}>
+                        {ds.map(d => (
+                          <button key={d.id} onClick={() => onOpenProject(p.id)}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors"
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                            <FileSpreadsheet className="w-3 h-3 shrink-0" style={{ color: '#10b981' }} />
+                            <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{d.file_name}</span>
+                          </button>
+                        ))}
+                        <button onClick={() => onOpenProject(p.id)}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors"
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <Plus className="w-3 h-3 shrink-0" style={{ color: 'var(--accent)' }} />
+                          <span className="text-[11px]" style={{ color: 'var(--accent)' }}>Add dataset</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
             )}
           </div>
         </div>
