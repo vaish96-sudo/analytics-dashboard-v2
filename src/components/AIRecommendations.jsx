@@ -82,7 +82,7 @@ Provide exactly 4-5 recommendations ordered by priority. Be specific — referen
 
       const data = await res.json()
       const text = data.content?.map(c => c.text || '').join('') || ''
-      setUsedModel('Claude Sonnet 4.6')
+      setUsedModel('Claude Opus 4.6')
 
       try {
         const cleaned = text.replace(/```json|```/g, '').trim()
