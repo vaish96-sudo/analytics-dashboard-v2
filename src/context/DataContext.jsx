@@ -105,6 +105,7 @@ export function DataProvider({ children }) {
         dataTableState: raw.data_table_state || {},
         insights: raw.insights || [],
         insightsLoaded: raw.insights_loaded || false,
+        recommendations: raw.recommendations || [],
         aiCharts: raw.ai_charts || [],
         customMetrics: raw.custom_metrics || [],
         chatHistory: [],
@@ -172,6 +173,7 @@ export function DataProvider({ children }) {
         chatHistory: [],
         insights: raw.insights || [],
         insightsLoaded: raw.insights_loaded || false,
+        recommendations: raw.recommendations || [],
         aiCharts: raw.ai_charts || [],
         customMetrics: raw.custom_metrics || [],
         globalFilters: raw.global_filters || {},
@@ -406,6 +408,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
         dataTableState: ds.dataTableState || {},
         insights: ds.insights || [],
         insightsLoaded: ds.insightsLoaded || false,
+        recommendations: ds.recommendations || [],
         aiCharts: ds.aiCharts || [],
         customMetrics: ds.customMetrics || [],
         chatHistory: ds.chatHistory || [],
@@ -458,6 +461,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
         data_table_state: localDashboardState.dataTableState || {},
         ai_charts: localDashboardState.aiCharts || [],
         custom_metrics: localDashboardState.customMetrics || [],
+        recommendations: localDashboardState.recommendations || [],
         // DO NOT include insights — saved separately via saveInsightsOnly
       }
 
@@ -485,9 +489,84 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
       if (Array.isArray(val) && val.length > 0) d = d.filter(row => val.includes(String(row[col])))
       else if (val && val !== '__all__') d = d.filter(row => String(row[col]) === String(val))
     })
+
+    // Identify custom metrics that need special aggregation (ratio or average)
+    const customAggMap = {}
+    ;(localDashboardState.customMetrics || []).forEach((cm, i) => {
+      const colKey = `_custom_${i}_${cm.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}`
+      if (cm.aggregation === 'ratio' || cm.aggregation === 'average') {
+        customAggMap[colKey] = { aggregation: cm.aggregation, formula: cm.formula }
+      }
+    })
+
+    // Helper: compute aggregated value for a custom metric on a set of rows
+    function computeCustomAgg(colKey, rows) {
+      const info = customAggMap[colKey]
+      if (!info) return null // not a special agg — use default sum
+
+      if (info.aggregation === 'average') {
+        // Simple average of per-row values
+        const vals = rows.map(row => parseFloat(String(row[colKey] ?? 0).replace(/[,$%]/g, ''))).filter(v => !isNaN(v))
+        return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
+      }
+
+      if (info.aggregation === 'ratio') {
+        // Parse formula to extract numerator and denominator columns
+        // Formula format: "col_a / col_b" or "col_a / (col_b + col_c)"
+        const parts = info.formula.split('/')
+        if (parts.length !== 2) {
+          // Complex formula — fall back to average of per-row values
+          const vals = rows.map(row => parseFloat(String(row[colKey] ?? 0).replace(/[,$%]/g, ''))).filter(v => !isNaN(v))
+          return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
+        }
+
+        // Evaluate numerator and denominator expressions by summing their components
+        const evalExpr = (expr, rows) => {
+          const trimmed = expr.trim().replace(/[()]/g, '')
+          // Find metric columns referenced in this expression
+          const metricCols = Object.entries(baseSchema || {})
+            .filter(([, def]) => def.type === 'metric' && !def.isCustom)
+            .sort((a, b) => b[0].length - a[0].length)
+
+          // Simple case: single column or expression with + operators
+          // Sum each column across rows, then evaluate
+          let evalStr = trimmed
+          metricCols.forEach(([col]) => {
+            if (evalStr.includes(col)) {
+              const colSum = rows.reduce((sum, row) => {
+                const v = parseFloat(String(row[col] ?? 0).replace(/[,$%]/g, ''))
+                return sum + (isNaN(v) ? 0 : v)
+              }, 0)
+              evalStr = evalStr.replaceAll(col, String(colSum))
+            }
+          })
+
+          // Evaluate the expression safely
+          if (!/^[\d\s+\-*.()]+$/.test(evalStr)) return 0
+          try {
+            const result = new Function(`"use strict"; return (${evalStr})`)()
+            return isFinite(result) ? result : 0
+          } catch { return 0 }
+        }
+
+        const numerator = evalExpr(parts[0], rows)
+        const denominator = evalExpr(parts[1], rows)
+        return denominator !== 0 ? numerator / denominator : 0
+      }
+
+      return null
+    }
+
     if (dimensions.length === 0) {
       const totals = {}
-      metrics.forEach(m => { totals[m] = d.reduce((sum, row) => { const v = parseFloat(String(row[m] ?? 0).replace(/[,$%]/g, '')); return sum + (isNaN(v) ? 0 : v) }, 0) })
+      metrics.forEach(m => {
+        const customResult = computeCustomAgg(m, d)
+        if (customResult !== null) {
+          totals[m] = customResult
+        } else {
+          totals[m] = d.reduce((sum, row) => { const v = parseFloat(String(row[m] ?? 0).replace(/[,$%]/g, '')); return sum + (isNaN(v) ? 0 : v) }, 0)
+        }
+      })
       return [totals]
     }
     const groups = {}
@@ -498,10 +577,17 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
     })
     return Object.values(groups).map(group => {
       const result = {}; dimensions.forEach(dim => { result[dim] = group[dim] })
-      metrics.forEach(m => { result[m] = group._rows.reduce((sum, row) => { const v = parseFloat(String(row[m] ?? 0).replace(/[,$%]/g, '')); return sum + (isNaN(v) ? 0 : v) }, 0) })
+      metrics.forEach(m => {
+        const customResult = computeCustomAgg(m, group._rows)
+        if (customResult !== null) {
+          result[m] = customResult
+        } else {
+          result[m] = group._rows.reduce((sum, row) => { const v = parseFloat(String(row[m] ?? 0).replace(/[,$%]/g, '')); return sum + (isNaN(v) ? 0 : v) }, 0)
+        }
+      })
       return result
     })
-  }, [filteredRawData, rawData, schema])
+  }, [filteredRawData, rawData, schema, baseSchema, localDashboardState.customMetrics])
 
   const aggregateUnfiltered = useCallback((dimensions, metrics, filters = {}) => aggregate(dimensions, metrics, filters, false), [aggregate])
 
@@ -525,6 +611,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
       data_table_state: st.dataTableState || {},
       ai_charts: st.aiCharts || [],
       custom_metrics: st.customMetrics || [],
+      recommendations: st.recommendations || [],
       // DO NOT include insights — saved separately via saveInsightsOnly
     }
 
