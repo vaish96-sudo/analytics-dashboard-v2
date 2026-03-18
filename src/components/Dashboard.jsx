@@ -329,7 +329,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto lg:ml-60 pb-20 lg:pb-0">
-        <div className="p-4 lg:p-6 max-w-[1400px] mx-auto">
+        <div className={`p-4 lg:p-6 mx-auto ${activeTab === 'ai' ? 'max-w-[1800px]' : 'max-w-[1400px]'}`}>
           <div className="mb-4 lg:mb-6">
             <div className="hidden lg:flex items-center gap-2 text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
               <button onClick={onGoHome} className="hover:underline">Home</button>
