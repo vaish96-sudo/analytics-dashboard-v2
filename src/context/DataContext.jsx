@@ -495,7 +495,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
     ;(localDashboardState.customMetrics || []).forEach((cm, i) => {
       const colKey = `_custom_${i}_${cm.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}`
       if (cm.aggregation === 'ratio' || cm.aggregation === 'average') {
-        customAggMap[colKey] = { aggregation: cm.aggregation, formula: cm.formula }
+        customAggMap[colKey] = { aggregation: cm.aggregation, formula: cm.formula, suffix: cm.suffix || '' }
       }
     })
 
@@ -505,31 +505,23 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
       if (!info) return null // not a special agg — use default sum
 
       if (info.aggregation === 'average') {
-        // Simple average of per-row values
         const vals = rows.map(row => parseFloat(String(row[colKey] ?? 0).replace(/[,$%]/g, ''))).filter(v => !isNaN(v))
         return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
       }
 
       if (info.aggregation === 'ratio') {
-        // Parse formula to extract numerator and denominator columns
-        // Formula format: "col_a / col_b" or "col_a / (col_b + col_c)"
         const parts = info.formula.split('/')
         if (parts.length !== 2) {
-          // Complex formula — fall back to average of per-row values
           const vals = rows.map(row => parseFloat(String(row[colKey] ?? 0).replace(/[,$%]/g, ''))).filter(v => !isNaN(v))
           return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
         }
 
-        // Evaluate numerator and denominator expressions by summing their components
         const evalExpr = (expr, rows) => {
           const trimmed = expr.trim().replace(/[()]/g, '')
-          // Find metric columns referenced in this expression
           const metricCols = Object.entries(baseSchema || {})
             .filter(([, def]) => def.type === 'metric' && !def.isCustom)
             .sort((a, b) => b[0].length - a[0].length)
 
-          // Simple case: single column or expression with + operators
-          // Sum each column across rows, then evaluate
           let evalStr = trimmed
           metricCols.forEach(([col]) => {
             if (evalStr.includes(col)) {
@@ -551,7 +543,9 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
 
         const numerator = evalExpr(parts[0], rows)
         const denominator = evalExpr(parts[1], rows)
-        return denominator !== 0 ? numerator / denominator : 0
+        const ratio = denominator !== 0 ? numerator / denominator : 0
+        // If suffix is %, multiply by 100 for display (0.70 → 70%)
+        return info.suffix === '%' ? ratio * 100 : ratio
       }
 
       return null

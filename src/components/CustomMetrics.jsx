@@ -277,7 +277,7 @@ function MetricPill({ metric, schema, onEdit, onRemove, colors }) {
 
 // ─── Main Component ──────────────────────────────────────────────
 export default function CustomMetrics() {
-  const { schema, rawData, columnsByType, updateDatasetState } = useData()
+  const { schema, rawData, columnsByType, updateDatasetState, activeDatasetId } = useData()
   const customMetrics = useData().localCustomMetrics || []
   const colors = useCustomMetricColors()
 
@@ -287,6 +287,14 @@ export default function CustomMetrics() {
   const [suggestLoading, setSuggestLoading] = useState(false)
   const [suggestError, setSuggestError] = useState(null)
   const [acceptedSuggestions, setAcceptedSuggestions] = useState(new Set())
+
+  // Clear stale suggestions when switching datasets/projects
+  useEffect(() => {
+    setSuggestions(null)
+    setAcceptedSuggestions(new Set())
+    setShowForm(false)
+    setEditIndex(null)
+  }, [activeDatasetId])
 
   const handleSave = (metric) => {
     let updated
