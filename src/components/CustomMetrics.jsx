@@ -67,9 +67,14 @@ CRITICAL RULES:
 - Example formula: "cost / (clicks + 1)" or "gold / (equity_market + mutual_funds)"
 - Each formula must use at least 2 columns from the dataset.
 - Do NOT suggest metrics that already exist as columns.
+- For EVERY metric, specify the correct aggregation method:
+  - "sum" → the formula result should be summed across rows (e.g. profit = revenue - cost)
+  - "ratio" → the metric is a rate/percentage computed from totals: SUM(numerator) / SUM(denominator). The formula should be written as "numerator / denominator". Examples: delivery rate, CTR, conversion rate, CPA.
+  - "average" → the metric should be averaged, not summed. Examples: avg order value.
+- Getting aggregation wrong makes the metric useless. A rate like "delivered / qty" MUST be "ratio", never "sum".
 
 Respond with ONLY a JSON array (no markdown, no backticks):
-[{"name":"Metric Name","formula":"col_a / (col_b + col_c)","description":"What this measures and why it matters.","suffix":"%" or "" or "$"}]`
+[{"name":"Metric Name","formula":"col_a / (col_b + col_c)","aggregation":"sum|ratio|average","description":"What this measures and why it matters.","suffix":"%" or "" or "$"}]`
 
   const res = await fetch(API_URL, {
     method: 'POST',
@@ -133,6 +138,7 @@ function MetricForm({ schema, columnsByType, onSave, onCancel, initial, colors }
   const [name, setName] = useState(initial?.name || '')
   const [formula, setFormula] = useState(initial?.formula || '')
   const [suffix, setSuffix] = useState(initial?.suffix || '')
+  const [aggregation, setAggregation] = useState(initial?.aggregation || 'sum')
   const nameRef = useRef(null)
   const formulaRef = useRef(null)
 
@@ -152,6 +158,13 @@ function MetricForm({ schema, columnsByType, onSave, onCancel, initial, colors }
     setTimeout(() => { el.selectionStart = el.selectionEnd = start + col.length; el.focus() }, 0)
   }
 
+  // Auto-detect aggregation type from formula and suffix
+  useEffect(() => {
+    if (suffix === '%' || formula.includes('/')) {
+      setAggregation('ratio')
+    }
+  }, [formula, suffix])
+
   const canSave = name.trim() && formula.trim()
 
   return (
@@ -169,6 +182,15 @@ function MetricForm({ schema, columnsByType, onSave, onCancel, initial, colors }
             <input type="text" value={suffix} onChange={e => setSuffix(e.target.value)}
               placeholder="%" className="w-full px-3 py-2 text-sm rounded-lg nb-input text-center" />
           </div>
+          <div className="w-28">
+            <label className="text-[10px] font-medium uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>Aggregation</label>
+            <select value={aggregation} onChange={e => setAggregation(e.target.value)}
+              className="w-full px-2 py-2 text-xs rounded-lg nb-input">
+              <option value="sum">Sum</option>
+              <option value="ratio">Ratio</option>
+              <option value="average">Average</option>
+            </select>
+          </div>
         </div>
 
         <div>
@@ -180,7 +202,7 @@ function MetricForm({ schema, columnsByType, onSave, onCancel, initial, colors }
             placeholder="e.g. cost / (clicks + 1)  or  gold / (equity_market + mutual_funds)"
             className="w-full px-3 py-2 text-sm font-mono rounded-lg nb-input" />
           <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-            Use column names with +, -, *, /, and parentheses. Click "Insert column" to add columns.
+            Use column names with +, -, *, /, and parentheses. {aggregation === 'ratio' ? 'Ratio = SUM(numerator) / SUM(denominator) across rows.' : aggregation === 'average' ? 'Will be averaged across rows, not summed.' : 'Will be summed across rows.'}
           </p>
         </div>
 
@@ -189,13 +211,14 @@ function MetricForm({ schema, columnsByType, onSave, onCancel, initial, colors }
             <Calculator className="w-3.5 h-3.5 shrink-0" style={{ color: colors.accent }} />
             <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
               {name || '?'} = {formulaToDisplay(formula, schema)}{suffix && ` (${suffix})`}
+              <span className="ml-2 opacity-60">({aggregation})</span>
             </span>
           </div>
         )}
 
         <div className="flex items-center justify-end gap-2 pt-1">
           <button onClick={onCancel} className="px-3 py-1.5 text-xs rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }}>Cancel</button>
-          <button onClick={() => canSave && onSave({ name: name.trim(), formula: formula.trim(), suffix })}
+          <button onClick={() => canSave && onSave({ name: name.trim(), formula: formula.trim(), suffix, aggregation })}
             disabled={!canSave}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-40 text-white"
             style={{ background: colors.accent }}>
@@ -302,7 +325,7 @@ export default function CustomMetrics() {
   }
 
   const handleAcceptSuggestion = (suggestion, index) => {
-    const metric = { name: suggestion.name, formula: suggestion.formula, suffix: suggestion.suffix || '' }
+    const metric = { name: suggestion.name, formula: suggestion.formula, suffix: suggestion.suffix || '', aggregation: suggestion.aggregation || 'sum' }
     updateDatasetState('customMetrics', [...customMetrics, metric])
     setAcceptedSuggestions(prev => new Set([...prev, index]))
   }
