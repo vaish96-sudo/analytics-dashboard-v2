@@ -71,7 +71,7 @@ Provide exactly 4-5 recommendations ordered by priority. Be specific — referen
           system,
           messages: [{ role: 'user', content: `Data summary (${rawData.length} total rows):\n${summaryParts.join('\n')}\n\nProvide 4-5 actionable recommendations.` }],
           max_tokens: 2000,
-          model: 'claude-sonnet-4-6',
+          model: 'claude-opus-4-6',
         }),
       })
 
