@@ -337,9 +337,21 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
               <ChevronRight className="w-3 h-3" />
               <span style={{ color: 'var(--text-secondary)' }}>{TABS.find(t => t.id === activeTab)?.label}</span>
             </div>
-            <h1 className="text-xl lg:text-2xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>
-              {TABS.find(t => t.id === activeTab)?.label}
-            </h1>
+            {activeTab === 'ai' ? (
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(37,99,235,0.15))' }}>
+                  <Sparkles className="w-5 h-5" style={{ color: 'var(--accent)' }} />
+                </div>
+                <div>
+                  <h1 className="text-xl lg:text-2xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>AI Assistant</h1>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Chat, analyze, and get recommendations powered by Claude</p>
+                </div>
+              </div>
+            ) : (
+              <h1 className="text-xl lg:text-2xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>
+                {TABS.find(t => t.id === activeTab)?.label}
+              </h1>
+            )}
           </div>
           {showFilterBar && <GlobalFilterBar />}
           <div className="space-y-4 lg:space-y-6">

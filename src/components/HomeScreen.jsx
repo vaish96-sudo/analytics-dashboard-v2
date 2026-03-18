@@ -90,8 +90,8 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
     import('../lib/projectService').then(ps => {
       ps.listAllConversations(user.id).then(c => setChatCount(c.length)).catch(() => setChatCount(0))
       ps.listAllInsights(user.id).then(data => {
-        const total = data.reduce((sum, p) => sum + p.insights.length, 0)
-        setInsightCount(total)
+        // Count projects that have insights, not individual insights
+        setInsightCount(data.length)
       }).catch(() => setInsightCount(0))
     })
   }, [user?.id, projects])
@@ -427,28 +427,52 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                   )}
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {filteredProjects.map((p, i) => {
                     const ds = p.datasets || []
-                    const firstDs = ds[0]
                     const totalRows = ds.reduce((sum, d) => sum + (d.row_count || 0), 0)
                     return (
-                      <button key={p.id} onClick={() => onOpenProject(p.id)}
-                        className="w-full flex items-center gap-4 p-4 rounded-xl transition-all hover:shadow-sm nb-card text-left group animate-slide-up"
+                      <div key={p.id} className="rounded-xl overflow-hidden nb-card animate-slide-up"
                         style={{ animationDelay: `${(i + 3) * 60}ms` }}>
-                        <div className={`w-2.5 h-2.5 rounded-full ${PROJECT_COLORS[i % PROJECT_COLORS.length]} shrink-0`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</p>
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                            {firstDs?.file_name || 'No datasets'} · {totalRows.toLocaleString()} rows · {timeAgo(p.updated_at)}
-                          </p>
+                        {/* Project header row */}
+                        <div className="flex items-center gap-4 p-4 group cursor-pointer"
+                          onClick={() => onOpenProject(p.id)}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <div className={`w-2.5 h-2.5 rounded-full ${PROJECT_COLORS[i % PROJECT_COLORS.length]} shrink-0`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</p>
+                            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                              {ds.length} {ds.length === 1 ? 'dataset' : 'datasets'} · {totalRows.toLocaleString()} rows · {timeAgo(p.updated_at)}
+                            </p>
+                          </div>
+                          <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this project and all its data?')) deleteProject(p.id) }}
+                            className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 shrink-0" style={{ color: 'var(--text-muted)' }} title="Delete project">
+                            <Trash2 className="w-3.5 h-3.5 hover:text-red-500" />
+                          </button>
+                          <ChevronRight className="w-4 h-4 shrink-0 transition-colors" style={{ color: 'var(--text-muted)' }} />
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this project and all its data?')) deleteProject(p.id) }}
-                          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 shrink-0" style={{ color: 'var(--text-muted)' }} title="Delete project">
-                          <Trash2 className="w-3.5 h-3.5 hover:text-red-500" />
-                        </button>
-                        <ChevronRight className="w-4 h-4 shrink-0 transition-colors" style={{ color: 'var(--text-muted)' }} />
-                      </button>
+                        {/* Nested datasets */}
+                        {ds.length > 0 && (
+                          <div style={{ borderTop: '1px solid var(--border-light)' }}>
+                            {ds.map(d => (
+                              <button key={d.id} onClick={() => onOpenProject(p.id)}
+                                className="w-full flex items-center gap-3 px-4 py-2.5 pl-11 text-left transition-colors"
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" style={{ color: '#10b981' }} />
+                                <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{d.file_name}</span>
+                                <span className="text-[10px] ml-auto shrink-0" style={{ color: 'var(--text-muted)' }}>{(d.row_count || 0).toLocaleString()} rows</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {ds.length === 0 && (
+                          <div className="px-4 py-2.5 pl-11" style={{ borderTop: '1px solid var(--border-light)' }}>
+                            <p className="text-[11px] italic" style={{ color: 'var(--text-muted)' }}>No datasets — click to upload</p>
+                          </div>
+                        )}
+                      </div>
                     )
                   })}
                 </div>
