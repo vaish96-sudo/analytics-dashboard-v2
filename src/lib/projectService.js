@@ -40,7 +40,7 @@ export async function getProject(projectId) {
     .from('projects')
     .select(`
       id, name, data_source_type, data_source_meta, created_at, updated_at,
-      datasets(id, file_name, schema_def, row_count, raw_data, created_at)
+      datasets(id, file_name, schema_def, row_count, raw_data_path, raw_data, created_at)
     `)
     .eq('id', projectId)
     .single()
