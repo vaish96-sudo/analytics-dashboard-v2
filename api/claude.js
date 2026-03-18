@@ -1,17 +1,17 @@
-export const config = { runtime: 'edge', maxDuration: 60 }
+export const config = { maxDuration: 60 }
 
-export default async function handler(req) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } })
+    return res.status(405).json({ error: 'Method not allowed' })
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' })
   }
 
   try {
-    const { messages, system, max_tokens = 1024, model } = await req.json()
+    const { messages, system, max_tokens = 1024, model } = req.body
     const useModel = model || 'claude-sonnet-4-20250514'
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -20,10 +20,10 @@ export default async function handler(req) {
     })
     const data = await response.json()
     if (!response.ok) {
-      return new Response(JSON.stringify({ error: data.error?.message || 'API request failed' }), { status: response.status, headers: { 'Content-Type': 'application/json' } })
+      return res.status(response.status).json({ error: data.error?.message || 'API request failed' })
     }
-    return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    return res.status(200).json(data)
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    return res.status(500).json({ error: err.message })
   }
 }
