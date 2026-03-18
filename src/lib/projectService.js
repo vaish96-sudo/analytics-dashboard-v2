@@ -106,12 +106,21 @@ export async function deleteProject(projectId) {
 // ============================================================
 
 export async function createDataset(projectId, { fileName, schemaDef, rowCount, rawData }) {
-  // Large datasets can exceed Supabase's request size limit (~6MB) when stored as JSONB.
-  // Store only a sample in the DB; the full data stays in-memory during the session.
-  const DB_ROW_LIMIT = 5000
-  const isTruncated = rawData.length > DB_ROW_LIMIT
-  const dataForDb = isTruncated ? rawData.slice(0, DB_ROW_LIMIT) : rawData
+  // Upload raw data to Supabase Storage instead of Postgres
+  const storagePath = `${projectId}/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}.json`
 
+  const blob = new Blob([JSON.stringify(rawData)], { type: 'application/json' })
+  const { error: uploadErr } = await supabase.storage
+    .from('datasets')
+    .upload(storagePath, blob, { contentType: 'application/json', upsert: true })
+
+  if (uploadErr) {
+    throw new Error(`Failed to upload data: ${uploadErr.message}`)
+  }
+
+  console.log('Uploaded to Storage:', storagePath, `(${rawData.length} rows)`)
+
+  // Insert metadata into Postgres — raw_data is empty, path points to Storage
   const { data, error } = await supabase
     .from('datasets')
     .insert({
@@ -119,25 +128,51 @@ export async function createDataset(projectId, { fileName, schemaDef, rowCount, 
       file_name: fileName,
       schema_def: schemaDef,
       row_count: rowCount,
-      raw_data: dataForDb,
+      raw_data: [],
+      raw_data_path: storagePath,
     })
     .select()
     .single()
 
-  if (error) throw new Error(error.message)
-
-  // Attach metadata so the caller knows to cache the full data
-  if (isTruncated) {
-    data._isTruncated = true
-    data._fullRawData = rawData
+  if (error) {
+    // Clean up Storage file if DB insert fails
+    await supabase.storage.from('datasets').remove([storagePath])
+    throw new Error(error.message)
   }
 
+  // Attach full data so caller can use it in-memory immediately
+  data._fullRawData = rawData
+
   // Create default dashboard state
-  await supabase.from('dashboard_states').insert({
-    dataset_id: data.id,
-  })
+  await supabase.from('dashboard_states').insert({ dataset_id: data.id })
 
   return data
+}
+
+// Download raw data from Supabase Storage
+export async function downloadRawData(rawDataPath) {
+  if (!rawDataPath) return []
+
+  console.log('Downloading raw data from Storage:', rawDataPath)
+
+  const { data, error } = await supabase.storage
+    .from('datasets')
+    .download(rawDataPath)
+
+  if (error) {
+    console.error('Storage download failed:', error.message)
+    return []
+  }
+
+  try {
+    const text = await data.text()
+    const parsed = JSON.parse(text)
+    console.log('Downloaded and parsed', parsed.length, 'rows')
+    return parsed
+  } catch (err) {
+    console.error('Failed to parse downloaded data:', err.message)
+    return []
+  }
 }
 
 export async function updateDataset(datasetId, updates) {
