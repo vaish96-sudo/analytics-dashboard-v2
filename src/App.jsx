@@ -99,7 +99,9 @@ function AppContent() {
     setShowProjectWizard(false)
     setShowAllChats(false)
     setShowAllInsights(false)
-    if (tab) setActiveTab(tab)
+    // Map old tab IDs to new unified tabs
+    const tabMap = { ask: 'ai', insights: 'ai', charts: 'overview' }
+    if (tab) setActiveTab(tabMap[tab] || tab)
     setPendingConversationId(conversationId || null)
     openProject()
   }

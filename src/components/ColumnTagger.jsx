@@ -63,7 +63,7 @@ function SummaryPill({ colName, def, onChangeType }) {
 
 // ─── Main Component ──────────────────────────────────────────────
 export default function ColumnTagger({ onConfirm }) {
-  const { rawData, fileName, schema, updateColumnSchema, removeColumn, cancelTagging, columnsByType, rowCount, confirmTagging, schemaLoading } = useData()
+  const { rawData, fileName, schema, updateColumnSchema, removeColumn, cancelTagging, columnsByType, rowCount, confirmTagging, schemaLoading, confirmLoading, confirmError } = useData()
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   const samplesByCol = useMemo(() => {
@@ -243,29 +243,39 @@ export default function ColumnTagger({ onConfirm }) {
         )}
 
         {/* ─── Bottom Bar ──────────────────────────────────────── */}
-        <div className="flex items-center justify-between p-3 sm:p-4 rounded-xl shadow-sm sticky bottom-4 sm:bottom-6" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
-          <div className="flex items-center gap-3">
-            <button onClick={cancelTagging}
-              className="flex items-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
-              style={{ color: 'var(--text-muted)' }}>
-              <ArrowLeft className="w-4 h-4" /> Cancel
-            </button>
-            <div className="hidden sm:flex items-center gap-2">
-              {canProceed
-                ? <><CheckCircle2 className="w-4 h-4 text-emerald-500" /><span className="text-xs" style={{ color: 'var(--text-muted)' }}>Ready to build</span></>
-                : <><AlertCircle className="w-4 h-4 text-amber-500" /><span className="text-xs" style={{ color: 'var(--text-muted)' }}>Need at least 1 category + 1 number</span></>
-              }
+        <div className="space-y-2 sticky bottom-4 sm:bottom-6">
+          {confirmError && (
+            <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2 animate-fade-in">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <span className="text-xs text-red-600">{confirmError}</span>
             </div>
+          )}
+          <div className="flex items-center justify-between p-3 sm:p-4 rounded-xl shadow-sm" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+            <div className="flex items-center gap-3">
+              <button onClick={cancelTagging} disabled={confirmLoading}
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-40"
+                style={{ color: 'var(--text-muted)' }}>
+                <ArrowLeft className="w-4 h-4" /> Cancel
+              </button>
+              <div className="hidden sm:flex items-center gap-2">
+                {canProceed
+                  ? <><CheckCircle2 className="w-4 h-4 text-emerald-500" /><span className="text-xs" style={{ color: 'var(--text-muted)' }}>Ready to build</span></>
+                  : <><AlertCircle className="w-4 h-4 text-amber-500" /><span className="text-xs" style={{ color: 'var(--text-muted)' }}>Need at least 1 category + 1 number</span></>
+                }
+              </div>
+            </div>
+            <button onClick={handleConfirm} disabled={!canProceed || schemaLoading || confirmLoading}
+              className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-sm font-display font-semibold transition-all disabled:opacity-40"
+              style={{ background: canProceed ? 'var(--accent)' : 'var(--border)', color: canProceed ? '#fff' : 'var(--text-muted)' }}>
+              {confirmLoading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Building dashboard...</>
+              ) : schemaLoading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing...</>
+              ) : (
+                <><span>Looks good, build dashboard</span> <ArrowRight className="w-4 h-4" /></>
+              )}
+            </button>
           </div>
-          <button onClick={handleConfirm} disabled={!canProceed || schemaLoading}
-            className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-sm font-display font-semibold transition-all disabled:opacity-40"
-            style={{ background: canProceed ? 'var(--accent)' : 'var(--border)', color: canProceed ? '#fff' : 'var(--text-muted)' }}>
-            {schemaLoading ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing...</>
-            ) : (
-              <><span>Looks good, build dashboard</span> <ArrowRight className="w-4 h-4" /></>
-            )}
-          </button>
         </div>
       </div>
     </div>

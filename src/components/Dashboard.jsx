@@ -7,26 +7,23 @@ import KPICards from './KPICards'
 import AutoCharts from './AutoCharts'
 import DataTable from './DataTable'
 import ReportBuilder from './ReportBuilder'
-import AskAI from './AskAI'
-import AIInsights from './AIInsights'
+import AIHub from './AIHub'
 import AIChartBuilder from './AIChartBuilder'
 import CustomMetrics from './CustomMetrics'
 import GlobalFilterBar from './GlobalFilterBar'
 import UserProfile from './UserProfile'
 import LogoMark from './LogoMark'
 import {
-  LayoutDashboard, BarChart3, Table2, Wand2, MessageSquare, Lightbulb,
+  LayoutDashboard, Table2, Wand2, Sparkles,
   FileSpreadsheet, Upload, ChevronRight, Settings, Menu, X, ChevronDown,
   Plus, Trash2, LogOut, Home, Sun, Moon, Monitor, FileDown, Crown, Loader2, FolderOpen
 } from 'lucide-react'
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'charts', label: 'Charts', icon: BarChart3 },
   { id: 'builder', label: 'Builder', icon: Wand2 },
   { id: 'data', label: 'Data', icon: Table2 },
-  { id: 'ask', label: 'Ask AI', icon: MessageSquare },
-  { id: 'insights', label: 'Insights', icon: Lightbulb },
+  { id: 'ai', label: 'AI', icon: Sparkles },
   { id: 'settings', label: 'Settings', icon: Settings },
 ]
 
@@ -168,7 +165,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
     document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
   }, [mobileMenuOpen])
 
-  const showFilterBar = activeTab === 'overview' || activeTab === 'charts'
+  const showFilterBar = activeTab === 'overview'
 
   const handleExportReport = async () => {
     setExporting(true)
@@ -347,11 +344,9 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
           {showFilterBar && <GlobalFilterBar />}
           <div className="space-y-4 lg:space-y-6">
             {activeTab === 'overview' && <><KPICards /><AIChartBuilder /><AutoCharts /></>}
-            {activeTab === 'charts' && <><AIChartBuilder /><AutoCharts /></>}
             {activeTab === 'builder' && <><CustomMetrics /><ReportBuilder /></>}
             {activeTab === 'data' && <DataTable />}
-            {activeTab === 'ask' && <AskAI conversationId={activeConversationId} onConversationChange={setActiveConversationId} />}
-            {activeTab === 'insights' && <AIInsights />}
+            {activeTab === 'ai' && <AIHub conversationId={activeConversationId} onConversationChange={setActiveConversationId} />}
             {activeTab === 'settings' && <UserProfile />}
           </div>
         </div>
@@ -360,18 +355,13 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
       {/* Mobile Bottom Tabs */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 nb-sidebar" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="flex items-center justify-around px-1 py-1.5">
-          {TABS.slice(0, 5).map(tab => (
+          {TABS.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg min-w-0 flex-1 transition-colors"
               style={{ color: activeTab === tab.id ? 'var(--accent)' : 'var(--text-muted)' }}>
               <tab.icon className="w-5 h-5" /><span className="text-[10px] font-medium truncate">{tab.label}</span>
             </button>
           ))}
-          <button onClick={() => setActiveTab('insights')}
-            className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg min-w-0 flex-1 transition-colors"
-            style={{ color: activeTab === 'insights' ? 'var(--accent)' : 'var(--text-muted)' }}>
-            <Lightbulb className="w-5 h-5" /><span className="text-[10px] font-medium">Insights</span>
-          </button>
         </div>
       </div>
     </div>

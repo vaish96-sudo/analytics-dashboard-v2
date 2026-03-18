@@ -40,7 +40,12 @@ export function DataProvider({ children }) {
     try { return localStorage.getItem('nb_step') || 'home' } catch { return 'home' }
   })
   const [activeTab, setActiveTab] = useState(() => {
-    try { return localStorage.getItem('nb_tab') || 'overview' } catch { return 'overview' }
+    try {
+      const saved = localStorage.getItem('nb_tab') || 'overview'
+      // Migrate old tab IDs to new structure
+      const tabMap = { ask: 'ai', insights: 'ai', charts: 'overview' }
+      return tabMap[saved] || saved
+    } catch { return 'overview' }
   })
 
   // Persist step and tab to localStorage
@@ -55,6 +60,11 @@ export function DataProvider({ children }) {
   const [pendingData, setPendingData] = useState(null)
   const [pendingFileName, setPendingFileName] = useState(null)
   const [pendingSchema, setPendingSchema] = useState(null)
+  const [confirmLoading, setConfirmLoading] = useState(false)
+  const [confirmError, setConfirmError] = useState(null)
+
+  // Cache for full raw data when DB only stores a sample (large datasets > 5K rows)
+  const fullDataCacheRef = useRef({})
 
   // Dashboard state — local mirror, synced to Supabase
   const [localDashboardState, setLocalDashboardState] = useState({})
@@ -109,12 +119,14 @@ export function DataProvider({ children }) {
     if (!activeProject?.datasets) return []
     return activeProject.datasets.map(ds => {
       const raw = ds.dashboard_states?.[0] || {}
+      // Use cached full data if available (large datasets where DB has only a sample)
+      const rawData = fullDataCacheRef.current[ds.id] || ds.raw_data || []
       return {
         id: ds.id,
-        rawData: ds.raw_data || [],
+        rawData,
         fileName: ds.file_name,
         schema: ds.schema_def || {},
-        rowCount: ds.row_count || 0,
+        rowCount: ds.row_count || rawData.length,
         reportBuilderState: raw.report_builder_state || {},
         dataTableState: raw.data_table_state || {},
         chartsState: raw.charts_state || {},
@@ -321,17 +333,28 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
 
   const confirmTagging = useCallback(async () => {
     if (!pendingData || !pendingSchema || !activeProjectId) return
+    setConfirmLoading(true)
+    setConfirmError(null)
     try {
       const dataset = await addDatasetToProject({
         fileName: pendingFileName, schemaDef: pendingSchema,
         rowCount: pendingData.length, rawData: pendingData,
       })
+      // If the dataset was truncated for DB storage, cache full data in memory
+      if (dataset._isTruncated || dataset._fullRawData) {
+        fullDataCacheRef.current[dataset.id] = pendingData
+      }
       setPendingData(null); setPendingFileName(null); setPendingSchema(null)
       setActiveDatasetId(dataset.id)
       setLocalDashboardState({})
       setActiveTab('overview')
       setStep('dashboard')
-    } catch (err) { console.error('Failed to save dataset:', err) }
+    } catch (err) {
+      console.error('Failed to save dataset:', err)
+      setConfirmError(err.message || 'Failed to build dashboard. Please try again.')
+    } finally {
+      setConfirmLoading(false)
+    }
   }, [pendingData, pendingSchema, pendingFileName, activeProjectId, addDatasetToProject])
 
   const switchDataset = useCallback((id) => {
@@ -494,6 +517,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
     rawData, filteredRawData, fileName, schema, step, setStep, activeTab, setActiveTab,
     globalFilters, setGlobalFilters, hasGlobalFilters,
     loadData, cancelTagging, confirmTagging, updateColumnSchema, removeColumn, columnsByType, schemaLoading,
+    confirmLoading, confirmError,
     aggregate, aggregateUnfiltered, getUniqueValues, rowCount, filteredRowCount,
     datasets, activeDatasetId, activeDataset, switchDataset, removeDataset, updateDatasetState,
     clearAll, goHome, openProject, flushSave,

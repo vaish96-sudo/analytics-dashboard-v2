@@ -106,6 +106,12 @@ export async function deleteProject(projectId) {
 // ============================================================
 
 export async function createDataset(projectId, { fileName, schemaDef, rowCount, rawData }) {
+  // Large datasets can exceed Supabase's request size limit (~6MB) when stored as JSONB.
+  // Store only a sample in the DB; the full data stays in-memory during the session.
+  const DB_ROW_LIMIT = 5000
+  const isTruncated = rawData.length > DB_ROW_LIMIT
+  const dataForDb = isTruncated ? rawData.slice(0, DB_ROW_LIMIT) : rawData
+
   const { data, error } = await supabase
     .from('datasets')
     .insert({
@@ -113,12 +119,18 @@ export async function createDataset(projectId, { fileName, schemaDef, rowCount, 
       file_name: fileName,
       schema_def: schemaDef,
       row_count: rowCount,
-      raw_data: rawData,
+      raw_data: dataForDb,
     })
     .select()
     .single()
 
   if (error) throw new Error(error.message)
+
+  // Attach metadata so the caller knows to cache the full data
+  if (isTruncated) {
+    data._isTruncated = true
+    data._fullRawData = rawData
+  }
 
   // Create default dashboard state
   await supabase.from('dashboard_states').insert({
