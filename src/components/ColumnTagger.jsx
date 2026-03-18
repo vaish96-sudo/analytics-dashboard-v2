@@ -47,11 +47,13 @@ function SummaryPill({ colName, def, onChangeType }) {
   const config = TYPE_CONFIG[def.type]
   const Icon = config.icon
   return (
-    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium ${config.bg} ${config.color} ${config.border}`}>
+    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium cursor-pointer ${config.bg} ${config.color} ${config.border} group relative`}
+      title={`${def.label} — classified as ${config.label}. Click to change type.`}>
       <Icon className="w-3 h-3" />
       <span>{def.label}</span>
       <select value={def.type} onChange={(e) => onChangeType(e.target.value)}
-        className="appearance-none bg-transparent border-none text-inherit font-medium focus:outline-none cursor-pointer pr-1 text-[10px] opacity-0 hover:opacity-100 w-0 hover:w-auto transition-all">
+        className="appearance-none bg-transparent border-none text-inherit font-medium focus:outline-none cursor-pointer pr-1 text-[10px] opacity-0 group-hover:opacity-100 w-0 group-hover:w-auto transition-all"
+        title="Change column type">
         <option value="dimension">Category</option>
         <option value="metric">Number</option>
         <option value="date">Date</option>

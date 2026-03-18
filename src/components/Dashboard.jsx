@@ -273,8 +273,9 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
                 <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{user.name || 'User'}</p>
                 <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{user.email}</p>
               </div>
-              <button onClick={onLogout} className="p-1.5 rounded-lg transition-colors hover:opacity-80" style={{ color: 'var(--text-muted)' }} title="Sign out">
+              <button onClick={onLogout} className="flex items-center gap-1.5 p-1.5 rounded-lg transition-colors hover:opacity-80" style={{ color: 'var(--text-muted)' }} title="Sign out">
                 <LogOut className="w-3.5 h-3.5" />
+                <span className="text-[10px]">Sign out</span>
               </button>
             </div>
           )}

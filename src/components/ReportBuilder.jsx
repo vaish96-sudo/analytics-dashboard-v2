@@ -135,7 +135,7 @@ export default function ReportBuilder() {
     return aggregate(selectedDims, selectedMetrics, filterObj).sort((a, b) => (b[selectedMetrics[0]] || 0) - (a[selectedMetrics[0]] || 0)).slice(0, 50)
   }, [selectedDims, selectedMetrics, filters, aggregate])
 
-  const displayData = reportData.map((row, i) => ({ ...row, _label: selectedDims.length > 0 ? selectedDims.map(d => truncate(String(row[d] ?? ''), 20)).join(' / ') : `Row ${i + 1}` }))
+  const displayData = useMemo(() => reportData.map((row, i) => ({ ...row, _label: selectedDims.length > 0 ? selectedDims.map(d => truncate(String(row[d] ?? ''), 20)).join(' / ') : `Row ${i + 1}` })), [reportData, selectedDims])
 
   // Sortable table data
   const sortedTableData = useMemo(() => {
