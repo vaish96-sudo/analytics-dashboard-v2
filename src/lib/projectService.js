@@ -35,19 +35,21 @@ export async function listProjects(userId) {
 }
 
 export async function getProject(projectId) {
-  // Step 1: Fetch project + datasets (without nested dashboard_states — nested select is unreliable)
+  // Fetch project + dataset METADATA only (no raw_data — too heavy for Postgres)
+  // raw_data is downloaded separately from Storage via downloadRawData()
+  // For old datasets without raw_data_path, we fetch raw_data as fallback
   const { data, error } = await supabase
     .from('projects')
     .select(`
       id, name, data_source_type, data_source_meta, created_at, updated_at,
-      datasets(id, file_name, schema_def, row_count, raw_data, created_at)
+      datasets(id, file_name, schema_def, row_count, raw_data_path, raw_data, created_at)
     `)
     .eq('id', projectId)
     .single()
 
   if (error) throw new Error(error.message)
 
-  // Step 2: Fetch dashboard_states directly for all datasets in this project
+  // Fetch dashboard_states directly for all datasets in this project
   if (data?.datasets && data.datasets.length > 0) {
     const datasetIds = data.datasets.map(ds => ds.id)
 
@@ -58,7 +60,6 @@ export async function getProject(projectId) {
 
     if (stErr) console.error('Failed to fetch dashboard_states:', stErr.message)
 
-    // Step 3: Attach states to their datasets, auto-create if missing
     for (const ds of data.datasets) {
       const matched = (allStates || []).filter(s => s.dataset_id === ds.id)
 
@@ -93,6 +94,23 @@ export async function updateProject(projectId, updates) {
 }
 
 export async function deleteProject(projectId) {
+  // Clean up Storage files for all datasets in this project
+  try {
+    const { data: datasets } = await supabase
+      .from('datasets')
+      .select('raw_data_path')
+      .eq('project_id', projectId)
+
+    if (datasets) {
+      const paths = datasets.map(ds => ds.raw_data_path).filter(Boolean)
+      if (paths.length > 0) {
+        await supabase.storage.from('datasets').remove(paths)
+      }
+    }
+  } catch (err) {
+    console.warn('Storage cleanup failed:', err.message)
+  }
+
   const { error } = await supabase
     .from('projects')
     .delete()
@@ -106,12 +124,21 @@ export async function deleteProject(projectId) {
 // ============================================================
 
 export async function createDataset(projectId, { fileName, schemaDef, rowCount, rawData }) {
-  // Large datasets can exceed Supabase's request size limit (~6MB) when stored as JSONB.
-  // Store only a sample in the DB; the full data stays in-memory during the session.
-  const DB_ROW_LIMIT = 5000
-  const isTruncated = rawData.length > DB_ROW_LIMIT
-  const dataForDb = isTruncated ? rawData.slice(0, DB_ROW_LIMIT) : rawData
+  // Upload raw data to Supabase Storage instead of Postgres
+  const storagePath = `${projectId}/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}.json`
 
+  const blob = new Blob([JSON.stringify(rawData)], { type: 'application/json' })
+  const { error: uploadErr } = await supabase.storage
+    .from('datasets')
+    .upload(storagePath, blob, { contentType: 'application/json', upsert: true })
+
+  if (uploadErr) {
+    throw new Error(`Failed to upload data: ${uploadErr.message}`)
+  }
+
+  console.log('Uploaded to Storage:', storagePath, `(${rawData.length} rows)`)
+
+  // Insert metadata into Postgres — raw_data is empty, path points to Storage
   const { data, error } = await supabase
     .from('datasets')
     .insert({
@@ -119,25 +146,47 @@ export async function createDataset(projectId, { fileName, schemaDef, rowCount, 
       file_name: fileName,
       schema_def: schemaDef,
       row_count: rowCount,
-      raw_data: dataForDb,
+      raw_data: [],
+      raw_data_path: storagePath,
     })
     .select()
     .single()
 
-  if (error) throw new Error(error.message)
-
-  // Attach metadata so the caller knows to cache the full data
-  if (isTruncated) {
-    data._isTruncated = true
-    data._fullRawData = rawData
+  if (error) {
+    // Clean up Storage file if DB insert fails
+    await supabase.storage.from('datasets').remove([storagePath])
+    throw new Error(error.message)
   }
 
+  // Attach full data so caller can use it in-memory immediately
+  data._fullRawData = rawData
+
   // Create default dashboard state
-  await supabase.from('dashboard_states').insert({
-    dataset_id: data.id,
-  })
+  await supabase.from('dashboard_states').insert({ dataset_id: data.id })
 
   return data
+}
+
+// Download raw data from Supabase Storage
+export async function downloadRawData(rawDataPath) {
+  if (!rawDataPath) return []
+
+  const { data, error } = await supabase.storage
+    .from('datasets')
+    .download(rawDataPath)
+
+  if (error) {
+    console.error('Storage download failed:', error.message)
+    return []
+  }
+
+  try {
+    const text = await data.text()
+    return JSON.parse(text)
+  } catch (err) {
+    console.error('Failed to parse downloaded data:', err.message)
+    return []
+  }
 }
 
 export async function updateDataset(datasetId, updates) {
@@ -153,6 +202,21 @@ export async function updateDataset(datasetId, updates) {
 }
 
 export async function deleteDataset(datasetId) {
+  // Clean up Storage file
+  try {
+    const { data: ds } = await supabase
+      .from('datasets')
+      .select('raw_data_path')
+      .eq('id', datasetId)
+      .single()
+
+    if (ds?.raw_data_path) {
+      await supabase.storage.from('datasets').remove([ds.raw_data_path])
+    }
+  } catch (err) {
+    console.warn('Storage cleanup failed:', err.message)
+  }
+
   const { error } = await supabase
     .from('datasets')
     .delete()
@@ -180,7 +244,6 @@ export async function saveDashboardState(datasetId, state) {
   // CRITICAL: Strip insights fields — they must ONLY be written by saveInsightsOnly()
   const { insights, insights_loaded, ...safeState } = state
 
-  // Try update first
   const { data, error } = await supabase
     .from('dashboard_states')
     .update({ ...safeState, updated_at: new Date().toISOString() })
@@ -192,7 +255,6 @@ export async function saveDashboardState(datasetId, state) {
     throw new Error(error.message)
   }
 
-  // If no row existed, insert one
   if (!data || data.length === 0) {
     console.log('DB WRITE: no row found for dataset', datasetId, '— inserting new row')
     const { data: inserted, error: insertErr } = await supabase
@@ -214,11 +276,10 @@ export async function saveDashboardState(datasetId, state) {
 export async function saveInsightsOnly(datasetId, insights, insightsLoaded) {
   console.log('saveInsightsOnly called with datasetId:', datasetId, 'insights count:', insights?.length)
   
-  // Just do a direct update — we know the row exists from the JOIN query
   const { data, error, count } = await supabase
     .from('dashboard_states')
     .update({ 
-      insights: JSON.parse(JSON.stringify(insights)),  // Force clean JSON
+      insights: JSON.parse(JSON.stringify(insights)),
       insights_loaded: insightsLoaded 
     })
     .eq('dataset_id', datasetId)
@@ -233,7 +294,6 @@ export async function saveInsightsOnly(datasetId, insights, insightsLoaded) {
   
   if (!data || data.length === 0) {
     console.warn('saveInsightsOnly: no rows matched dataset_id', datasetId)
-    // Try insert instead
     const { error: insertErr } = await supabase
       .from('dashboard_states')
       .insert({ 
@@ -328,7 +388,6 @@ export async function addMessage(conversationId, { role, content, sqlPlan, meta 
 
   if (error) throw new Error(error.message)
 
-  // Touch conversation updated_at
   await supabase
     .from('conversations')
     .update({ updated_at: new Date().toISOString() })
@@ -342,7 +401,6 @@ export async function addMessage(conversationId, { role, content, sqlPlan, meta 
 // ============================================================
 
 export async function listAllConversations(userId) {
-  // Get all projects for this user, then all conversations
   const { data: projects, error: pErr } = await supabase
     .from('projects')
     .select('id, name')
