@@ -160,6 +160,11 @@ async function uploadResumable(storagePath, blob) {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
+  // Use direct storage hostname to bypass the API gateway size limit
+  // https://project-id.supabase.co → https://project-id.storage.supabase.co
+  const projectId2 = supabaseUrl.replace('https://', '').split('.')[0]
+  const storageUrl = `https://${projectId2}.storage.supabase.co`
+
   return new Promise((resolve, reject) => {
     const chunkSize = 6 * 1024 * 1024 // 6MB chunks
 
@@ -174,7 +179,7 @@ async function uploadResumable(storagePath, blob) {
 
     // Step 1: Create the upload
     const createXhr = new XMLHttpRequest()
-    createXhr.open('POST', `${supabaseUrl}/storage/v1/upload/resumable`, true)
+    createXhr.open('POST', `${storageUrl}/storage/v1/upload/resumable`, true)
     createXhr.setRequestHeader('Authorization', `Bearer ${supabaseKey}`)
     createXhr.setRequestHeader('apikey', supabaseKey)
     createXhr.setRequestHeader('x-upsert', 'true')
