@@ -106,13 +106,26 @@ export async function deleteProject(projectId) {
 // ============================================================
 
 export async function createDataset(projectId, { fileName, schemaDef, rowCount, rawData }) {
-  // Upload raw data to Supabase Storage instead of Postgres
-  const storagePath = `${projectId}/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}.json`
+  // Compress raw data with gzip before uploading — reduces size by ~85%
+  // 83K rows × 30 cols = ~50MB JSON → ~5-8MB gzipped
+  const storagePath = `${projectId}/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}.json.gz`
 
-  const blob = new Blob([JSON.stringify(rawData)], { type: 'application/json' })
+  const jsonStr = JSON.stringify(rawData)
+  let uploadBlob
+
+  // Use CompressionStream API (available in all modern browsers)
+  if (typeof CompressionStream !== 'undefined') {
+    const stream = new Blob([jsonStr]).stream().pipeThrough(new CompressionStream('gzip'))
+    uploadBlob = await new Response(stream).blob()
+    console.log(`Compressed: ${(jsonStr.length / 1024 / 1024).toFixed(1)}MB → ${(uploadBlob.size / 1024 / 1024).toFixed(1)}MB`)
+  } else {
+    // Fallback: upload uncompressed
+    uploadBlob = new Blob([jsonStr], { type: 'application/json' })
+  }
+
   const { error: uploadErr } = await supabase.storage
     .from('datasets')
-    .upload(storagePath, blob, { contentType: 'application/json', upsert: true })
+    .upload(storagePath, uploadBlob, { contentType: 'application/gzip', upsert: true })
 
   if (uploadErr) {
     throw new Error(`Failed to upload data: ${uploadErr.message}`)
@@ -135,21 +148,18 @@ export async function createDataset(projectId, { fileName, schemaDef, rowCount, 
     .single()
 
   if (error) {
-    // Clean up Storage file if DB insert fails
     await supabase.storage.from('datasets').remove([storagePath])
     throw new Error(error.message)
   }
 
-  // Attach full data so caller can use it in-memory immediately
   data._fullRawData = rawData
 
-  // Create default dashboard state
   await supabase.from('dashboard_states').insert({ dataset_id: data.id })
 
   return data
 }
 
-// Download raw data from Supabase Storage
+// Download raw data from Supabase Storage (handles both gzipped and plain JSON)
 export async function downloadRawData(rawDataPath) {
   if (!rawDataPath) return []
 
@@ -165,7 +175,17 @@ export async function downloadRawData(rawDataPath) {
   }
 
   try {
-    const text = await data.text()
+    let text
+
+    // If gzipped, decompress first
+    if (rawDataPath.endsWith('.gz') && typeof DecompressionStream !== 'undefined') {
+      const stream = data.stream().pipeThrough(new DecompressionStream('gzip'))
+      const decompressed = await new Response(stream).blob()
+      text = await decompressed.text()
+    } else {
+      text = await data.text()
+    }
+
     const parsed = JSON.parse(text)
     console.log('Downloaded and parsed', parsed.length, 'rows')
     return parsed
