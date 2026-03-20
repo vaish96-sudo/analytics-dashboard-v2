@@ -106,34 +106,32 @@ export async function deleteProject(projectId) {
 // ============================================================
 
 export async function createDataset(projectId, { fileName, schemaDef, rowCount, rawData }) {
-  // Compress raw data with gzip before uploading — reduces size by ~85%
-  // 83K rows × 30 cols = ~50MB JSON → ~5-8MB gzipped
   const storagePath = `${projectId}/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}.json.gz`
 
+  // Compress raw data with gzip
   const jsonStr = JSON.stringify(rawData)
   let uploadBlob
 
-  // Use CompressionStream API (available in all modern browsers)
   if (typeof CompressionStream !== 'undefined') {
     const stream = new Blob([jsonStr]).stream().pipeThrough(new CompressionStream('gzip'))
     uploadBlob = await new Response(stream).blob()
     console.log(`Compressed: ${(jsonStr.length / 1024 / 1024).toFixed(1)}MB → ${(uploadBlob.size / 1024 / 1024).toFixed(1)}MB`)
   } else {
-    // Fallback: upload uncompressed
-    uploadBlob = new Blob([jsonStr], { type: 'application/json' })
+    uploadBlob = new Blob([jsonStr], { type: 'application/gzip' })
   }
 
-  const { error: uploadErr } = await supabase.storage
-    .from('datasets')
-    .upload(storagePath, uploadBlob, { contentType: 'application/gzip', upsert: true })
-
-  if (uploadErr) {
-    throw new Error(`Failed to upload data: ${uploadErr.message}`)
+  // Use resumable upload (TUS protocol) for files > 5MB, standard for smaller
+  if (uploadBlob.size > 5 * 1024 * 1024) {
+    await uploadResumable(storagePath, uploadBlob)
+  } else {
+    const { error: uploadErr } = await supabase.storage
+      .from('datasets')
+      .upload(storagePath, uploadBlob, { contentType: 'application/gzip', upsert: true })
+    if (uploadErr) throw new Error(`Failed to upload data: ${uploadErr.message}`)
   }
 
-  console.log('Uploaded to Storage:', storagePath, `(${rawData.length} rows)`)
+  console.log('Uploaded to Storage:', storagePath, `(${rawData.length} rows, ${(uploadBlob.size / 1024 / 1024).toFixed(1)}MB)`)
 
-  // Insert metadata into Postgres — raw_data is empty, path points to Storage
   const { data, error } = await supabase
     .from('datasets')
     .insert({
@@ -153,10 +151,97 @@ export async function createDataset(projectId, { fileName, schemaDef, rowCount, 
   }
 
   data._fullRawData = rawData
-
   await supabase.from('dashboard_states').insert({ dataset_id: data.id })
-
   return data
+}
+
+// Resumable upload using TUS protocol — bypasses 50MB proxy limit, supports up to 5GB
+async function uploadResumable(storagePath, blob) {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+  return new Promise((resolve, reject) => {
+    const chunkSize = 6 * 1024 * 1024 // 6MB chunks
+
+    const xhr = new XMLHttpRequest()
+    const file = new File([blob], storagePath.split('/').pop(), { type: 'application/gzip' })
+
+    // TUS upload via manual chunked approach
+    const totalSize = blob.size
+    let offset = 0
+
+    console.log(`Starting resumable upload: ${(totalSize / 1024 / 1024).toFixed(1)}MB in ${Math.ceil(totalSize / chunkSize)} chunks`)
+
+    // Step 1: Create the upload
+    const createXhr = new XMLHttpRequest()
+    createXhr.open('POST', `${supabaseUrl}/storage/v1/upload/resumable`, true)
+    createXhr.setRequestHeader('Authorization', `Bearer ${supabaseKey}`)
+    createXhr.setRequestHeader('apikey', supabaseKey)
+    createXhr.setRequestHeader('x-upsert', 'true')
+    createXhr.setRequestHeader('Upload-Length', String(totalSize))
+    createXhr.setRequestHeader('Upload-Metadata', `bucketName ${btoa('datasets')},objectName ${btoa(storagePath)},contentType ${btoa('application/gzip')}`)
+    createXhr.setRequestHeader('Tus-Resumable', '1.0.0')
+
+    createXhr.onload = function () {
+      if (createXhr.status !== 201) {
+        reject(new Error(`TUS create failed: ${createXhr.status} ${createXhr.responseText}`))
+        return
+      }
+
+      const uploadUrl = createXhr.getResponseHeader('Location')
+      if (!uploadUrl) {
+        reject(new Error('TUS create: no Location header'))
+        return
+      }
+
+      console.log('TUS upload created, sending chunks...')
+
+      // Step 2: Upload chunks
+      function uploadNextChunk() {
+        if (offset >= totalSize) {
+          console.log('TUS upload complete')
+          resolve()
+          return
+        }
+
+        const end = Math.min(offset + chunkSize, totalSize)
+        const chunk = blob.slice(offset, end)
+
+        const patchXhr = new XMLHttpRequest()
+        patchXhr.open('PATCH', uploadUrl, true)
+        patchXhr.setRequestHeader('Authorization', `Bearer ${supabaseKey}`)
+        patchXhr.setRequestHeader('apikey', supabaseKey)
+        patchXhr.setRequestHeader('Tus-Resumable', '1.0.0')
+        patchXhr.setRequestHeader('Upload-Offset', String(offset))
+        patchXhr.setRequestHeader('Content-Type', 'application/offset+octet-stream')
+
+        patchXhr.onload = function () {
+          if (patchXhr.status !== 204) {
+            reject(new Error(`TUS patch failed at offset ${offset}: ${patchXhr.status} ${patchXhr.responseText}`))
+            return
+          }
+          offset = end
+          const pct = Math.round((offset / totalSize) * 100)
+          console.log(`Upload progress: ${pct}% (${(offset / 1024 / 1024).toFixed(1)}MB / ${(totalSize / 1024 / 1024).toFixed(1)}MB)`)
+          uploadNextChunk()
+        }
+
+        patchXhr.onerror = function () {
+          reject(new Error(`TUS patch network error at offset ${offset}`))
+        }
+
+        patchXhr.send(chunk)
+      }
+
+      uploadNextChunk()
+    }
+
+    createXhr.onerror = function () {
+      reject(new Error('TUS create network error'))
+    }
+
+    createXhr.send(null)
+  })
 }
 
 // Download raw data from Supabase Storage (handles both gzipped and plain JSON)
