@@ -103,9 +103,10 @@ export default async function handler(req) {
     })
 
     if (!emailRes.ok) {
+      const emailErr = await emailRes.json().catch(() => ({}))
       // Clean up the code if email fails
       await supabase.from('login_codes').delete().eq('email', normalizedEmail)
-      return new Response(JSON.stringify({ error: 'Failed to send email. Please try again.' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ error: emailErr.message || 'Failed to send email. Please try again.' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
     }
 
     return new Response(JSON.stringify({
