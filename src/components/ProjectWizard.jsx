@@ -101,9 +101,9 @@ export default function ProjectWizard({ onComplete, onCancel }) {
   const handleGoogleSheets = async () => {
     const project = await handleCreateProject('google_sheets')
     if (!project) return
-    // Trigger the Google Sheets picker via custom event (same as v1)
+    // Trigger the Google Sheets picker — don't call onComplete yet,
+    // the picker or OAuth redirect will handle the rest
     window.dispatchEvent(new Event('nb-open-sheets'))
-    onComplete?.()
   }
 
   const handleApiConnect = async (e) => {

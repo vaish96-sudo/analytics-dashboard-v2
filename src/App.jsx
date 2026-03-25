@@ -88,8 +88,9 @@ function AppContent() {
 
   useEffect(() => {
     const handler = () => {
-      if (googleToken) { setShowSheetsPicker(true) }
+      if (googleToken) { setShowSheetsPicker(true); setShowProjectWizard(false) }
       else if (GOOGLE_CLIENT_ID) {
+        localStorage.setItem('nb_pending_sheets', '1')
         const params = new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, redirect_uri: REDIRECT_URI, response_type: 'code', scope: SCOPES, access_type: 'offline', prompt: 'consent' })
         window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
       }
@@ -98,11 +99,26 @@ function AppContent() {
     return () => window.removeEventListener('nb-open-sheets', handler)
   }, [googleToken])
 
+  // After Google OAuth callback sets the token, auto-show the sheets picker
   useEffect(() => {
-    if (showSheetsPicker && step !== 'upload' && step !== 'tag') setShowSheetsPicker(false)
-  }, [step, showSheetsPicker])
+    if (googleToken && !showSheetsPicker) {
+      // Check if we just came back from OAuth (token freshly set)
+      const pending = localStorage.getItem('nb_pending_sheets')
+      if (pending) {
+        localStorage.removeItem('nb_pending_sheets')
+        setShowSheetsPicker(true)
+        setShowProjectWizard(false)
+      }
+    }
+  }, [googleToken])
 
-  const handleGoogleToken = (token) => { setGoogleToken(token); saveGoogleToken(token) }
+  const handleGoogleToken = (token) => {
+    setGoogleToken(token)
+    saveGoogleToken(token)
+    // Auto-open sheets picker after OAuth completes
+    setShowSheetsPicker(true)
+    setShowProjectWizard(false)
+  }
 
   const handleLogout = () => { clearAll(); clearGoogleToken(); selectProject(null); logout() }
 
