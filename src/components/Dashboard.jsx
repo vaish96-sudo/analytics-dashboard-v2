@@ -12,6 +12,7 @@ import AIChartBuilder from './AIChartBuilder'
 import CustomMetrics from './CustomMetrics'
 import GlobalFilterBar from './GlobalFilterBar'
 import UserProfile from './UserProfile'
+import ScheduledReports from './ScheduledReports'
 import LogoMark from './LogoMark'
 import {
   LayoutDashboard, Table2, Wand2, Sparkles,
@@ -360,7 +361,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
             {activeTab === 'builder' && <><CustomMetrics /><ReportBuilder /></>}
             {activeTab === 'data' && <DataTable />}
             {activeTab === 'ai' && <AIHub conversationId={activeConversationId} onConversationChange={setActiveConversationId} />}
-            {activeTab === 'settings' && <UserProfile />}
+            {activeTab === 'settings' && <><UserProfile /><ScheduledReports /></>}
           </div>
         </div>
       </main>

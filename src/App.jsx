@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { ProjectProvider, useProject } from './context/ProjectContext'
 import { DataProvider, useData } from './context/DataContext'
 import { ThemeProvider } from './context/ThemeContext'
+import { TierProvider, useTier } from './context/TierContext'
 import AuthScreen from './components/AuthScreen'
 import HomeScreen from './components/HomeScreen'
 import ProjectWizard from './components/ProjectWizard'
@@ -13,6 +14,7 @@ import GoogleSheetsPicker from './components/GoogleSheetsPicker'
 import AllChats from './components/AllChats'
 import AllInsights from './components/AllInsights'
 import UserProfile from './components/UserProfile'
+import OnboardingOverlay from './components/OnboardingOverlay'
 import { Loader2 } from 'lucide-react'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
@@ -51,6 +53,7 @@ function AppContent() {
   const { user, logout, loading: authLoading } = useAuth()
   const { activeProject, activeProjectId, loading: projectsLoading, projectLoading, selectProject } = useProject()
   const { step, setStep, activeTab, setActiveTab, confirmTagging, clearAll, goHome, openProject } = useData()
+  const { profile, loading: tierLoading } = useTier()
 
   const [googleToken, setGoogleToken] = useState(loadGoogleToken)
   const [showSheetsPicker, setShowSheetsPicker] = useState(false)
@@ -59,6 +62,14 @@ function AppContent() {
   const [showAllInsights, setShowAllInsights] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [pendingConversationId, setPendingConversationId] = useState(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
+  // Show onboarding for new users
+  useEffect(() => {
+    if (user && profile && !profile.onboarding_completed && !tierLoading) {
+      setShowOnboarding(true)
+    }
+  }, [user, profile, tierLoading])
 
   const isGoogleCallback = window.location.pathname === '/auth/callback'
 
@@ -122,6 +133,9 @@ function AppContent() {
 
   if (!user) return <AuthScreen />
 
+  // Onboarding overlay for new users
+  const onboardingOverlay = showOnboarding ? <OnboardingOverlay onComplete={() => setShowOnboarding(false)} /> : null
+
   if (projectsLoading || (step === 'dashboard' && !activeProject && projectLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
@@ -171,13 +185,16 @@ function AppContent() {
   // Home screen
   if (step === 'home') {
     return (
-      <HomeScreen
-        onOpenProject={handleOpenProject}
-        onNewProject={handleNewProject}
-        onShowChats={() => setShowAllChats(true)}
-        onShowInsights={() => setShowAllInsights(true)}
-        onSettings={() => setShowSettings(true)}
-      />
+      <>
+        {onboardingOverlay}
+        <HomeScreen
+          onOpenProject={handleOpenProject}
+          onNewProject={handleNewProject}
+          onShowChats={() => setShowAllChats(true)}
+          onShowInsights={() => setShowAllInsights(true)}
+          onSettings={() => setShowSettings(true)}
+        />
+      </>
     )
   }
 
@@ -214,11 +231,13 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
+        <TierProvider>
         <ProjectProvider>
           <DataProvider>
             <AppContent />
           </DataProvider>
         </ProjectProvider>
+        </TierProvider>
       </AuthProvider>
     </ThemeProvider>
   )

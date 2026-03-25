@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useData } from '../context/DataContext'
 import { useTheme } from '../context/ThemeContext'
+import { useTier } from '../context/TierContext'
 import {
   Plus, X, Check, Pencil, Trash2, Calculator, Sparkles, FlaskConical,
-  Loader2, Lightbulb, ChevronDown,
+  Loader2, Lightbulb, ChevronDown, Lock,
 } from 'lucide-react'
 
 // Theme-aware colors: teal on light, amber on dark
@@ -269,6 +270,21 @@ export default function CustomMetrics() {
   const { schema, rawData, columnsByType, updateDatasetState, activeDatasetId } = useData()
   const customMetrics = useData().localCustomMetrics || []
   const colors = useCustomMetricColors()
+  const { can, tier } = useTier()
+
+  // Gate: custom metrics require Starter+
+  if (!can('customMetrics')) {
+    return (
+      <div className="rounded-xl p-6 text-center" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+        <Lock className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
+        <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Custom Metrics</p>
+        <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Create calculated columns with formulas. Available on Starter plan and above.</p>
+        <button className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium text-white" style={{ background: 'var(--accent)' }}>
+          Upgrade to unlock
+        </button>
+      </div>
+    )
+  }
 
   const [showForm, setShowForm] = useState(false)
   const [editIndex, setEditIndex] = useState(null)

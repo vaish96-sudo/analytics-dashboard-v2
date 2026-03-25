@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import LogoMark from './LogoMark'
 import { useData } from '../context/DataContext'
+import { useTier } from '../context/TierContext'
 import { getInsights } from '../utils/aiService'
 import { exportToPDF, exportToWord } from '../utils/exportService'
+import { UsageBadge } from './UpgradePrompt'
 import { Lightbulb, TrendingUp, AlertTriangle, Target, Loader2, RefreshCw, FileText, File } from 'lucide-react'
 
 const ICONS = { opportunity: Target, trend: TrendingUp, alert: AlertTriangle, recommendation: Lightbulb }
@@ -11,14 +13,17 @@ const BORDERS = { opportunity: 'border-l-emerald-500', trend: 'border-l-sky-500'
 
 export default function AIInsights() {
   const { schema, rawData, aggregateUnfiltered, updateDatasetState, insights, insightsLoaded, activeDatasetId } = useData()
+  const { hasRemaining, remaining, incrementUsage } = useTier()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [usedModel, setUsedModel] = useState(null)
 
   const fetchInsights = async () => {
+    if (!hasRemaining('insightsRuns')) { setError('You\'ve used all your Insights runs for this month. Upgrade to get more.'); return }
     setLoading(true); setError(null)
     try {
       const result = await getInsights(schema, rawData, aggregateUnfiltered)
+      await incrementUsage('insightsRuns')
       const insightsData = result.insights || result
       setUsedModel(result.model || 'Claude')
 
@@ -53,9 +58,12 @@ export default function AIInsights() {
           <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><LogoMark className="w-5 h-5 object-contain" /></div>
           <div className="min-w-0">
             <h3 className="text-sm font-display font-semibold text-slate-800">AI Insights</h3>
-            <p className="text-xs text-slate-400 truncate">
-              Strategic recommendations{usedModel && <span> · Powered by <span className="text-slate-500 font-medium">{usedModel}</span></span>}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-slate-400 truncate">
+                Strategic recommendations{usedModel && <span> · Powered by <span className="text-slate-500 font-medium">{usedModel}</span></span>}
+              </p>
+              <UsageBadge remaining={remaining('insightsRuns')} label="runs left" />
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1">

@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
 import { useData } from '../context/DataContext'
+import { useTier } from '../context/TierContext'
 import { Target, Loader2, RefreshCw, AlertTriangle, CheckCircle2, ArrowRight, Clock, FileText, File, Shield } from 'lucide-react'
 import { exportToPDF, exportToWord } from '../utils/exportService'
+import { BlurredPreview, UsageBadge } from './UpgradePrompt'
 
 import { callClaudeAPI } from '../utils/claudeClient.js'
 const PRIORITY_STYLES = {
@@ -169,13 +171,19 @@ Provide 5-6 recommendations. Think like a 30-year industry veteran presenting to
 
 export default function AIRecommendations() {
   const { schema, rawData, aggregateUnfiltered, activeDatasetId, updateDatasetState, recommendations } = useData()
+  const { hasRemaining, remaining, incrementUsage, can, tier, profile } = useTier()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [usedModel, setUsedModel] = useState(null)
   const [detectedIndustry, setDetectedIndustry] = useState(null)
 
+  // Blurred preview for tiers without recommendations access
+  const showPreview = !hasRemaining('recommendationsRuns') && (recommendations?.length || 0) === 0
+  const isLocked = !can('showRecommendationsPreview') === false && !hasRemaining('recommendationsRuns') && tier !== 'pro' && tier !== 'agency' && tier !== 'enterprise'
+
   const fetchRecommendations = async () => {
     if (!schema || !rawData) return
+    if (!hasRemaining('recommendationsRuns')) { setError('You\'ve used all your Recommendations runs for this month. Upgrade to get more.'); return }
     setLoading(true)
     setError(null)
 
@@ -225,12 +233,19 @@ export default function AIRecommendations() {
         systemPrompt = buildGeneralPrompt(cols, industry) + RESPONSE_FORMAT
       }
 
+      // Feature 1: Append custom AI playbook if user has one (Agency+ tier)
+      if (profile?.custom_ai_playbook && can('customPlaybook')) {
+        systemPrompt += `\n\nADDITIONAL CLIENT RULES (follow these carefully):\n${profile.custom_ai_playbook}`
+      }
+
       const { text } = await callClaudeAPI({
         system: systemPrompt,
         messages: [{ role: 'user', content: `Dataset: ${rawData.length} rows, ${metrics.length} metrics, ${dimensions.length} dimensions.\n\nData Summary:\n${summaryParts.join('\n')}\n\nProvide 5-6 actionable recommendations.` }],
         max_tokens: 3000,
         feature: 'recommendations',
       })
+
+      await incrementUsage('recommendationsRuns')
 
       try {
         const cleaned = text.replace(/```json|```/g, '').trim()

@@ -12,7 +12,9 @@ const RED = [200, 50, 50]
 const AMBER = [190, 120, 30]
 const SLATE = [100, 116, 139]
 
-export async function exportToPDF(content, title = 'Northern Bird Report') {
+export async function exportToPDF(content, title = 'Northern Bird Report', branding = {}) {
+  const brandName = branding.companyName || 'NORTHERN BIRD'
+  const brandSuffix = branding.companyName ? '' : 'ANALYTICS'
   const { default: jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pw = doc.internal.pageSize.getWidth()   // 210
@@ -68,8 +70,8 @@ export async function exportToPDF(content, title = 'Northern Bird Report') {
   doc.rect(0, 0, pw, 2.5, 'F')
 
   y = 13
-  text('NORTHERN BIRD', m, y, 9, 'bold', GOLD)
-  text('ANALYTICS', m + 28, y, 7, 'normal', MUTED)
+  text(brandName.toUpperCase(), m, y, 9, 'bold', GOLD)
+  if (brandSuffix) text(brandSuffix, m + 28, y, 7, 'normal', MUTED)
   y += 10
 
   doc.setFontSize(20)
@@ -323,7 +325,7 @@ export async function exportToPDF(content, title = 'Northern Bird Report') {
     // Gold accent dot
     doc.setFillColor(...GOLD)
     doc.circle(m + 1.5, ph - 5, 0.8, 'F')
-    text('Northern Bird Analytics  |  Confidential', m + 5, ph - 3.5, 6.5, 'normal', MUTED)
+    text(`${branding.companyName || 'Northern Bird Analytics'}  |  Confidential`, m + 5, ph - 3.5, 6.5, 'normal', MUTED)
     text(`Page ${i} of ${pages}`, pw - m, ph - 3.5, 6.5, 'normal', MUTED, { align: 'right' })
   }
 
@@ -433,11 +435,12 @@ export async function exportDashboardReport({ projectName, fileName, rowCount, s
 
 
 // === WORD EXPORT ===
-export async function exportToWord(content, title = 'Northern Bird Report') {
+export async function exportToWord(content, title = 'Northern Bird Report', branding = {}) {
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle } = await import('docx')
   const children = []
+  const brandName = branding.companyName || 'NORTHERN BIRD ANALYTICS'
 
-  children.push(new Paragraph({ text: 'NORTHERN BIRD ANALYTICS', heading: HeadingLevel.HEADING_1, spacing: { after: 100 } }))
+  children.push(new Paragraph({ text: brandName.toUpperCase(), heading: HeadingLevel.HEADING_1, spacing: { after: 100 } }))
   children.push(new Paragraph({ text: title, heading: HeadingLevel.HEADING_2, spacing: { after: 100 } }))
   children.push(new Paragraph({ children: [new TextRun({ text: `Generated: ${new Date().toLocaleString()}`, size: 18, color: '94A3B8' })], spacing: { after: 300 } }))
   children.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' } }, spacing: { after: 300 } }))

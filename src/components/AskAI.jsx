@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useData } from '../context/DataContext'
 import { useProject } from '../context/ProjectContext'
+import { useTier } from '../context/TierContext'
 import { askAI } from '../utils/aiService'
 import { exportToPDF, exportToWord } from '../utils/exportService'
 import * as projectService from '../lib/projectService'
@@ -8,6 +9,7 @@ import {
   MessageSquare, Send, Loader2, Code, User, Sparkles,
   Plus, History, FileText, File, Trash2, MoreHorizontal
 } from 'lucide-react'
+import { UsageBadge } from './UpgradePrompt'
 import LogoMark from './LogoMark'
 
 function MarkdownText({ text }) {
@@ -78,6 +80,7 @@ function MessageBubble({ message }) {
 export default function AskAI({ conversationId: externalConvId, onConversationChange }) {
   const { schema, rawData, aggregateUnfiltered, columnsByType, activeDatasetId } = useData()
   const { activeProjectId } = useProject()
+  const { hasRemaining, remaining, incrementUsage, tier } = useTier()
 
   const [conversationId, setConversationId] = useState(externalConvId || null)
   const [messages, setMessages] = useState([])
@@ -140,6 +143,14 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
 
   const handleSend = async () => {
     if (!input.trim() || loading) return
+
+    // Tier gate: check remaining AI queries
+    if (!hasRemaining('askAiQueries')) {
+      setMessages(prev => [...prev, { role: 'user', content: input.trim() }, { role: 'assistant', content: `You've used all ${remaining('askAiQueries') === 0 ? 'your' : ''} Ask AI queries for this month. Upgrade your plan to continue chatting with your data.` }])
+      setInput('')
+      return
+    }
+
     const q = input.trim()
     setInput('')
 
@@ -162,6 +173,7 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
 
     try {
       const r = await askAI(q, schema, rawData, aggregateUnfiltered, withUserMsg)
+      await incrementUsage('askAiQueries')
       const assistantMsg = { role: 'assistant', content: r.answer, sql_plan: r.sql, meta: { tokensUsed: r.tokensUsed, estimatedCost: r.estimatedCost } }
       setMessages(prev => [...prev, assistantMsg])
       try {
@@ -194,7 +206,10 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
           <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><LogoMark className="w-5 h-5 object-contain" alt="NB" /></div>
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-display font-semibold text-slate-800">Ask AI</h3>
-            <p className="text-xs text-slate-400 truncate">Ask about your data in plain English</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-slate-400 truncate">Ask about your data in plain English</p>
+              <UsageBadge remaining={remaining('askAiQueries')} label="queries left" />
+            </div>
           </div>
           <div className="flex items-center gap-1">
             <button onClick={() => setShowHistory(!showHistory)} className="lg:hidden p-2 rounded-lg text-slate-400 hover:bg-slate-100" title="Chat history">
