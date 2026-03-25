@@ -134,7 +134,7 @@ export function DataProvider({ children }) {
       toDownload.map(async (ds) => {
         try {
           const { downloadRawData } = await import('../lib/projectService')
-          const data = await downloadRawData(ds.raw_data_path)
+          const data = await downloadRawData(ds.raw_data_path, ds.id)
           if (mounted && data.length > 0) {
             fullDataCacheRef.current[ds.id] = data
           }
