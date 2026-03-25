@@ -17,7 +17,18 @@ export function formatNumber(value, opts = {}) {
 }
 
 export function formatCurrency(value, compact = true) {
-  return formatNumber(value, { prefix: '$', decimals: compact ? 0 : 2, compact })
+  const num = typeof value === 'number' ? value : parseFloat(String(value).replace(/[,$%]/g, ''))
+  if (isNaN(num)) return '–'
+  // Small values (under 10) always show 2 decimals — "$1.27" not "$1"
+  // Medium values (10-999) show 0 decimals — "$342" not "$342.00"
+  // Large values use compact notation — "$14.2K"
+  if (compact && Math.abs(num) >= 1000) {
+    return formatNumber(num, { prefix: '$', decimals: 0, compact: true })
+  }
+  if (Math.abs(num) < 10) {
+    return formatNumber(num, { prefix: '$', decimals: 2 })
+  }
+  return formatNumber(num, { prefix: '$', decimals: 0 })
 }
 
 export function formatPercent(value) {
@@ -41,13 +52,24 @@ export function looksLikeRate(colName) {
   return /rate|ratio|percent|ctr|cvr|roas|roi|margin|share|bounce|conversion/i.test(colName)
 }
 
+export function looksLikePerUnit(colName) {
+  return /per\s*(unit|item|order|click|impression|user|customer|visitor|session|day|month|hour)/i.test(colName)
+}
+
 export function smartFormat(value, colName) {
   if (value === null || value === undefined) return '–'
   const num = typeof value === 'number' ? value : parseFloat(String(value).replace(/[,$%]/g, ''))
   if (isNaN(num)) return String(value)
 
+  // Per-unit metrics: always show 2 decimals with currency prefix if it looks like money
+  if (looksLikePerUnit(colName)) {
+    if (looksLikeCurrency(colName)) return formatNumber(num, { prefix: '$', decimals: 2 })
+    return formatNumber(num, { decimals: 2 })
+  }
   if (looksLikeCurrency(colName)) return formatCurrency(num)
   if (looksLikeRate(colName)) return formatPercent(num)
+  // Small decimals: show precision
+  if (!Number.isInteger(num) && Math.abs(num) < 100) return formatNumber(num, { decimals: 2 })
   if (num > 10000) return formatNumber(num, { compact: true })
   if (Number.isInteger(num)) return formatNumber(num)
   return formatNumber(num, { decimals: 2 })
