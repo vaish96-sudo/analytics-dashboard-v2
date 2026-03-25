@@ -33,7 +33,9 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
 
   const [dragId, setDragId] = useState(null)
   const [hoverId, setHoverId] = useState(null)
+  const [dropEnd, setDropEnd] = useState(false)
   const dragRef = useRef(null)
+  const gridRef = useRef(null)
 
   useEffect(() => {
     setOrder(prev => {
@@ -60,17 +62,20 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
   const onDragEnd = useCallback(() => {
     setDragId(null)
     setHoverId(null)
+    setDropEnd(false)
     dragRef.current = null
   }, [])
 
   const onDragOver = useCallback((e, id) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
+    setDropEnd(false)
     if (id !== dragRef.current) setHoverId(id)
   }, [])
 
   const onDrop = useCallback((e, targetId) => {
     e.preventDefault()
+    e.stopPropagation()
     const sourceId = dragRef.current
     if (!sourceId || sourceId === targetId) { setHoverId(null); return }
     setOrder(prev => {
@@ -87,10 +92,50 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
       return n
     })
     setHoverId(null)
-  }, [storageKey, updateDatasetState])
+  }, [storageKey, updateDatasetState, widgetOrder])
+
+  // Container-level drag over — for empty space / end of grid
+  const onContainerDragOver = useCallback((e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    // Check if we're over a widget or in empty space
+    const target = e.target.closest('[data-dw]')
+    if (!target) {
+      setHoverId(null)
+      setDropEnd(true)
+    }
+  }, [])
+
+  // Container-level drop — move to end
+  const onContainerDrop = useCallback((e) => {
+    e.preventDefault()
+    const sourceId = dragRef.current
+    if (!sourceId) return
+    // Only handle if not caught by a widget's own onDrop
+    setOrder(prev => {
+      const n = [...prev]
+      const si = n.indexOf(sourceId)
+      if (si === -1) return prev
+      n.splice(si, 1)
+      n.push(sourceId)
+      try {
+        const hidden = Array.isArray(widgetOrder) ? [] : (widgetOrder?.hidden || [])
+        updateDatasetState(storageKey, { order: n, hidden })
+      } catch {}
+      return n
+    })
+    setHoverId(null)
+    setDropEnd(false)
+  }, [storageKey, updateDatasetState, widgetOrder])
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+    <div
+      ref={gridRef}
+      className="grid grid-cols-1 md:grid-cols-6 gap-3"
+      onDragOver={onContainerDragOver}
+      onDrop={onContainerDrop}
+      style={{ minHeight: dragId ? '100px' : undefined }}
+    >
       {order.map(id => {
         const child = childMap[id]
         if (!child) return null
@@ -132,6 +177,25 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
           </div>
         )
       })}
+      {/* Drop zone at end of grid — visible when dragging over empty space */}
+      {dragId && (
+        <div
+          data-dw="__drop-end__"
+          className="col-span-1 md:col-span-6 flex items-center justify-center rounded-xl transition-all"
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDropEnd(true); setHoverId(null) }}
+          onDragLeave={() => setDropEnd(false)}
+          onDrop={(e) => { e.stopPropagation(); onContainerDrop(e) }}
+          style={{
+            minHeight: '48px',
+            border: dropEnd ? '2px dashed var(--accent)' : '2px dashed var(--border-light)',
+            background: dropEnd ? 'rgba(139, 92, 246, 0.05)' : 'transparent',
+          }}
+        >
+          <span className="text-[10px] font-medium" style={{ color: dropEnd ? 'var(--accent)' : 'var(--text-muted)', opacity: 0.7 }}>
+            Drop here to move to end
+          </span>
+        </div>
+      )}
     </div>
   )
 }

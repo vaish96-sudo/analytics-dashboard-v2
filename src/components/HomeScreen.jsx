@@ -375,19 +375,19 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                                     </div>
                                   </button>
                                 )}
-                                <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this project?')) deleteProject(p.id) }}
-                                  className="p-1 mr-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0" style={{ color: 'var(--text-muted)' }}>
-                                  <Trash2 className="w-2.5 h-2.5" />
-                                </button>
                                 {ownedTeamId && (
                                   <button ref={el => { projectShareButtonRefs.current[p.id] = el }}
                                     onClick={(e) => { e.stopPropagation(); setShareMenuProject(shareMenuProject === p.id ? null : p.id) }}
-                                    className="p-1 mr-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                                    style={{ color: shareMenuProject === p.id ? '#8b5cf6' : 'var(--text-muted)' }}
+                                    className="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                    style={{ color: shareMenuProject === p.id ? '#3b82f6' : 'var(--text-muted)' }}
                                     title={`Share "${p.name}" with team members`}>
                                     <Users className="w-2.5 h-2.5" />
                                   </button>
                                 )}
+                                <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this project?')) deleteProject(p.id) }}
+                                  className="p-1 mr-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0" style={{ color: 'var(--text-muted)' }}>
+                                  <Trash2 className="w-2.5 h-2.5" />
+                                </button>
                                 {shareMenuProject === p.id && ownedTeamId && (
                                   <ProjectShareMenu projectId={p.id} projectName={p.name} teamId={ownedTeamId}
                                     onClose={() => setShareMenuProject(null)}
@@ -450,6 +450,20 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                         className="p-1 mr-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0" style={{ color: 'var(--text-muted)' }}>
                         <Trash2 className="w-3 h-3" />
                       </button>
+                      {ownedTeamId && (
+                        <button ref={el => { projectShareButtonRefs.current[p.id] = el }}
+                          onClick={(e) => { e.stopPropagation(); setShareMenuProject(shareMenuProject === p.id ? null : p.id) }}
+                          className="p-1 mr-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                          style={{ color: shareMenuProject === p.id ? '#3b82f6' : 'var(--text-muted)' }}
+                          title={`Share "${p.name}" with team members`}>
+                          <Users className="w-3 h-3" />
+                        </button>
+                      )}
+                      {shareMenuProject === p.id && ownedTeamId && (
+                        <ProjectShareMenu projectId={p.id} projectName={p.name} teamId={ownedTeamId}
+                          onClose={() => setShareMenuProject(null)}
+                          anchorRef={{ current: projectShareButtonRefs.current[p.id] }} />
+                      )}
                     </div>
                     {isExpanded && (
                       <div className="ml-5 pl-2 space-y-0.5" style={{ borderLeft: '1px solid var(--border-light)' }}>
