@@ -85,7 +85,10 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
   const [loading, setLoading] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [conversations, setConversations] = useState([])
+  const [sendOnNextRender, setSendOnNextRender] = useState(false)
   const scrollRef = useRef(null)
+
+  useEffect(() => { if (sendOnNextRender && input.trim()) { setSendOnNextRender(false); handleSend() } }, [sendOnNextRender, input])
 
   useEffect(() => { if (externalConvId) loadConversation(externalConvId) }, [externalConvId])
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight }, [messages])
@@ -228,7 +231,7 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
               <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center"><Sparkles className="w-6 h-6 text-accent" /></div>
               <p className="text-sm text-slate-400 text-center">Ask anything about your data.<br /><span className="text-xs text-slate-300">AI runs real queries against your dataset.</span></p>
               <div className="flex flex-wrap gap-2 justify-center max-w-md">
-                {suggestions.map(s => (<button key={s} onClick={() => setInput(s)} className="text-xs px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 transition-colors">{s}</button>))}
+                {suggestions.map(s => (<button key={s} onClick={() => { setInput(s); setSendOnNextRender(true) }} className="text-xs px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 transition-colors">{s}</button>))}
               </div>
             </div>
           ) : messages.map((m, i) => <MessageBubble key={i} message={m} />)}

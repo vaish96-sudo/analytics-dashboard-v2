@@ -160,7 +160,19 @@ export async function askAI(question, schema, rawData, aggregateFn, history = []
   mets.forEach(m => { totals[m] = results.reduce((sum, row) => sum + (parseFloat(row[m]) || 0), 0) })
 
   const { system: sys2, messages: msgs2 } = buildAnswerPrompt(question, schema, results, totals, history)
-  const call2 = await callClaude(sys2, msgs2, 1024, 'ask_ai')
+  let call2
+  try {
+    call2 = await callClaude(sys2, msgs2, 1024, 'ask_ai')
+  } catch {
+    // Second call failed — return query plan description as fallback instead of raw JSON
+    const desc = queryPlan.description || 'Query completed'
+    return {
+      answer: `${desc}\n\nDimensions: ${dims.map(d => schema[d]?.label || d).join(', ') || 'None'}\nMetrics: ${mets.map(m => schema[m]?.label || m).join(', ')}`,
+      sql: `Dimensions: [${dims.join(', ')}]\nMetrics: [${mets.join(', ')}]\nSort: ${queryPlan.sort_by} ${queryPlan.sort_dir}\nLimit: ${queryPlan.limit || 200}`,
+      tokensUsed: { input: call1.usage.input_tokens || 0, output: call1.usage.output_tokens || 0 },
+      estimatedCost: ((call1.usage.input_tokens || 0) * 3 + (call1.usage.output_tokens || 0) * 15) / 1_000_000,
+    }
+  }
 
   const totalInput = (call1.usage.input_tokens || 0) + (call2.usage.input_tokens || 0)
   const totalOutput = (call1.usage.output_tokens || 0) + (call2.usage.output_tokens || 0)
