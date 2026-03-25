@@ -144,7 +144,7 @@ function MetricPicker({ allMets, selected, schema, onChange }) {
 }
 
 // ─── Single AI Chart ─────────────────────────────────────────────
-function AIChart({ config, schema, columnsByType, aggregate, index, onRemove, onUpdate }) {
+function AIChart({ config, schema, columnsByType, aggregate, index, onRemove, onUpdate, onBarClick, globalFilters }) {
   const [chartType, setChartType] = useState(config.chart_type || 'bar')
   const [expanded, setExpanded] = useState(false)
   const [dim, setDim] = useState(config.dimensions?.[0] || '')
@@ -173,6 +173,16 @@ function AIChart({ config, schema, columnsByType, aggregate, index, onRemove, on
     )
     return sorted.slice(0, config.limit || 12)
   }, [dim, metrics.join(','), aggregate, config.sort_by, config.sort_dir, config.limit])
+
+  // Click handler for bar/pie/area clicks → triggers global filter
+  const handleChartClick = (row) => {
+    if (!row || !dim || !onBarClick) return
+    const val = row[dim] || row._raw || row.name
+    if (val) onBarClick(dim, String(val))
+  }
+
+  const dimFilter = (globalFilters && globalFilters[dim]) || []
+  const hasDimFilter = dimFilter.length > 0
 
   const pieData = useMemo(() => {
     if (chartType !== 'pie' || !data.length) return []
@@ -294,6 +304,8 @@ function AIChart({ config, schema, columnsByType, aggregate, index, onRemove, on
                 cx="50%" cy="50%" outerRadius="75%" innerRadius="45%" paddingAngle={2}
                 label={({ name, percent }) => `${name} (${percent}%)`}
                 labelLine={{ stroke: 'var(--text-muted)' }}
+                cursor="pointer"
+                onClick={(_, idx) => { if (pieData[idx]) handleChartClick({ [dim]: pieData[idx]._raw || pieData[idx].name }) }}
               >
                 {pieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
               </Pie>
@@ -302,20 +314,23 @@ function AIChart({ config, schema, columnsByType, aggregate, index, onRemove, on
           </ResponsiveContainer>
         ) : chartType === 'bar' ? (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 40 }}>
+            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 40 }}
+              onClick={(e) => { if (e?.activePayload) handleChartClick(e.activePayload[0]?.payload) }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
               <XAxis dataKey={dim} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickFormatter={v => truncate(String(v), 12)} angle={-35} textAnchor="end" height={60} />
               <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickFormatter={v => smartFormat(v, primaryMet)} />
               <Tooltip content={<ChartTooltip />} />
               {metrics.length > 1 && <Legend wrapperStyle={{ fontSize: 11 }} />}
               {metrics.map((m, mi) => (
-                <Bar key={m} dataKey={m} name={schema[m]?.label || m} fill={CHART_COLORS[mi % CHART_COLORS.length]} radius={[3, 3, 0, 0]} />
+                <Bar key={m} dataKey={m} name={schema[m]?.label || m} fill={CHART_COLORS[mi % CHART_COLORS.length]} radius={[3, 3, 0, 0]}
+                  cursor="pointer" />
               ))}
             </BarChart>
           </ResponsiveContainer>
         ) : chartType === 'line' ? (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 40 }}>
+            <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 40 }}
+              onClick={(e) => { if (e?.activePayload) handleChartClick(e.activePayload[0]?.payload) }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
               <XAxis dataKey={dim} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickFormatter={v => truncate(String(v), 12)} angle={-35} textAnchor="end" height={60} />
               <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickFormatter={v => smartFormat(v, primaryMet)} />
@@ -330,7 +345,8 @@ function AIChart({ config, schema, columnsByType, aggregate, index, onRemove, on
           </ResponsiveContainer>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 40 }}>
+            <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 40 }}
+              onClick={(e) => { if (e?.activePayload) handleChartClick(e.activePayload[0]?.payload) }}>
               <defs>
                 {metrics.map((m, mi) => (
                   <linearGradient key={m} id={`ai-grad-${index}-${mi}`} x1="0" y1="0" x2="0" y2="1">
@@ -453,7 +469,7 @@ function Suggestions({ schema, columnsByType, onSelect }) {
 
 // ─── Main Component ──────────────────────────────────────────────
 export default function AIChartBuilder() {
-  const { schema, rawData, columnsByType, aggregate, updateDatasetState, aiCharts } = useData()
+  const { schema, rawData, columnsByType, aggregate, updateDatasetState, aiCharts, globalFilters, setGlobalFilters } = useData()
   const [promptOpen, setPromptOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -533,6 +549,21 @@ export default function AIChartBuilder() {
 
   if (!rawData || !schema) return null
 
+  const handleBarClick = (dimension, value) => {
+    setGlobalFilters(prev => {
+      const current = prev[dimension] || []
+      if (current.includes(value)) {
+        const next = current.filter(v => v !== value)
+        const result = { ...prev }
+        if (next.length === 0) delete result[dimension]
+        else result[dimension] = next
+        return result
+      } else {
+        return { ...prev, [dimension]: [value] }
+      }
+    })
+  }
+
   return (
     <div className="space-y-3">
       {/* Toggle bar */}
@@ -592,6 +623,8 @@ export default function AIChartBuilder() {
               aggregate={aggregate}
               onRemove={handleRemove}
               onUpdate={handleUpdate}
+              onBarClick={handleBarClick}
+              globalFilters={globalFilters}
             />
           ))}
         </div>
