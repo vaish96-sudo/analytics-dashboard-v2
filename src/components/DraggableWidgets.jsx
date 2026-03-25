@@ -5,15 +5,11 @@ import { useData } from '../context/DataContext'
 /**
  * Reorderable + resizable widget grid.
  *
- * Each child declares a default size via data-widget-size:
- *   "small"  → 1-col (KPI card)
- *   "medium" → 3-col (half width chart)
- *   "large"  → 6-col (full width)
+ * Drag is initiated ONLY from the grip handle bar — not the whole card.
+ * This prevents conflicts with chart tooltips, bar clicks, etc.
  *
- * Users can toggle any widget between medium ↔ large via a hover button.
- * Small widgets (KPI cards) toggle between small ↔ medium.
- *
- * Persisted state shape: { order: [...], hidden: [...], sizes: { id: size } }
+ * Size toggle: medium ↔ large (small ↔ medium for KPI cards).
+ * Persisted state: { order: [...], hidden: [...], sizes: { id: size } }
  */
 const SIZE_MAP = {
   small: 'col-span-1',
@@ -48,6 +44,7 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
   const [dropEnd, setDropEnd] = useState(false)
   const [ghostHighlight, setGhostHighlight] = useState(null)
   const dragRef = useRef(null)
+  const widgetRefs = useRef({})
 
   useEffect(() => {
     setOrder(prev => {
@@ -64,7 +61,6 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
     childMap[id] = c
   })
 
-  // Get effective size for a widget (override or default)
   const getSize = useCallback((id) => {
     if (sizeOverrides[id]) return sizeOverrides[id]
     const child = childMap[id]
@@ -74,26 +70,37 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
   const persist = useCallback((newOrder, newSizes) => {
     try {
       const hidden = savedState.hidden || []
-      updateDatasetState(storageKey, { order: newOrder || order, hidden, sizes: newSizes || sizeOverrides })
+      updateDatasetState(storageKey, {
+        order: newOrder || order,
+        hidden,
+        sizes: newSizes || sizeOverrides,
+      })
     } catch {}
   }, [storageKey, updateDatasetState, savedState, order, sizeOverrides])
 
-  // Toggle widget size
   const toggleSize = useCallback((id) => {
     const currentSize = getSize(id)
     let newSize
-    if (currentSize === 'small') {
-      newSize = 'medium'
-    } else if (currentSize === 'medium') {
-      newSize = 'large'
-    } else {
-      // large → medium
-      newSize = 'medium'
-    }
+    if (currentSize === 'small') newSize = 'medium'
+    else if (currentSize === 'medium') newSize = 'large'
+    else newSize = 'medium'
     const newSizes = { ...sizeOverrides, [id]: newSize }
     setSizeOverrides(newSizes)
     persist(null, newSizes)
   }, [getSize, sizeOverrides, persist])
+
+  // ── Drag handle approach ──
+  // The grip bar calls this on mousedown to make the parent div draggable,
+  // then the native dragstart fires on the now-draggable parent.
+  const enableDrag = useCallback((id) => {
+    const el = widgetRefs.current[id]
+    if (el) el.setAttribute('draggable', 'true')
+  }, [])
+
+  const disableDrag = useCallback((id) => {
+    const el = widgetRefs.current[id]
+    if (el) el.removeAttribute('draggable')
+  }, [])
 
   const onDragStart = useCallback((e, id) => {
     setDragId(id)
@@ -102,13 +109,14 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
     e.dataTransfer.setData('text/plain', id)
   }, [])
 
-  const onDragEnd = useCallback(() => {
+  const onDragEnd = useCallback((id) => {
     setDragId(null)
     setDropIndicator(null)
     setDropEnd(false)
     setGhostHighlight(null)
     dragRef.current = null
-  }, [])
+    disableDrag(id)
+  }, [disableDrag])
 
   const onDragOver = useCallback((e, id) => {
     e.preventDefault()
@@ -131,7 +139,6 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
   const doReorder = useCallback((targetId, position) => {
     const sourceId = dragRef.current
     if (!sourceId || sourceId === targetId) { setDropIndicator(null); return }
-
     setOrder(prev => {
       const n = [...prev]
       const si = n.indexOf(sourceId)
@@ -182,7 +189,7 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
     setGhostHighlight(null)
   }, [persist])
 
-  // Build render items
+  // ── Render ──
   const visibleOrder = order.filter(id => childMap[id])
   const renderItems = []
   let colsUsed = 0
@@ -200,7 +207,6 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
 
     if (colsUsed + span > TOTAL_COLS) colsUsed = 0
 
-    // Size toggle label
     const nextSizeLabel = size === 'large' ? '½' : size === 'medium' ? 'Full' : '½'
     const nextSizeTitle = size === 'large' ? 'Half width' : size === 'medium' ? 'Full width' : 'Half width'
     const SizeIcon = size === 'large' ? Minimize2 : Maximize2
@@ -208,16 +214,15 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
     renderItems.push(
       <div
         key={id}
+        ref={el => { widgetRefs.current[id] = el }}
         data-dw={id}
-        draggable
         onDragStart={(e) => onDragStart(e, id)}
-        onDragEnd={onDragEnd}
+        onDragEnd={() => onDragEnd(id)}
         onDragOver={(e) => onDragOver(e, id)}
         onDrop={(e) => onDrop(e, id)}
         className={`relative group ${spanClass}`}
         style={{
           opacity: isDragging ? 0.25 : 1,
-          cursor: 'grab',
           borderRadius: '12px',
           transition: 'opacity 0.15s',
         }}
@@ -235,15 +240,21 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
         )}
 
         {/* Top hover controls: drag handle + resize */}
-        <div className="absolute left-1/2 -translate-x-1/2 -top-0 z-10 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+        <div className="absolute left-1/2 -translate-x-1/2 top-0 z-20 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
           style={{ marginTop: '-1px' }}>
-          <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-b-md shadow-sm cursor-grab active:cursor-grabbing"
-            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-light)', borderTop: 'none' }}>
+          <div
+            className="flex items-center gap-0.5 px-2 py-1 rounded-b-lg shadow-sm cursor-grab active:cursor-grabbing select-none"
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-light)', borderTop: 'none' }}
+            onMouseDown={() => enableDrag(id)}
+            onMouseUp={() => disableDrag(id)}
+            onMouseLeave={() => { if (!dragId) disableDrag(id) }}
+          >
             <GripVertical className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
+            <span className="text-[9px] font-medium" style={{ color: 'var(--text-muted)' }}>Drag</span>
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); toggleSize(id) }}
-            className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-b-md shadow-sm transition-colors"
+            className="flex items-center gap-0.5 px-2 py-1 rounded-b-lg shadow-sm transition-colors"
             style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-light)', borderTop: 'none', color: 'var(--text-muted)' }}
             title={nextSizeTitle}
           >
@@ -255,7 +266,7 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
         {/* Hide button */}
         {onHide && (
           <button onClick={(e) => { e.stopPropagation(); onHide(id) }}
-            className="absolute -right-1 -top-1 z-10 p-0.5 rounded-full opacity-0 group-hover:opacity-70 hover:opacity-100 transition-opacity"
+            className="absolute -right-1 -top-1 z-20 p-0.5 rounded-full opacity-0 group-hover:opacity-70 hover:opacity-100 transition-opacity"
             style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
             title="Hide this widget">
             <X className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
@@ -267,7 +278,7 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
 
     colsUsed += span
 
-    // Ghost placeholder for empty grid cells during drag
+    // Ghost drop targets in empty grid cells
     if (colsUsed > 0 && colsUsed < TOTAL_COLS && dragId) {
       const remaining = TOTAL_COLS - colsUsed
       const isHighlighted = ghostHighlight === id
