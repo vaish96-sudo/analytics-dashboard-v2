@@ -43,7 +43,6 @@ export default function AIInsights() {
     } catch (err) { setError(err.message) } finally { setLoading(false) }
   }
 
-  const { profile } = useTier()
   const branding = { companyName: profile?.custom_company_name || '', logoUrl: profile?.custom_logo_url || '' }
 
   const handleExportPDF = () => {
