@@ -79,6 +79,7 @@ function AppContent() {
       const savedProjectId = localStorage.getItem('nb_active_project')
       if (savedProjectId) {
         selectProject(savedProjectId)
+        setActiveTab('overview')
       } else {
         goHome()
       }
@@ -112,7 +113,8 @@ function AppContent() {
     setShowAllInsights(false)
     // Map old tab IDs to new unified tabs
     const tabMap = { ask: 'ai', insights: 'ai', charts: 'overview' }
-    if (tab) setActiveTab(tabMap[tab] || tab)
+    // Default to overview unless a specific tab was requested (e.g. from All Chats/Insights)
+    setActiveTab(tab ? (tabMap[tab] || tab) : 'overview')
     setPendingConversationId(conversationId || null)
     openProject()
   }

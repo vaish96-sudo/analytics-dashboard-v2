@@ -129,7 +129,10 @@ export async function askAI(question, schema, rawData, aggregateFn, history = []
 
   let queryPlan
   try {
-    const cleaned = call1.text.replace(/```json|```/g, '').trim()
+    let cleaned = call1.text.replace(/```json|```/g, '').trim()
+    // Extract JSON object even if there's text before/after it
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+    if (jsonMatch) cleaned = jsonMatch[0]
     queryPlan = JSON.parse(cleaned)
   } catch {
     return {
