@@ -60,7 +60,7 @@ function ThemeToggle() {
 
 export default function HomeScreen({ onOpenProject, onNewProject, onSettings, onShowChats, onShowInsights }) {
   const { user, logout } = useAuth()
-  const { projects, loading, deleteProject } = useProject()
+  const { projects, sharedProjects, loading, deleteProject } = useProject()
   const { tier } = useTier()
   const [searchQuery, setSearchQuery] = useState('')
   const [activeView, setActiveView] = useState(null)
@@ -93,6 +93,18 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
     })
     return groups
   }, [projects, isAgency])
+
+  // Group shared projects by client_name
+  const sharedClientGroups = useMemo(() => {
+    if (!sharedProjects || sharedProjects.length === 0) return null
+    const groups = {}
+    sharedProjects.forEach(p => {
+      const client = p.client_name || 'Uncategorized'
+      if (!groups[client]) groups[client] = []
+      groups[client].push(p)
+    })
+    return groups
+  }, [sharedProjects])
 
   const userName = user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'there'
   const initials = (user?.name || user?.email || '?')[0].toUpperCase()
@@ -291,6 +303,66 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
             )}
           </div>
         </div>
+
+        {/* Shared with me section */}
+        {sharedProjects && sharedProjects.length > 0 && (
+          <div className="px-3 pb-3">
+            <div className="pt-2 mb-2" style={{ borderTop: '1px solid var(--border-light)' }}>
+              <p className="text-[10px] font-medium uppercase tracking-wider px-2 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                <Users className="w-3 h-3" /> Shared with me
+              </p>
+            </div>
+            <div className="space-y-0.5">
+              {sharedClientGroups ? (
+                Object.entries(sharedClientGroups).map(([clientName, clientProjects]) => {
+                  const isClientExp = expandedClients[`shared_${clientName}`] !== false
+                  return (
+                    <div key={`shared_${clientName}`} className="mb-1">
+                      <button onClick={() => toggleClient(`shared_${clientName}`)}
+                        className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-left transition-colors"
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <ChevronRight className={`w-3 h-3 shrink-0 transition-transform ${isClientExp ? 'rotate-90' : ''}`} style={{ color: 'var(--text-muted)' }} />
+                        <Building2 className="w-3.5 h-3.5 shrink-0" style={{ color: '#8b5cf6' }} />
+                        <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{clientName}</span>
+                        <span className="text-[9px] ml-auto shrink-0" style={{ color: 'var(--text-muted)' }}>{clientProjects.length}</span>
+                      </button>
+                      {isClientExp && (
+                        <div className="ml-4 pl-2 space-y-0.5" style={{ borderLeft: '2px solid rgba(139, 92, 246, 0.2)' }}>
+                          {clientProjects.map((p, i) => (
+                            <button key={p.id} onClick={() => onOpenProject(p.id)}
+                              className="w-full flex items-center gap-2 py-1.5 px-1 rounded-lg text-left transition-colors"
+                              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <FolderOpen className="w-3 h-3 shrink-0" style={{ color: FOLDER_COLORS[i % FOLDER_COLORS.length] }} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</p>
+                                <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{(p.datasets || []).length} files</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              ) : (
+                sharedProjects.map((p, i) => (
+                  <button key={p.id} onClick={() => onOpenProject(p.id)}
+                    className="w-full flex items-center gap-2 py-1.5 px-2 rounded-lg text-left transition-colors"
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <FolderOpen className="w-3.5 h-3.5 shrink-0" style={{ color: FOLDER_COLORS[i % FOLDER_COLORS.length] }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{p._teamName || 'Shared'}</p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="p-3" style={{ borderTop: '1px solid var(--border)' }}>
           <button onClick={() => { if (typeof onSettings === 'function') onSettings(); }} className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs font-medium transition-colors hover:opacity-80 mb-2" style={{ color: 'var(--text-secondary)' }}>

@@ -24,7 +24,7 @@ export async function listProjects(userId) {
   const { data, error } = await supabase
     .from('projects')
     .select(`
-      id, name, data_source_type, data_source_meta, created_at, updated_at,
+      id, name, client_name, data_source_type, data_source_meta, created_at, updated_at,
       datasets(id, file_name, row_count, created_at)
     `)
     .eq('user_id', userId)
@@ -32,6 +32,42 @@ export async function listProjects(userId) {
 
   if (error) throw new Error(error.message)
   return data || []
+}
+
+// Load projects shared with user via team membership
+export async function listSharedProjects(userId) {
+  // Find teams this user belongs to
+  const { data: memberships } = await supabase
+    .from('team_members')
+    .select('team_id, role')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+
+  if (!memberships || memberships.length === 0) return []
+
+  // Find team owners
+  const teamIds = memberships.map(m => m.team_id)
+  const { data: teams } = await supabase
+    .from('teams')
+    .select('id, owner_id, name')
+    .in('id', teamIds)
+
+  if (!teams || teams.length === 0) return []
+
+  // Load projects from team owners (excluding user's own)
+  const ownerIds = teams.map(t => t.owner_id).filter(id => id !== userId)
+  if (ownerIds.length === 0) return []
+
+  const { data: projects } = await supabase
+    .from('projects')
+    .select(`
+      id, name, client_name, user_id, data_source_type, data_source_meta, created_at, updated_at,
+      datasets(id, file_name, row_count, created_at)
+    `)
+    .in('user_id', ownerIds)
+    .order('updated_at', { ascending: false })
+
+  return (projects || []).map(p => ({ ...p, _shared: true, _teamName: teams.find(t => t.owner_id === p.user_id)?.name }))
 }
 
 export async function getProject(projectId) {

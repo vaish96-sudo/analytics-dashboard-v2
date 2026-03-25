@@ -13,6 +13,7 @@ export function useProject() {
 export function ProjectProvider({ children }) {
   const { user } = useAuth()
   const [projects, setProjects] = useState([])
+  const [sharedProjects, setSharedProjects] = useState([])
   const [activeProjectId, setActiveProjectId] = useState(null)
   const [activeProject, setActiveProject] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -22,6 +23,7 @@ export function ProjectProvider({ children }) {
   useEffect(() => {
     if (!user) {
       setProjects([])
+      setSharedProjects([])
       setActiveProjectId(null)
       setActiveProject(null)
       setLoading(false)
@@ -34,8 +36,12 @@ export function ProjectProvider({ children }) {
     if (!user) return
     setLoading(true)
     try {
-      const list = await projectService.listProjects(user.id)
+      const [list, shared] = await Promise.all([
+        projectService.listProjects(user.id),
+        projectService.listSharedProjects(user.id).catch(() => []),
+      ])
       setProjects(list)
+      setSharedProjects(shared)
 
       // Restore last active project from localStorage
       const savedId = localStorage.getItem('nb_active_project')
@@ -127,6 +133,7 @@ export function ProjectProvider({ children }) {
   return (
     <ProjectContext.Provider value={{
       projects,
+      sharedProjects,
       activeProjectId,
       activeProject,
       loading,

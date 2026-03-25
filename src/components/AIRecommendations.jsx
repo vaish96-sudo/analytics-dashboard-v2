@@ -235,7 +235,7 @@ export default function AIRecommendations() {
 
       // Feature 1: Append custom AI playbook if user has one (Agency+ tier)
       if (profile?.custom_ai_playbook && can('customPlaybook')) {
-        systemPrompt += `\n\nADDITIONAL CLIENT RULES (follow these carefully):\n${profile.custom_ai_playbook}`
+        systemPrompt += `\n\nCUSTOM CLIENT RULES (these take priority over the default framework above when they conflict):\n${profile.custom_ai_playbook}\n\nIMPORTANT: If any custom rule above contradicts the default framework, follow the custom rule. The custom rules represent the client's specific strategy and override general best practices.`
       }
 
       const { text } = await callClaudeAPI({
