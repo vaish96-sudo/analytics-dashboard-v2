@@ -46,6 +46,8 @@ export default async function handler(req, res) {
     }
 
     const { projects, ...rest } = dataset
+    // Cache for 5 minutes — dataset data doesn't change after upload
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600')
     return res.json({ ...rest, raw_data: rawData })
   }
 

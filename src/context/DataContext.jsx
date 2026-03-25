@@ -11,12 +11,36 @@ export function useData() {
   return ctx
 }
 
-function detectColumnType(values) {
+function detectColumnType(values, colName) {
   const sample = values.filter(v => v !== null && v !== undefined && v !== '').slice(0, 50)
   if (sample.length === 0) return 'ignore'
   const datePatterns = [/^\d{4}-\d{2}-\d{2}/, /^\d{1,2}\/\d{1,2}\/\d{2,4}/, /^\d{1,2}-\d{1,2}-\d{2,4}/, /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i]
   if (sample.filter(v => { const s = String(v).trim(); return datePatterns.some(p => p.test(s)) || (!isNaN(Date.parse(s)) && s.length > 6) }).length > sample.length * 0.7) return 'date'
-  if (sample.filter(v => !isNaN(typeof v === 'number' ? v : parseFloat(String(v).replace(/[,$%]/g, '')))).length > sample.length * 0.8) return 'metric'
+  
+  const numericCount = sample.filter(v => !isNaN(typeof v === 'number' ? v : parseFloat(String(v).replace(/[,$%]/g, '')))).length
+  const isNumeric = numericCount > sample.length * 0.8
+
+  if (isNumeric) {
+    // Smart check: even if values are numeric, some columns are dimensions
+    const name = (colName || '').toLowerCase()
+    
+    // Column names that are almost always dimensions even with numeric values
+    const dimensionNames = ['id', 'age', 'year', 'month', 'day', 'zip', 'zipcode', 'zip_code', 'postal',
+      'code', 'phone', 'number', 'no', 'num', 'rank', 'ranking', 'rating', 'score', 'grade',
+      'level', 'tier', 'floor', 'room', 'seat', 'size', 'group', 'class', 'category',
+      'region', 'zone', 'district', 'ward', 'block', 'batch', 'version']
+    if (dimensionNames.some(d => name === d || name.startsWith(d + '_') || name.endsWith('_' + d))) return 'dimension'
+    
+    // If there are very few unique values relative to rows, it's likely a dimension (e.g., age groups, ratings 1-5)
+    const uniqueValues = new Set(sample.map(v => String(v).trim()))
+    if (uniqueValues.size <= Math.min(20, sample.length * 0.3)) return 'dimension'
+    
+    // Contains ranges like "20-30" or "100-200" — dimension
+    if (sample.some(v => /^\d+\s*[-–]\s*\d+/.test(String(v)))) return 'dimension'
+    
+    return 'metric'
+  }
+  
   return 'dimension'
 }
 
@@ -28,7 +52,7 @@ function buildAutoSchema(data) {
   const columns = Object.keys(data[0])
   const autoSchema = {}
   columns.forEach(col => {
-    autoSchema[col] = { type: detectColumnType(data.map(row => row[col])), label: toLabel(col) }
+    autoSchema[col] = { type: detectColumnType(data.map(row => row[col]), col), label: toLabel(col) }
   })
   return autoSchema
 }
@@ -401,7 +425,9 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
             return updated
           })
         }
-      } catch { /* AI tagging failed — heuristic schema already set above */ }
+      } catch (aiErr) { 
+        console.warn('AI column tagging failed, using heuristic:', aiErr.message) 
+      }
     } catch (err) {
     } finally {
       setSchemaLoading(false)
