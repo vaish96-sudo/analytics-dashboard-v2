@@ -76,13 +76,14 @@ export function ProjectProvider({ children }) {
     }
   }, [])
 
-  const createProject = useCallback(async ({ name, dataSourceType, dataSourceMeta }) => {
+  const createProject = useCallback(async ({ name, dataSourceType, dataSourceMeta, clientName }) => {
     if (!user) throw new Error('Not authenticated')
 
     const project = await projectService.createProject(user.id, {
       name,
       dataSourceType,
       dataSourceMeta,
+      clientName,
     })
 
     setProjects(prev => [project, ...prev])
@@ -108,6 +109,18 @@ export function ProjectProvider({ children }) {
       setActiveProject(prev => ({ ...prev, name: updated.name }))
     }
   }, [activeProjectId, activeProject])
+
+  const updateProjectClient = useCallback(async (projectId, clientName) => {
+    const updated = await projectService.updateProject(projectId, { client_name: clientName || null })
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, client_name: updated.client_name } : p))
+  }, [])
+
+  const renameClient = useCallback(async (oldName, newName) => {
+    if (!newName?.trim() || oldName === newName) return
+    const clientProjects = projects.filter(p => p.client_name === oldName)
+    await Promise.all(clientProjects.map(p => projectService.updateProject(p.id, { client_name: newName.trim() })))
+    setProjects(prev => prev.map(p => p.client_name === oldName ? { ...p, client_name: newName.trim() } : p))
+  }, [projects])
 
   // Dataset operations within active project
   const addDatasetToProject = useCallback(async ({ fileName, schemaDef, rowCount, rawData }) => {
@@ -143,6 +156,8 @@ export function ProjectProvider({ children }) {
       createProject,
       deleteProject: deleteProjectById,
       renameProject,
+      updateProjectClient,
+      renameClient,
       addDatasetToProject,
       removeDatasetFromProject,
     }}>

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import LogoMark from './LogoMark'
 import { useAuth } from '../context/AuthContext'
 import { useProject } from '../context/ProjectContext'
@@ -7,8 +7,56 @@ import { useTier } from '../context/TierContext'
 import {
   FolderOpen, FolderPlus, Upload, FileSpreadsheet, Globe, LogOut,
   ChevronRight, Loader2, Search, Database, MessageSquare, Lightbulb, Sun, Moon, Monitor,
-  Crown, Menu, X, User, Settings, Trash2, ChevronDown, Plus, Users, Building2
+  Crown, Menu, X, User, Settings, Trash2, ChevronDown, Plus, Users, Building2,
+  MoreHorizontal, Pencil, ArrowRightLeft, GripVertical
 } from 'lucide-react'
+
+// ─── Context Menu ───────────────────────────────────────────────
+function ContextMenu({ x, y, items, onClose }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose() }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [onClose])
+
+  // Adjust position to stay in viewport
+
+  return (
+    <div ref={ref} className="min-w-[160px] py-1 rounded-xl shadow-lg border animate-fade-in"
+      onClick={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{ position: 'fixed', left: x, top: y, zIndex: 9999, background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+      {items.map((item, i) => item.separator ? (
+        <div key={i} className="my-1" style={{ borderTop: '1px solid var(--border-light)' }} />
+      ) : (
+        <button key={i} onClick={() => { item.action(); onClose() }}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors text-left ${item.danger ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20' : ''}`}
+          style={item.danger ? {} : { color: 'var(--text-secondary)' }}
+          onMouseEnter={e => { if (!item.danger) e.currentTarget.style.background = 'var(--bg-overlay)' }}
+          onMouseLeave={e => { if (!item.danger) e.currentTarget.style.background = 'transparent' }}>
+          {item.icon && <item.icon className="w-3.5 h-3.5 shrink-0" />}
+          {item.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ─── Inline Rename Input ────────────────────────────────────────
+function InlineRename({ value, onSave, onCancel }) {
+  const [text, setText] = useState(value)
+  const ref = useRef(null)
+  useEffect(() => { ref.current?.focus(); ref.current?.select() }, [])
+  const save = () => { if (text.trim() && text.trim() !== value) onSave(text.trim()); else onCancel() }
+  return (
+    <input ref={ref} value={text} onChange={e => setText(e.target.value)}
+      onBlur={save} onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') onCancel() }}
+      className="text-[11px] font-medium px-1 py-0.5 rounded border w-full"
+      style={{ background: 'var(--bg-surface)', borderColor: 'var(--accent)', color: 'var(--text-primary)', outline: 'none' }}
+      onClick={e => e.stopPropagation()} />
+  )
+}
 
 function getGreeting() {
   const h = new Date().getHours()
@@ -61,7 +109,7 @@ function ThemeToggle() {
 
 export default function HomeScreen({ onOpenProject, onNewProject, onSettings, onShowChats, onShowInsights }) {
   const { user, logout } = useAuth()
-  const { projects, sharedProjects, loading, deleteProject } = useProject()
+  const { projects, sharedProjects, loading, deleteProject, renameProject, updateProjectClient, renameClient } = useProject()
   const { tier } = useTier()
   const [searchQuery, setSearchQuery] = useState('')
   const [activeView, setActiveView] = useState(null)
@@ -72,6 +120,15 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
   const [expandedClients, setExpandedClients] = useState({})
   const projectsRef = useRef(null)
   const menuRef = useRef(null)
+
+  // Context menu state
+  const [ctxMenu, setCtxMenu] = useState(null) // { x, y, items }
+  // Inline rename state
+  const [renamingProject, setRenamingProject] = useState(null) // project id
+  const [renamingClient, setRenamingClient] = useState(null) // client name
+  // Drag-and-drop state
+  const [dragProjectId, setDragProjectId] = useState(null)
+  const [dropTarget, setDropTarget] = useState(null) // client name or '__personal__'
 
   const isAgency = tier === 'agency'
 
@@ -152,6 +209,66 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
 
   const handleLogout = () => { setMobileMenuOpen(false); logout() }
 
+  // ─── Context Menu Handlers ─────────────────────────────────
+  const showProjectMenu = useCallback((e, project) => {
+    e.preventDefault(); e.stopPropagation()
+    const clientNames = [...new Set(projects.filter(p => p.client_name).map(p => p.client_name))]
+    const items = [
+      { icon: Pencil, label: 'Rename', action: () => setRenamingProject(project.id) },
+      ...(isAgency ? [{
+        icon: ArrowRightLeft, label: 'Move to client…', action: () => {
+          // Show a sub-menu by setting a special ctx
+          const moveItems = [
+            { icon: User, label: 'Personal (no client)', action: () => updateProjectClient(project.id, null) },
+            ...clientNames.filter(n => n !== project.client_name).map(name => ({
+              icon: Building2, label: name, action: () => updateProjectClient(project.id, name),
+            })),
+          ]
+          setCtxMenu({ x: e.clientX, y: e.clientY, items: moveItems })
+        }
+      }] : []),
+      { separator: true },
+      { icon: Trash2, label: 'Delete project', danger: true, action: () => { if (confirm('Delete this project and all its data?')) deleteProject(project.id) } },
+    ]
+    setCtxMenu({ x: e.clientX, y: e.clientY, items })
+  }, [projects, isAgency, deleteProject, updateProjectClient])
+
+  const showClientMenu = useCallback((e, clientName) => {
+    e.preventDefault(); e.stopPropagation()
+    setCtxMenu({
+      x: e.clientX, y: e.clientY,
+      items: [
+        { icon: Pencil, label: 'Rename client', action: () => setRenamingClient(clientName) },
+      ],
+    })
+  }, [])
+
+  // ─── Drag & Drop Handlers ─────────────────────────────────
+  const handleDragStart = useCallback((e, projectId) => {
+    setDragProjectId(projectId)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', projectId)
+  }, [])
+
+  const handleDragOver = useCallback((e, targetClient) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDropTarget(targetClient)
+  }, [])
+
+  const handleDragLeave = useCallback(() => { setDropTarget(null) }, [])
+
+  const handleDrop = useCallback((e, targetClient) => {
+    e.preventDefault()
+    setDropTarget(null)
+    if (!dragProjectId) return
+    const newClient = targetClient === '__personal__' ? null : targetClient
+    updateProjectClient(dragProjectId, newClient)
+    setDragProjectId(null)
+  }, [dragProjectId, updateProjectClient])
+
+  const handleDragEnd = useCallback(() => { setDragProjectId(null); setDropTarget(null) }, [])
+
   return (
     <div className="min-h-screen flex" style={{ background: 'var(--bg-primary)' }}>
       {/* ===== DESKTOP SIDEBAR ===== */}
@@ -189,45 +306,69 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
             ) : projects.length === 0 ? (
               <p className="text-xs px-2 py-4" style={{ color: 'var(--text-muted)' }}>No projects yet</p>
             ) : isAgency && clientGroups ? (
-              /* Agency view: projects grouped by client */
-              Object.entries(clientGroups).map(([clientName, clientProjects]) => {
-                const isClientExpanded = expandedClients[clientName] !== false
+              /* Agency view: projects grouped by client with DnD + context menu */
+              <>
+              {Object.entries(clientGroups).map(([cName, clientProjects]) => {
+                const isClientExpanded = expandedClients[cName] !== false
+                const isDragOver = dropTarget === cName
                 return (
-                  <div key={clientName} className="mb-1">
-                    <button onClick={() => toggleClient(clientName)}
-                      className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-left transition-colors"
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <ChevronRight className={`w-3 h-3 shrink-0 transition-transform ${isClientExpanded ? 'rotate-90' : ''}`} style={{ color: 'var(--text-muted)' }} />
+                  <div key={cName} className="mb-1"
+                    onDragOver={(e) => handleDragOver(e, cName)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, cName)}>
+                    <div className={`w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-left transition-all ${isDragOver ? 'ring-2 ring-purple-400 bg-purple-50 dark:bg-purple-900/20' : ''}`}
+                      onMouseEnter={e => { if (!isDragOver) e.currentTarget.style.background = 'var(--bg-overlay)' }}
+                      onMouseLeave={e => { if (!isDragOver) e.currentTarget.style.background = 'transparent' }}>
+                      <button onClick={() => toggleClient(cName)} className="shrink-0">
+                        <ChevronRight className={`w-3 h-3 transition-transform ${isClientExpanded ? 'rotate-90' : ''}`} style={{ color: 'var(--text-muted)' }} />
+                      </button>
                       <Building2 className="w-3.5 h-3.5 shrink-0" style={{ color: '#8b5cf6' }} />
-                      <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{clientName}</span>
-                      <span className="text-[9px] ml-auto shrink-0" style={{ color: 'var(--text-muted)' }}>{clientProjects.length}</span>
-                    </button>
+                      {renamingClient === cName ? (
+                        <InlineRename value={cName} onSave={(newName) => { renameClient(cName, newName); setRenamingClient(null) }} onCancel={() => setRenamingClient(null)} />
+                      ) : (
+                        <button onClick={() => toggleClient(cName)} className="flex-1 min-w-0 text-left">
+                          <span className="text-xs font-semibold truncate block" style={{ color: 'var(--text-primary)' }}>{cName}</span>
+                        </button>
+                      )}
+                      <span className="text-[9px] shrink-0" style={{ color: 'var(--text-muted)' }}>{clientProjects.length}</span>
+                      <button onClick={(e) => showClientMenu(e, cName)}
+                        className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:opacity-100 shrink-0" style={{ color: 'var(--text-muted)' }}>
+                        <MoreHorizontal className="w-3 h-3" />
+                      </button>
+                    </div>
                     {isClientExpanded && (
                       <div className="ml-4 pl-2 space-y-0.5" style={{ borderLeft: '2px solid rgba(139, 92, 246, 0.2)' }}>
                         {clientProjects.map((p, i) => {
                           const ds = p.datasets || []
                           const isExpanded = expandedProjects[p.id]
+                          const isDragging = dragProjectId === p.id
                           return (
-                            <div key={p.id}>
+                            <div key={p.id} draggable onDragStart={(e) => handleDragStart(e, p.id)} onDragEnd={handleDragEnd}
+                              style={{ opacity: isDragging ? 0.4 : 1 }}>
                               <div className="group flex items-center gap-0.5 rounded-lg transition-colors"
                                 onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
-                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                <button onClick={() => toggleProject(p.id)}
-                                  className="p-1 shrink-0" style={{ color: 'var(--text-muted)' }}>
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                onContextMenu={(e) => showProjectMenu(e, p)}>
+                                <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-40 cursor-grab" style={{ color: 'var(--text-muted)' }} />
+                                <button onClick={() => toggleProject(p.id)} className="p-0.5 shrink-0" style={{ color: 'var(--text-muted)' }}>
                                   <ChevronRight className={`w-2.5 h-2.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                                 </button>
-                                <button onClick={() => onOpenProject(p.id)}
-                                  className="flex-1 flex items-center gap-2 py-1.5 pr-1 text-left min-w-0">
+                                <button onClick={() => onOpenProject(p.id)} className="flex-1 flex items-center gap-2 py-1.5 pr-1 text-left min-w-0">
                                   <FolderOpen className="w-3 h-3 shrink-0" style={{ color: FOLDER_COLORS[i % FOLDER_COLORS.length] }} />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</p>
-                                    <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{ds.length} files · {timeAgo(p.updated_at)}</p>
+                                    {renamingProject === p.id ? (
+                                      <InlineRename value={p.name} onSave={(name) => { renameProject(p.id, name); setRenamingProject(null) }} onCancel={() => setRenamingProject(null)} />
+                                    ) : (
+                                      <>
+                                        <p className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</p>
+                                        <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{ds.length} files · {timeAgo(p.updated_at)}</p>
+                                      </>
+                                    )}
                                   </div>
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this project?')) deleteProject(p.id) }}
-                                  className="p-1 mr-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0" style={{ color: 'var(--text-muted)' }}>
-                                  <Trash2 className="w-2.5 h-2.5" />
+                                <button onClick={(e) => showProjectMenu(e, p)}
+                                  className="p-1 mr-1 rounded opacity-0 group-hover:opacity-100 transition-opacity shrink-0" style={{ color: 'var(--text-muted)' }}>
+                                  <MoreHorizontal className="w-2.5 h-2.5" />
                                 </button>
                               </div>
                               {isExpanded && (
@@ -250,9 +391,18 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                     )}
                   </div>
                 )
-              })
+              })}
+              {/* Uncategorized drop target */}
+              {clientGroups['Uncategorized'] && (
+                <div className={`mt-1 p-2 rounded-lg transition-all ${dropTarget === '__personal__' ? 'ring-2 ring-slate-400 bg-slate-50 dark:bg-slate-800' : ''}`}
+                  onDragOver={(e) => handleDragOver(e, '__personal__')}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, '__personal__')}>
+                </div>
+              )}
+              </>
             ) : (
-              /* Standard view: flat project list */
+              /* Standard view: flat project list with context menu */
               projects.slice(0, 15).map((p, i) => {
                 const ds = p.datasets || []
                 const isExpanded = expandedProjects[p.id]
@@ -260,7 +410,8 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                   <div key={p.id}>
                     <div className="group flex items-center gap-0.5 rounded-lg transition-colors"
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      onContextMenu={(e) => showProjectMenu(e, p)}>
                       <button onClick={() => toggleProject(p.id)}
                         className="p-1.5 pl-2 shrink-0 transition-transform" style={{ color: 'var(--text-muted)' }}>
                         <ChevronRight className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
@@ -269,13 +420,19 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                         className="flex-1 flex items-center gap-2 py-2 pr-1 text-left min-w-0">
                         <FolderOpen className="w-3.5 h-3.5 shrink-0" style={{ color: FOLDER_COLORS[i % FOLDER_COLORS.length] }} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</p>
-                          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{ds.length} {ds.length === 1 ? 'file' : 'files'} · {timeAgo(p.updated_at)}</p>
+                          {renamingProject === p.id ? (
+                            <InlineRename value={p.name} onSave={(name) => { renameProject(p.id, name); setRenamingProject(null) }} onCancel={() => setRenamingProject(null)} />
+                          ) : (
+                            <>
+                              <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</p>
+                              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{ds.length} {ds.length === 1 ? 'file' : 'files'} · {timeAgo(p.updated_at)}</p>
+                            </>
+                          )}
                         </div>
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this project?')) deleteProject(p.id) }}
-                        className="p-1 mr-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0" style={{ color: 'var(--text-muted)' }}>
-                        <Trash2 className="w-3 h-3" />
+                      <button onClick={(e) => showProjectMenu(e, p)}
+                        className="p-1 mr-1 rounded opacity-0 group-hover:opacity-100 transition-opacity shrink-0" style={{ color: 'var(--text-muted)' }}>
+                        <MoreHorizontal className="w-3 h-3" />
                       </button>
                     </div>
                     {isExpanded && (
@@ -666,6 +823,9 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
           </div>
         </div>
       </main>
+
+      {/* Context Menu Portal */}
+      {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />}
     </div>
   )
 }

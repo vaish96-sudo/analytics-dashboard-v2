@@ -13,7 +13,7 @@ const BORDERS = { opportunity: 'border-l-emerald-500', trend: 'border-l-sky-500'
 
 export default function AIInsights() {
   const { schema, rawData, aggregateUnfiltered, updateDatasetState, insights, insightsLoaded, activeDatasetId } = useData()
-  const { hasRemaining, remaining, incrementUsage } = useTier()
+  const { hasRemaining, remaining, incrementUsage, profile } = useTier()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [usedModel, setUsedModel] = useState(null)
@@ -43,12 +43,15 @@ export default function AIInsights() {
     } catch (err) { setError(err.message) } finally { setLoading(false) }
   }
 
+  const { profile } = useTier()
+  const branding = { companyName: profile?.custom_company_name || '', logoUrl: profile?.custom_logo_url || '' }
+
   const handleExportPDF = () => {
-    exportToPDF({ type: 'insights', items: insights }, 'AI_Strategic_Insights')
+    exportToPDF({ type: 'insights', items: insights }, 'AI_Strategic_Insights', branding)
   }
 
   const handleExportWord = () => {
-    exportToWord({ type: 'insights', items: insights }, 'AI_Strategic_Insights')
+    exportToWord({ type: 'insights', items: insights }, 'AI_Strategic_Insights', branding)
   }
 
   return (

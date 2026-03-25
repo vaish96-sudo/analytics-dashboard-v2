@@ -42,13 +42,19 @@ function ColumnRow({ colName, def, sampleValues, onUpdate, onRemove }) {
   )
 }
 
-// ─── Summary Pill (for confirmation view) ────────────────────────
+// ─── Summary Pill (for confirmation view) — draggable ──────────
 function SummaryPill({ colName, def, onChangeType }) {
   const config = TYPE_CONFIG[def.type]
   const Icon = config.icon
   return (
-    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium cursor-pointer ${config.bg} ${config.color} ${config.border} group relative`}
-      title={`${def.label} — classified as ${config.label}. Click to change type.`}>
+    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium cursor-grab ${config.bg} ${config.color} ${config.border} group relative`}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', colName)
+        e.dataTransfer.setData('application/x-col-type', def.type)
+      }}
+      title={`${def.label} — classified as ${config.label}. Drag to another category or click to change.`}>
       <Icon className="w-3 h-3" />
       <span>{def.label}</span>
       <select value={def.type} onChange={(e) => onChangeType(e.target.value)}
@@ -63,10 +69,40 @@ function SummaryPill({ colName, def, onChangeType }) {
   )
 }
 
+// ─── Droppable Zone (for drag-and-drop between categories) ─────
+function DroppableZone({ targetType, children, onDropColumn, label }) {
+  const [isOver, setIsOver] = React.useState(false)
+  const config = TYPE_CONFIG[targetType]
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setIsOver(true) }}
+      onDragLeave={() => setIsOver(false)}
+      onDrop={(e) => {
+        e.preventDefault(); setIsOver(false)
+        const colName = e.dataTransfer.getData('text/plain')
+        const fromType = e.dataTransfer.getData('application/x-col-type')
+        if (colName && fromType !== targetType) onDropColumn(colName, targetType)
+      }}
+      className={`p-4 rounded-xl transition-all ${isOver ? 'ring-2 ring-offset-1 ' + config.border.replace('border-', 'ring-') : ''}`}
+      style={{ background: 'var(--bg-surface)', border: `1px solid ${isOver ? 'transparent' : 'var(--border)'}` }}>
+      {children}
+      {isOver && (
+        <div className={`mt-2 p-2 rounded-lg border-2 border-dashed ${config.border} ${config.bg} text-center`}>
+          <span className={`text-[10px] font-medium ${config.color}`}>Drop here to make {config.label}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Component ──────────────────────────────────────────────
 export default function ColumnTagger({ onConfirm }) {
   const { rawData, fileName, schema, updateColumnSchema, removeColumn, cancelTagging, columnsByType, rowCount, confirmTagging, schemaLoading, confirmLoading, confirmError } = useData()
   const [showAdvanced, setShowAdvanced] = useState(false)
+
+  const handleDropColumn = (colName, newType) => {
+    updateColumnSchema(colName, { type: newType })
+  }
 
   const samplesByCol = useMemo(() => {
     if (!rawData || !schema) return {}
@@ -134,7 +170,7 @@ export default function ColumnTagger({ onConfirm }) {
 
             {/* Categories */}
             {grouped.dimension?.length > 0 && (
-              <div className="p-4 rounded-xl" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+              <DroppableZone targetType="dimension" onDropColumn={handleDropColumn}>
                 <div className="flex items-center gap-2 mb-3">
                   <Tag className="w-4 h-4 text-sky-600" />
                   <span className="text-xs font-semibold uppercase tracking-wider text-sky-600">
@@ -148,12 +184,12 @@ export default function ColumnTagger({ onConfirm }) {
                       onChangeType={(type) => updateColumnSchema(item.col, { type })} />
                   ))}
                 </div>
-              </div>
+              </DroppableZone>
             )}
 
             {/* Numbers */}
             {grouped.metric?.length > 0 && (
-              <div className="p-4 rounded-xl" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+              <DroppableZone targetType="metric" onDropColumn={handleDropColumn}>
                 <div className="flex items-center gap-2 mb-3">
                   <Hash className="w-4 h-4 text-emerald-600" />
                   <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
@@ -167,12 +203,12 @@ export default function ColumnTagger({ onConfirm }) {
                       onChangeType={(type) => updateColumnSchema(item.col, { type })} />
                   ))}
                 </div>
-              </div>
+              </DroppableZone>
             )}
 
             {/* Dates */}
             {grouped.date?.length > 0 && (
-              <div className="p-4 rounded-xl" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+              <DroppableZone targetType="date" onDropColumn={handleDropColumn}>
                 <div className="flex items-center gap-2 mb-3">
                   <Calendar className="w-4 h-4 text-amber-600" />
                   <span className="text-xs font-semibold uppercase tracking-wider text-amber-600">
@@ -186,13 +222,13 @@ export default function ColumnTagger({ onConfirm }) {
                       onChangeType={(type) => updateColumnSchema(item.col, { type })} />
                   ))}
                 </div>
-              </div>
+              </DroppableZone>
             )}
 
             {/* Skipped */}
             {grouped.ignore?.length > 0 && (
-              <div className="p-4 rounded-xl" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', opacity: 0.7 }}>
-                <div className="flex items-center gap-2 mb-3">
+              <DroppableZone targetType="ignore" onDropColumn={handleDropColumn}>
+                <div className="flex items-center gap-2 mb-3" style={{ opacity: 0.7 }}>
                   <EyeOff className="w-4 h-4 text-slate-400" />
                   <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Skipped ({grouped.ignore.length})
@@ -205,7 +241,27 @@ export default function ColumnTagger({ onConfirm }) {
                       onChangeType={(type) => updateColumnSchema(item.col, { type })} />
                   ))}
                 </div>
-              </div>
+              </DroppableZone>
+            )}
+
+            {/* Empty zone drop targets for categories that have no columns yet */}
+            {(!grouped.dimension || grouped.dimension.length === 0) && (
+              <DroppableZone targetType="dimension" onDropColumn={handleDropColumn}>
+                <div className="flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-sky-600" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-sky-600">Categories (0)</span>
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>— drag columns here</span>
+                </div>
+              </DroppableZone>
+            )}
+            {(!grouped.metric || grouped.metric.length === 0) && (
+              <DroppableZone targetType="metric" onDropColumn={handleDropColumn}>
+                <div className="flex items-center gap-2">
+                  <Hash className="w-4 h-4 text-emerald-600" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Numbers (0)</span>
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>— drag columns here</span>
+                </div>
+              </DroppableZone>
             )}
 
             {/* Advanced toggle */}

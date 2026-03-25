@@ -262,21 +262,23 @@ export default function AIRecommendations() {
   }
 
   const handleExportPDF = () => {
+    const branding = { companyName: profile?.custom_company_name || '', logoUrl: profile?.custom_logo_url || '' }
     const items = recommendations.map(r => ({
       type: 'recommendation', title: r.title,
       description: `${r.description}\n\nSteps: ${(r.steps || []).join(', ')}\nTimeline: ${r.timeline}\nExpected Impact: ${r.expected_impact}\nConfidence: ${r.confidence || 'N/A'}`,
       impact: r.priority,
     }))
-    exportToPDF({ type: 'insights', items }, 'AI_Recommendations')
+    exportToPDF({ type: 'insights', items }, 'AI_Recommendations', branding)
   }
 
   const handleExportWord = () => {
+    const branding = { companyName: profile?.custom_company_name || '', logoUrl: profile?.custom_logo_url || '' }
     const items = recommendations.map(r => ({
       type: 'recommendation', title: r.title,
       description: `${r.description}\n\nSteps: ${(r.steps || []).join(', ')}\nTimeline: ${r.timeline}\nExpected Impact: ${r.expected_impact}\nConfidence: ${r.confidence || 'N/A'}`,
       impact: r.priority,
     }))
-    exportToWord({ type: 'insights', items }, 'AI_Recommendations')
+    exportToWord({ type: 'insights', items }, 'AI_Recommendations', branding)
   }
 
   const industryLabel = { advertising: 'Advertising & Media', ecommerce: 'E-Commerce & Retail', manufacturing: 'Manufacturing', saas: 'SaaS & Subscription', healthcare: 'Healthcare', logistics: 'Logistics & Supply Chain', finance: 'Finance', general: 'Business Analysis' }

@@ -4,15 +4,18 @@ import { supabase } from '../lib/supabase'
 // PROJECTS
 // ============================================================
 
-export async function createProject(userId, { name, dataSourceType, dataSourceMeta }) {
+export async function createProject(userId, { name, dataSourceType, dataSourceMeta, clientName }) {
+  const row = {
+    user_id: userId,
+    name,
+    data_source_type: dataSourceType,
+    data_source_meta: dataSourceMeta || {},
+  }
+  if (clientName) row.client_name = clientName
+
   const { data, error } = await supabase
     .from('projects')
-    .insert({
-      user_id: userId,
-      name,
-      data_source_type: dataSourceType,
-      data_source_meta: dataSourceMeta || {},
-    })
+    .insert(row)
     .select()
     .single()
 
@@ -89,7 +92,7 @@ export async function getProject(projectId) {
 
     const { data: allStates, error: stErr } = await supabase
       .from('dashboard_states')
-      .select('id, dataset_id, active_tab, global_filters, charts_state, report_builder_state, data_table_state, insights, insights_loaded, recommendations, ai_charts, custom_metrics, updated_at')
+      .select('id, dataset_id, active_tab, global_filters, charts_state, report_builder_state, data_table_state, insights, insights_loaded, recommendations, ai_charts, custom_metrics, layout_config, updated_at')
       .in('dataset_id', datasetIds)
 
     if (stErr) console.error('Failed to fetch dashboard_states:', stErr.message)
@@ -105,7 +108,7 @@ export async function getProject(projectId) {
         const { data: newRow } = await supabase
           .from('dashboard_states')
           .insert({ dataset_id: ds.id })
-          .select('id, dataset_id, active_tab, global_filters, charts_state, report_builder_state, data_table_state, insights, insights_loaded, recommendations, ai_charts, custom_metrics, updated_at')
+          .select('id, dataset_id, active_tab, global_filters, charts_state, report_builder_state, data_table_state, insights, insights_loaded, recommendations, ai_charts, custom_metrics, layout_config, updated_at')
         ds.dashboard_states = newRow || []
       }
     }
