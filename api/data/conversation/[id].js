@@ -1,9 +1,13 @@
-import { validateSession } from '../../lib/validateSession.js'
+import { validateSession, checkOrigin } from '../../lib/validateSession.js'
+import { applyRateLimit } from '../../lib/rateLimit.js'
 
 export default async function handler(req, res) {
   const session = await validateSession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
   const { userId, supabase } = session
+
+  if (applyRateLimit(req, res, userId)) return
+  if (checkOrigin(req, res)) return
 
   const conversationId = req.query.id
   if (!conversationId) return res.status(400).json({ error: 'Missing conversation ID' })

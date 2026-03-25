@@ -1,9 +1,14 @@
-import { validateSession } from '../../lib/validateSession.js'
+import { validateSession, checkOrigin } from '../../lib/validateSession.js'
+import { applyRateLimit } from '../../lib/rateLimit.js'
+import { auditLog } from '../../lib/auditLog.js'
 
 export default async function handler(req, res) {
   const session = await validateSession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
   const { userId, supabase } = session
+
+  if (applyRateLimit(req, res, userId)) return
+  if (checkOrigin(req, res)) return
 
   const projectId = req.query.id
   if (!projectId) return res.status(400).json({ error: 'Missing project ID' })
@@ -132,12 +137,14 @@ export default async function handler(req, res) {
       .single()
 
     if (error) return res.status(500).json({ error: error.message })
+    await auditLog(supabase, userId, 'project.update', { projectId, updates: Object.keys(updates) })
     return res.json(data)
   }
 
   if (req.method === 'DELETE') {
     const { error } = await supabase.from('projects').delete().eq('id', projectId)
     if (error) return res.status(500).json({ error: error.message })
+    await auditLog(supabase, userId, 'project.delete', { projectId })
     return res.status(204).end()
   }
 

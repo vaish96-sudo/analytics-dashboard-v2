@@ -1,4 +1,5 @@
-import { validateSession } from '../lib/validateSession.js'
+import { validateSession, checkOrigin } from '../lib/validateSession.js'
+import { applyRateLimit } from '../lib/rateLimit.js'
 import { createClient } from '@supabase/supabase-js'
 
 export default async function handler(req, res) {
@@ -7,6 +8,9 @@ export default async function handler(req, res) {
   const session = await validateSession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
   const { userId, supabase } = session
+
+  if (applyRateLimit(req, res, userId)) return
+  if (checkOrigin(req, res)) return
 
   const { data: user, error } = await supabase
     .from('users')

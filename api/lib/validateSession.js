@@ -32,3 +32,36 @@ export async function validateSession(req) {
 
   return { userId: session.user_id, supabase, token }
 }
+
+/**
+ * CSRF protection — validates Origin header on mutating requests.
+ * Call this at the top of POST/PATCH/DELETE handlers.
+ * Returns true if the request should be blocked.
+ */
+export function checkOrigin(req, res) {
+  const method = req.method?.toUpperCase()
+  // Only check mutating requests
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return false
+
+  const origin = (typeof req.headers?.get === 'function'
+    ? req.headers.get('origin') || req.headers.get('referer')
+    : req.headers?.origin || req.headers?.referer) || ''
+
+  const allowed = [
+    'https://analytics-dashboard-v2-zeta.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ]
+
+  // If no origin header at all (e.g., server-to-server), allow it
+  // Browsers always send Origin on cross-origin requests
+  if (!origin) return false
+
+  const isAllowed = allowed.some(a => origin.startsWith(a))
+  if (!isAllowed) {
+    res.status(403).json({ error: 'Forbidden: invalid origin' })
+    return true // blocked
+  }
+
+  return false // allowed
+}

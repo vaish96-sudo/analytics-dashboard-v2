@@ -1,9 +1,14 @@
-import { validateSession } from '../lib/validateSession.js'
+import { validateSession, checkOrigin } from '../lib/validateSession.js'
+import { applyRateLimit } from '../lib/rateLimit.js'
+import { auditLog } from '../lib/auditLog.js'
 
 export default async function handler(req, res) {
   const session = await validateSession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
   const { userId, supabase } = session
+
+  if (applyRateLimit(req, res, userId)) return
+  if (checkOrigin(req, res)) return
 
   if (req.method === 'GET') {
     const { data, error } = await supabase
@@ -36,6 +41,7 @@ export default async function handler(req, res) {
       .single()
 
     if (error) return res.status(500).json({ error: error.message })
+    await auditLog(supabase, userId, 'project.create', { projectId: data.id, name })
     return res.status(201).json(data)
   }
 
