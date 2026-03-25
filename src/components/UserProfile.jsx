@@ -205,12 +205,12 @@ export default function UserProfile() {
         </div>
       </div>
 
-      {/* Feature 2: White-Label (Agency+) */}
+      {/* Feature 2: White-Label (Enterprise) */}
       <div className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <h3 className="text-base font-display font-semibold" style={{ color: 'var(--text-primary)' }}>White Label</h3>
-            {!can('whiteLabel') && <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium" style={{ background: 'linear-gradient(135deg, #1c1917, #292524)', color: '#d4a574' }}><Lock className="w-2.5 h-2.5" /> Agency+</span>}
+            {!can('whiteLabel') && <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium" style={{ background: 'linear-gradient(135deg, #1c1917, #292524)', color: '#d4a574' }}><Lock className="w-2.5 h-2.5" /> Enterprise</span>}
           </div>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Your branding on exported reports</p>
         </div>
@@ -242,7 +242,7 @@ export default function UserProfile() {
             <label className="text-sm font-medium flex items-center gap-1.5 mb-1.5" style={{ color: 'var(--text-secondary)' }}>
               <Building2 className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} /> Brand name on reports
             </label>
-            <input type="text" value={customCompany} onChange={(e) => setCustomCompany(e.target.value)} placeholder="Your Agency Name (replaces Northern Bird on exports)"
+            <input type="text" value={customCompany} onChange={(e) => setCustomCompany(e.target.value)} placeholder="Your Company Name (replaces Northern Bird on exports)"
               className="w-full px-3 py-2.5 text-sm rounded-xl nb-input" />
           </div>
           <div className="flex justify-end">
@@ -253,12 +253,12 @@ export default function UserProfile() {
         </div>
       </div>
 
-      {/* Feature 1: Custom AI Playbook (Agency+) */}
+      {/* Feature 1: Custom AI Playbook (Enterprise) */}
       <div className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <h3 className="text-base font-display font-semibold" style={{ color: 'var(--text-primary)' }}>AI Playbook</h3>
-            {!can('customPlaybook') && <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium" style={{ background: 'linear-gradient(135deg, #1c1917, #292524)', color: '#d4a574' }}><Lock className="w-2.5 h-2.5" /> Agency+</span>}
+            {!can('customPlaybook') && <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium" style={{ background: 'linear-gradient(135deg, #1c1917, #292524)', color: '#d4a574' }}><Lock className="w-2.5 h-2.5" /> Enterprise</span>}
           </div>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Custom rules that guide how AI generates recommendations for your data</p>
         </div>
