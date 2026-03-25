@@ -38,6 +38,7 @@ const FOLDER_COLORS = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899', '#
 import TierBadge from './TierBadge'
 import PendingInvites from './PendingInvites'
 import ClientShareMenu from './ClientShareMenu'
+import ProjectShareMenu from './ProjectShareMenu'
 
 function ThemeToggle() {
   const { mode, setTheme } = useTheme()
@@ -78,8 +79,11 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
   const [dragProjectId, setDragProjectId] = useState(null)
   const [dropTarget, setDropTarget] = useState(null)
   const [shareMenuClient, setShareMenuClient] = useState(null)
+  const [shareMenuProject, setShareMenuProject] = useState(null)
   const projectsRef = useRef(null)
   const menuRef = useRef(null)
+  const shareButtonRefs = useRef({})
+  const projectShareButtonRefs = useRef({})
 
   const isAgency = tier === 'agency'
   const [ownedTeamId, setOwnedTeamId] = useState(profile?.team_id || null)
@@ -326,7 +330,8 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                           <span className="text-[9px] ml-auto shrink-0" style={{ color: 'var(--text-muted)' }}>{clientProjects.length}</span>
                         </button>
                         {ownedTeamId && (
-                          <button onClick={(e) => { e.stopPropagation(); setShareMenuClient(shareMenuClient === clientName ? null : clientName) }}
+                          <button ref={el => { shareButtonRefs.current[clientName] = el }}
+                            onClick={(e) => { e.stopPropagation(); setShareMenuClient(shareMenuClient === clientName ? null : clientName) }}
                             className="p-1 rounded opacity-40 hover:opacity-100 transition-opacity shrink-0 mr-1"
                             style={{ color: shareMenuClient === clientName ? '#8b5cf6' : 'var(--text-muted)' }}
                             title={`Share "${clientName}" with team members`}>
@@ -334,7 +339,8 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                           </button>
                         )}
                         {shareMenuClient === clientName && ownedTeamId && (
-                          <ClientShareMenu clientName={clientName} teamId={ownedTeamId} onClose={() => setShareMenuClient(null)} />
+                          <ClientShareMenu clientName={clientName} teamId={ownedTeamId} onClose={() => setShareMenuClient(null)}
+                            anchorRef={{ current: shareButtonRefs.current[clientName] }} />
                         )}
                       </div>
                     )}
@@ -373,6 +379,20 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                                   className="p-1 mr-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0" style={{ color: 'var(--text-muted)' }}>
                                   <Trash2 className="w-2.5 h-2.5" />
                                 </button>
+                                {ownedTeamId && (
+                                  <button ref={el => { projectShareButtonRefs.current[p.id] = el }}
+                                    onClick={(e) => { e.stopPropagation(); setShareMenuProject(shareMenuProject === p.id ? null : p.id) }}
+                                    className="p-1 mr-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                    style={{ color: shareMenuProject === p.id ? '#8b5cf6' : 'var(--text-muted)' }}
+                                    title={`Share "${p.name}" with team members`}>
+                                    <Users className="w-2.5 h-2.5" />
+                                  </button>
+                                )}
+                                {shareMenuProject === p.id && ownedTeamId && (
+                                  <ProjectShareMenu projectId={p.id} projectName={p.name} teamId={ownedTeamId}
+                                    onClose={() => setShareMenuProject(null)}
+                                    anchorRef={{ current: projectShareButtonRefs.current[p.id] }} />
+                                )}
                               </div>
                               {isExpanded && (
                                 <div className="ml-4 pl-2 space-y-0.5" style={{ borderLeft: '1px solid var(--border-light)' }}>

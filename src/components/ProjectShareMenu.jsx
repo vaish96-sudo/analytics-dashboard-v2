@@ -2,14 +2,15 @@ import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { grantClientAccess, revokeClientAccess } from '../lib/projectService'
-import { Users, Check, X, Loader2 } from 'lucide-react'
+import { grantProjectAccess, revokeProjectAccess } from '../lib/projectService'
+import { FolderOpen, Check, X, Loader2 } from 'lucide-react'
 
 /**
- * Share menu rendered as a portal — avoids sidebar overflow clipping.
- * Accepts an anchorRef (the share button) to position itself next to it.
+ * Share menu for an individual project — lets the agency owner
+ * grant/revoke access for specific team members at the project level.
+ * Rendered as a portal to avoid sidebar overflow clipping.
  */
-export default function ClientShareMenu({ clientName, teamId, onClose, anchorRef }) {
+export default function ProjectShareMenu({ projectId, projectName, teamId, onClose, anchorRef }) {
   const { user } = useAuth()
   const [members, setMembers] = useState([])
   const [access, setAccess] = useState({}) // userId → boolean
@@ -23,15 +24,13 @@ export default function ClientShareMenu({ clientName, teamId, onClose, anchorRef
     if (!anchorRef?.current) return
     const updatePos = () => {
       const rect = anchorRef.current.getBoundingClientRect()
-      const menuWidth = 224 // w-56 = 14rem = 224px
-      const menuHeight = 260 // approximate max height
+      const menuWidth = 224
+      const menuHeight = 260
       let top = rect.top
       let left = rect.right + 8
-      // If menu would overflow right edge, show on left side
       if (left + menuWidth > window.innerWidth - 8) {
         left = rect.left - menuWidth - 8
       }
-      // If menu would overflow bottom, shift up
       if (top + menuHeight > window.innerHeight - 8) {
         top = Math.max(8, window.innerHeight - menuHeight - 8)
       }
@@ -81,12 +80,12 @@ export default function ClientShareMenu({ clientName, teamId, onClose, anchorRef
         .eq('team_id', teamId)
         .neq('user_id', user.id)
 
-      // Get current access for this client
+      // Get current access for this project
       const { data: accessData } = await supabase
-        .from('client_access')
+        .from('project_access')
         .select('user_id')
         .eq('team_id', teamId)
-        .eq('client_name', clientName)
+        .eq('project_id', projectId)
 
       const accessMap = {}
       ;(accessData || []).forEach(a => { accessMap[a.user_id] = true })
@@ -101,10 +100,10 @@ export default function ClientShareMenu({ clientName, teamId, onClose, anchorRef
     setSaving(memberId)
     try {
       if (access[memberId]) {
-        await revokeClientAccess(teamId, memberId, clientName)
+        await revokeProjectAccess(teamId, memberId, projectId)
         setAccess(prev => { const n = { ...prev }; delete n[memberId]; return n })
       } else {
-        await grantClientAccess(teamId, memberId, clientName)
+        await grantProjectAccess(teamId, memberId, projectId)
         setAccess(prev => ({ ...prev, [memberId]: true }))
       }
     } catch {} finally { setSaving(null) }
@@ -113,14 +112,16 @@ export default function ClientShareMenu({ clientName, teamId, onClose, anchorRef
   const activeMembers = members.filter(m => m.status === 'active' && m.user_id)
   const sharedCount = Object.keys(access).length
 
+  const displayName = projectName?.length > 20 ? projectName.slice(0, 20) + '…' : projectName
+
   const menu = (
     <div ref={ref} className="fixed z-[9999] w-56 rounded-xl shadow-xl animate-fade-in"
       style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', top: pos.top, left: pos.left }}>
       <div className="p-3 border-b" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <Users className="w-3.5 h-3.5" style={{ color: '#8b5cf6' }} />
-            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Share "{clientName}"</span>
+            <FolderOpen className="w-3.5 h-3.5" style={{ color: '#3b82f6' }} />
+            <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>Share "{displayName}"</span>
           </div>
           <button onClick={onClose} className="p-0.5 rounded" style={{ color: 'var(--text-muted)' }}>
             <X className="w-3 h-3" />
@@ -150,7 +151,7 @@ export default function ClientShareMenu({ clientName, teamId, onClose, anchorRef
                 onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-                  style={{ background: hasAccess ? '#8b5cf6' : 'var(--text-muted)' }}>
+                  style={{ background: hasAccess ? '#3b82f6' : 'var(--text-muted)' }}>
                   {(m.users?.name || m.invited_email || '?')[0].toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -165,7 +166,7 @@ export default function ClientShareMenu({ clientName, teamId, onClose, anchorRef
                   {isSaving ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--accent)' }} />
                   ) : hasAccess ? (
-                    <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: '#8b5cf6' }}>
+                    <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: '#3b82f6' }}>
                       <Check className="w-3 h-3 text-white" />
                     </div>
                   ) : (
