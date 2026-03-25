@@ -20,7 +20,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
-function ChartCard({ defaultType, defaultDim, defaultMet, index, schema, columnsByType, aggregate, savedState, onStateChange, onBarClick, globalFilters }) {
+export function ChartCard({ defaultType, defaultDim, defaultMet, index, schema, columnsByType, aggregate, savedState, onStateChange, onBarClick, globalFilters }) {
   const [expanded, setExpanded] = useState(false)
   const [dim, setDim] = useState(savedState?.dim || defaultDim)
   const [met, setMet] = useState(savedState?.met || defaultMet)

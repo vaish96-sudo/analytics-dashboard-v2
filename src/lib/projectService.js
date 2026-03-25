@@ -75,13 +75,10 @@ export async function listSharedProjects(userId) {
 
   if (!allProjects) return []
 
-  // If client_access rules exist, filter to only accessible clients
-  // If no rules exist (legacy), show everything (backward compatible)
-  let filtered = allProjects
-  if (accessRules && accessRules.length > 0) {
-    const accessibleClients = new Set(accessRules.map(r => r.client_name))
-    filtered = allProjects.filter(p => accessibleClients.has(p.client_name || 'Uncategorized'))
-  }
+  // Only show projects the user has been explicitly granted access to
+  if (!accessRules || accessRules.length === 0) return []
+  const accessibleClients = new Set(accessRules.map(r => r.client_name))
+  const filtered = allProjects.filter(p => accessibleClients.has(p.client_name || 'Uncategorized'))
 
   return filtered.map(p => ({ ...p, _shared: true, _teamName: teams.find(t => t.owner_id === p.user_id)?.name }))
 }

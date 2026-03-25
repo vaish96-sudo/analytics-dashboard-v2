@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, X } from 'lucide-react'
 import { useData } from '../context/DataContext'
 
 /**
@@ -15,14 +15,16 @@ const SIZE_MAP = {
   large: 'col-span-1 md:col-span-6',
 }
 
-export default function DraggableWidgets({ children, storageKey = 'widget_order' }) {
+export default function DraggableWidgets({ children, storageKey = 'widget_order', onHide }) {
   const { widgetOrder, updateDatasetState } = useData()
   const childArray = React.Children.toArray(children).filter(Boolean)
   const defaultOrder = childArray.map((c, i) => c.props?.['data-widget-id'] || `w-${i}`)
 
+  // widgetOrder can be an array (legacy) or { order: [...], hidden: [...] }
+  const savedOrder = Array.isArray(widgetOrder) ? widgetOrder : widgetOrder?.order
   const [order, setOrder] = useState(() => {
-    if (widgetOrder && Array.isArray(widgetOrder)) {
-      const valid = widgetOrder.filter(id => defaultOrder.includes(id))
+    if (savedOrder && Array.isArray(savedOrder)) {
+      const valid = savedOrder.filter(id => defaultOrder.includes(id))
       const missing = defaultOrder.filter(id => !valid.includes(id))
       return [...valid, ...missing]
     }
@@ -78,7 +80,10 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
       if (si === -1 || ti === -1) return prev
       n.splice(si, 1)
       n.splice(ti, 0, sourceId)
-      try { updateDatasetState(storageKey, n) } catch {}
+      try { 
+        const hidden = Array.isArray(widgetOrder) ? [] : (widgetOrder?.hidden || [])
+        updateDatasetState(storageKey, { order: n, hidden }) 
+      } catch {}
       return n
     })
     setHoverId(null)
@@ -115,6 +120,14 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
             <div className="absolute -left-0.5 top-1 z-10 p-0.5 rounded opacity-0 group-hover:opacity-60 transition-opacity pointer-events-none">
               <GripVertical className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
             </div>
+            {onHide && (
+              <button onClick={(e) => { e.stopPropagation(); onHide(id) }}
+                className="absolute -right-1 -top-1 z-10 p-0.5 rounded-full opacity-0 group-hover:opacity-70 hover:opacity-100 transition-opacity"
+                style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
+                title="Hide this widget">
+                <X className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
+              </button>
+            )}
             {child}
           </div>
         )

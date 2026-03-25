@@ -378,15 +378,48 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
 /** Overview tab: individual KPI cards + chart sections in one draggable grid */
 function OverviewGrid() {
   const kpis = useKPIData()
+  const { widgetOrder, updateDatasetState } = useData()
+  const hiddenWidgets = Array.isArray(widgetOrder) ? [] : (widgetOrder?.hidden || [])
+
+  const toggleHide = (widgetId) => {
+    const current = hiddenWidgets || []
+    const next = current.includes(widgetId) ? current.filter(id => id !== widgetId) : [...current, widgetId]
+    const orderArr = Array.isArray(widgetOrder) ? widgetOrder : (widgetOrder?.order || null)
+    updateDatasetState('widget_order', { order: orderArr, hidden: next })
+  }
+
+  // Filter out hidden widgets
+  const isHidden = (id) => hiddenWidgets.includes(id)
+
   return (
-    <DraggableWidgets storageKey="widget_order">
-      {kpis.map((kpi, i) => (
-        <div key={`kpi-${kpi.col}`} data-widget-id={`kpi-${kpi.col}`} data-widget-size="small">
-          <SingleKPICard kpi={kpi} index={i} />
+    <>
+      {hiddenWidgets.length > 0 && (
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <span className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'var(--text-muted)' }}>Hidden:</span>
+          {hiddenWidgets.map(id => (
+            <button key={id} onClick={() => toggleHide(id)}
+              className="text-[10px] px-2 py-1 rounded-lg transition-colors"
+              style={{ background: 'var(--bg-overlay)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+              + {id.replace('kpi-', '').replace('auto-charts', 'Charts').replace('ai-chart-builder', 'AI Charts')}
+            </button>
+          ))}
         </div>
-      ))}
-      <div data-widget-id="ai-chart-builder" data-widget-size="large"><AIChartBuilder /></div>
-      <div data-widget-id="auto-charts" data-widget-size="large"><AutoCharts /></div>
-    </DraggableWidgets>
+      )}
+      <DraggableWidgets storageKey="widget_order" onHide={toggleHide}>
+        {kpis.map((kpi, i) => (
+          !isHidden(`kpi-${kpi.col}`) && (
+            <div key={`kpi-${kpi.col}`} data-widget-id={`kpi-${kpi.col}`} data-widget-size="small">
+              <SingleKPICard kpi={kpi} index={i} />
+            </div>
+          )
+        )).filter(Boolean)}
+        {!isHidden('ai-chart-builder') && (
+          <div data-widget-id="ai-chart-builder" data-widget-size="large"><AIChartBuilder /></div>
+        )}
+        {!isHidden('auto-charts') && (
+          <div data-widget-id="auto-charts" data-widget-size="large"><AutoCharts /></div>
+        )}
+      </DraggableWidgets>
+    </>
   )
 }

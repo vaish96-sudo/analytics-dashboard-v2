@@ -82,6 +82,18 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
   const menuRef = useRef(null)
 
   const isAgency = tier === 'agency'
+  const [ownedTeamId, setOwnedTeamId] = useState(profile?.team_id || null)
+
+  // Find team this user owns (for share button)
+  useEffect(() => {
+    if (profile?.team_id) { setOwnedTeamId(profile.team_id); return }
+    if (!isAgency || !user?.id) return
+    import('../lib/supabase').then(({ supabase }) => {
+      supabase.from('teams').select('id').eq('owner_id', user.id).single().then(({ data }) => {
+        if (data) setOwnedTeamId(data.id)
+      })
+    })
+  }, [user?.id, isAgency, profile?.team_id])
 
   const toggleProject = (id) => {
     setExpandedProjects(prev => ({ ...prev, [id]: !prev[id] }))
@@ -313,7 +325,7 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                           <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{clientName}</span>
                           <span className="text-[9px] ml-auto shrink-0" style={{ color: 'var(--text-muted)' }}>{clientProjects.length}</span>
                         </button>
-                        {profile?.team_id && (
+                        {ownedTeamId && (
                           <button onClick={(e) => { e.stopPropagation(); setShareMenuClient(shareMenuClient === clientName ? null : clientName) }}
                             className="p-1 rounded opacity-40 hover:opacity-100 transition-opacity shrink-0 mr-1"
                             style={{ color: shareMenuClient === clientName ? '#8b5cf6' : 'var(--text-muted)' }}
@@ -321,8 +333,8 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                             <Users className="w-3 h-3" />
                           </button>
                         )}
-                        {shareMenuClient === clientName && profile?.team_id && (
-                          <ClientShareMenu clientName={clientName} teamId={profile.team_id} onClose={() => setShareMenuClient(null)} />
+                        {shareMenuClient === clientName && ownedTeamId && (
+                          <ClientShareMenu clientName={clientName} teamId={ownedTeamId} onClose={() => setShareMenuClient(null)} />
                         )}
                       </div>
                     )}
