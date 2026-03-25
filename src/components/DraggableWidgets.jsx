@@ -3,29 +3,26 @@ import { GripVertical } from 'lucide-react'
 import { useData } from '../context/DataContext'
 
 /**
- * Wraps children in a draggable, reorderable container.
- * Each child must have a unique `key` and a `data-widget-id` attribute.
- * 
- * Usage:
- *   <DraggableWidgets>
- *     <div data-widget-id="kpis"><KPICards /></div>
- *     <div data-widget-id="ai-charts"><AIChartBuilder /></div>
- *     <div data-widget-id="auto-charts"><AutoCharts /></div>
- *   </DraggableWidgets>
+ * Reorderable widget grid. Each child needs:
+ *   data-widget-id="unique-id"     — unique identifier
+ *   data-widget-size="small"       — 1-col span (KPI card)  
+ *   data-widget-size="medium"      — 3-col span (half width chart)
+ *   data-widget-size="large"       — 6-col span (full width, default)
  */
+const SIZE_MAP = {
+  small: 'col-span-1',
+  medium: 'col-span-1 md:col-span-3',
+  large: 'col-span-1 md:col-span-6',
+}
+
 export default function DraggableWidgets({ children, storageKey = 'widget_order' }) {
   const { widgetOrder, updateDatasetState } = useData()
-  
-  // Get widget IDs from children
   const childArray = React.Children.toArray(children).filter(Boolean)
-  const defaultOrder = childArray.map((c, i) => c.props?.['data-widget-id'] || `widget-${i}`)
-  
-  // Load saved order from dashboard state
-  const savedOrder = widgetOrder
+  const defaultOrder = childArray.map((c, i) => c.props?.['data-widget-id'] || `w-${i}`)
+
   const [order, setOrder] = useState(() => {
-    if (savedOrder && Array.isArray(savedOrder)) {
-      // Merge: keep saved order but add any new widgets and remove stale ones
-      const valid = savedOrder.filter(id => defaultOrder.includes(id))
+    if (widgetOrder && Array.isArray(widgetOrder)) {
+      const valid = widgetOrder.filter(id => defaultOrder.includes(id))
       const missing = defaultOrder.filter(id => !valid.includes(id))
       return [...valid, ...missing]
     }
@@ -36,7 +33,6 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
   const [hoverId, setHoverId] = useState(null)
   const dragRef = useRef(null)
 
-  // Update order when children change
   useEffect(() => {
     setOrder(prev => {
       const valid = prev.filter(id => defaultOrder.includes(id))
@@ -46,91 +42,78 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
     })
   }, [defaultOrder.join(',')])
 
-  // Build a map of widget-id → child element
   const childMap = {}
   childArray.forEach((c, i) => {
-    const id = c.props?.['data-widget-id'] || `widget-${i}`
+    const id = c.props?.['data-widget-id'] || `w-${i}`
     childMap[id] = c
   })
 
-  const handleDragStart = useCallback((e, id) => {
+  const onDragStart = useCallback((e, id) => {
     setDragId(id)
     dragRef.current = id
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', id)
-    // Delay to allow the browser to capture the drag image
-    requestAnimationFrame(() => {
-      const el = document.querySelector(`[data-drag-widget="${id}"]`)
-      if (el) el.style.opacity = '0.3'
-    })
   }, [])
 
-  const handleDragEnd = useCallback(() => {
-    const el = document.querySelector(`[data-drag-widget="${dragRef.current}"]`)
-    if (el) el.style.opacity = '1'
+  const onDragEnd = useCallback(() => {
     setDragId(null)
     setHoverId(null)
     dragRef.current = null
   }, [])
 
-  const handleDragOver = useCallback((e, id) => {
+  const onDragOver = useCallback((e, id) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    if (id !== dragRef.current) {
-      setHoverId(id)
-    }
+    if (id !== dragRef.current) setHoverId(id)
   }, [])
 
-  const handleDrop = useCallback((e, targetId) => {
+  const onDrop = useCallback((e, targetId) => {
     e.preventDefault()
     const sourceId = dragRef.current
     if (!sourceId || sourceId === targetId) { setHoverId(null); return }
-
     setOrder(prev => {
-      const newOrder = [...prev]
-      const sourceIdx = newOrder.indexOf(sourceId)
-      const targetIdx = newOrder.indexOf(targetId)
-      if (sourceIdx === -1 || targetIdx === -1) return prev
-      // Remove source and insert at target position
-      newOrder.splice(sourceIdx, 1)
-      newOrder.splice(targetIdx, 0, sourceId)
-      // Persist to dashboard state
-      try { updateDatasetState(storageKey, newOrder) } catch {}
-      return newOrder
+      const n = [...prev]
+      const si = n.indexOf(sourceId)
+      const ti = n.indexOf(targetId)
+      if (si === -1 || ti === -1) return prev
+      n.splice(si, 1)
+      n.splice(ti, 0, sourceId)
+      try { updateDatasetState(storageKey, n) } catch {}
+      return n
     })
     setHoverId(null)
   }, [storageKey, updateDatasetState])
 
   return (
-    <div className="space-y-4 lg:space-y-6">
+    <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
       {order.map(id => {
         const child = childMap[id]
         if (!child) return null
+        const size = child.props?.['data-widget-size'] || 'large'
+        const spanClass = SIZE_MAP[size] || SIZE_MAP.large
         const isDragging = dragId === id
-        const isHoverTarget = hoverId === id
+        const isHover = hoverId === id
         return (
           <div
             key={id}
-            data-drag-widget={id}
-            onDragOver={(e) => handleDragOver(e, id)}
-            onDrop={(e) => handleDrop(e, id)}
-            className="relative group transition-all"
+            data-dw={id}
+            draggable
+            onDragStart={(e) => onDragStart(e, id)}
+            onDragEnd={onDragEnd}
+            onDragOver={(e) => onDragOver(e, id)}
+            onDrop={(e) => onDrop(e, id)}
+            className={`relative group ${spanClass}`}
             style={{
               opacity: isDragging ? 0.3 : 1,
-              borderTop: isHoverTarget ? '3px solid var(--accent)' : '3px solid transparent',
-              paddingTop: isHoverTarget ? '4px' : '0',
+              cursor: 'grab',
+              borderRadius: '12px',
+              outline: isHover ? '2px dashed var(--accent)' : '2px dashed transparent',
+              outlineOffset: '2px',
+              transition: 'opacity 0.15s, outline 0.15s',
             }}
           >
-            {/* Drag handle */}
-            <div
-              draggable
-              onDragStart={(e) => handleDragStart(e, id)}
-              onDragEnd={handleDragEnd}
-              className="absolute -left-1 top-2 z-10 p-1.5 rounded-lg cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
-              title="Drag to reorder"
-            >
-              <GripVertical className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+            <div className="absolute -left-0.5 top-1 z-10 p-0.5 rounded opacity-0 group-hover:opacity-60 transition-opacity pointer-events-none">
+              <GripVertical className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
             </div>
             {child}
           </div>

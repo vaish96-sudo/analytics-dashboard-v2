@@ -103,10 +103,12 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
     if (!newName.trim() || newName.trim() === oldName) { setEditingClientOld(null); return }
     try {
       const { supabase } = await import('../lib/supabase')
-      await supabase.from('projects').update({ client_name: newName.trim() }).eq('client_name', oldName).eq('user_id', user.id)
-      // Force reload
-      const { loadProjects } = await import('../context/ProjectContext')
-      window.location.reload() // simplest way to refresh project list
+      if (oldName === 'Uncategorized') {
+        await supabase.from('projects').update({ client_name: newName.trim() }).is('client_name', null).eq('user_id', user.id)
+      } else {
+        await supabase.from('projects').update({ client_name: newName.trim() }).eq('client_name', oldName).eq('user_id', user.id)
+      }
+      window.location.reload()
     } catch {}
     setEditingClientOld(null)
   }
@@ -116,12 +118,26 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
     try {
       const { supabase } = await import('../lib/supabase')
       await supabase.from('projects').update({ client_name: newClientName || null }).eq('id', projectId)
-      // Reload projects from context
-      const ps = await import('../lib/projectService')
-      const list = await ps.listProjects(user.id)
-      // Force re-render by reloading page (simplest approach)
       window.location.reload()
     } catch {}
+  }
+
+  // Delayed click — prevents single-click navigation when user double-clicks to rename
+  const clickTimers = useRef({})
+  const handleProjectClick = (projectId) => {
+    if (clickTimers.current[projectId]) return
+    clickTimers.current[projectId] = setTimeout(() => {
+      clickTimers.current[projectId] = null
+      onOpenProject(projectId)
+    }, 250)
+  }
+  const handleProjectDoubleClick = (projectId, name) => {
+    if (clickTimers.current[projectId]) {
+      clearTimeout(clickTimers.current[projectId])
+      clickTimers.current[projectId] = null
+    }
+    setEditingProjectId(projectId)
+    setEditingProjectName(name)
   }
 
   // Drag and drop handlers
@@ -316,8 +332,8 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                                     onKeyDown={(e) => { if (e.key === 'Enter') handleRenameProject(p.id, editingProjectName); if (e.key === 'Escape') setEditingProjectId(null) }}
                                     className="flex-1 text-[11px] font-medium px-1 py-0.5 rounded nb-input" />
                                 ) : (
-                                  <button onClick={() => onOpenProject(p.id)}
-                                    onDoubleClick={(e) => { e.stopPropagation(); setEditingProjectId(p.id); setEditingProjectName(p.name) }}
+                                  <button onClick={() => handleProjectClick(p.id)}
+                                    onDoubleClick={() => handleProjectDoubleClick(p.id, p.name)}
                                     className="flex-1 flex items-center gap-2 py-1.5 pr-1 text-left min-w-0">
                                     <FolderOpen className="w-3 h-3 shrink-0" style={{ color: FOLDER_COLORS[i % FOLDER_COLORS.length] }} />
                                     <div className="flex-1 min-w-0">
@@ -373,8 +389,8 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                           onKeyDown={(e) => { if (e.key === 'Enter') handleRenameProject(p.id, editingProjectName); if (e.key === 'Escape') setEditingProjectId(null) }}
                           className="flex-1 text-xs font-medium px-1 py-0.5 rounded nb-input" />
                       ) : (
-                        <button onClick={() => onOpenProject(p.id)}
-                          onDoubleClick={(e) => { e.stopPropagation(); setEditingProjectId(p.id); setEditingProjectName(p.name) }}
+                        <button onClick={() => handleProjectClick(p.id)}
+                          onDoubleClick={() => handleProjectDoubleClick(p.id, p.name)}
                           className="flex-1 flex items-center gap-2 py-2 pr-1 text-left min-w-0">
                           <FolderOpen className="w-3.5 h-3.5 shrink-0" style={{ color: FOLDER_COLORS[i % FOLDER_COLORS.length] }} />
                           <div className="flex-1 min-w-0">

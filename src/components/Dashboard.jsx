@@ -3,7 +3,7 @@ import { useData } from '../context/DataContext'
 import { useProject } from '../context/ProjectContext'
 import { useTheme } from '../context/ThemeContext'
 import { exportDashboardReport } from '../utils/exportService'
-import KPICards from './KPICards'
+import KPICards, { useKPIData, SingleKPICard } from './KPICards'
 import AutoCharts from './AutoCharts'
 import DataTable from './DataTable'
 import ReportBuilder from './ReportBuilder'
@@ -350,13 +350,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
           </div>
           {showFilterBar && <GlobalFilterBar />}
           <div className="space-y-4 lg:space-y-6">
-            {activeTab === 'overview' && (
-              <DraggableWidgets storageKey="widget_order">
-                <div data-widget-id="kpis"><KPICards /></div>
-                <div data-widget-id="ai-chart-builder"><AIChartBuilder /></div>
-                <div data-widget-id="auto-charts"><AutoCharts /></div>
-              </DraggableWidgets>
-            )}
+            {activeTab === 'overview' && <OverviewGrid />}
             {activeTab === 'builder' && <><CustomMetrics /><ReportBuilder /></>}
             {activeTab === 'data' && <DataTable />}
             {activeTab === 'ai' && <AIHub conversationId={activeConversationId} onConversationChange={setActiveConversationId} />}
@@ -378,5 +372,21 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
         </div>
       </div>
     </div>
+  )
+}
+
+/** Overview tab: individual KPI cards + chart sections in one draggable grid */
+function OverviewGrid() {
+  const kpis = useKPIData()
+  return (
+    <DraggableWidgets storageKey="widget_order">
+      {kpis.map((kpi, i) => (
+        <div key={`kpi-${kpi.col}`} data-widget-id={`kpi-${kpi.col}`} data-widget-size="small">
+          <SingleKPICard kpi={kpi} index={i} />
+        </div>
+      ))}
+      <div data-widget-id="ai-chart-builder" data-widget-size="large"><AIChartBuilder /></div>
+      <div data-widget-id="auto-charts" data-widget-size="large"><AutoCharts /></div>
+    </DraggableWidgets>
   )
 }
