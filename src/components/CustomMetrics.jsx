@@ -278,9 +278,9 @@ export default function CustomMetrics() {
       <div className="rounded-xl p-6 text-center" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
         <Lock className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
         <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Custom Metrics</p>
-        <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Create calculated columns with formulas. Available on Starter plan and above.</p>
+        <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Create calculated columns with formulas. Available on Pro plan and above.</p>
         <button className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium text-white" style={{ background: 'var(--accent)' }}>
-          Upgrade to unlock
+          Upgrade to Pro — $19/mo
         </button>
       </div>
     )

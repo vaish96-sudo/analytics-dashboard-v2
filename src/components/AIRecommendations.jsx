@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useData } from '../context/DataContext'
 import { useTier } from '../context/TierContext'
-import { Target, Loader2, RefreshCw, AlertTriangle, CheckCircle2, ArrowRight, Clock, FileText, File, Shield } from 'lucide-react'
+import { Target, Loader2, RefreshCw, AlertTriangle, CheckCircle2, ArrowRight, Clock, FileText, File, Shield, Lock } from 'lucide-react'
 import { exportToPDF, exportToWord } from '../utils/exportService'
 import { BlurredPreview, UsageBadge } from './UpgradePrompt'
 
@@ -178,8 +178,67 @@ export default function AIRecommendations() {
   const [detectedIndustry, setDetectedIndustry] = useState(null)
 
   // Blurred preview for tiers without recommendations access
-  const showPreview = !hasRemaining('recommendationsRuns') && (recommendations?.length || 0) === 0
-  const isLocked = tier === 'free' && !hasRemaining('recommendationsRuns')
+  const showPreview = tier === 'free' && can('showRecommendationsPreview')
+  const recsRemaining = remaining('recommendationsRuns')
+
+  // Fake preview data for blurred teaser
+  const fakeRecs = [
+    { title: 'Reallocate budget from underperforming campaigns', description: 'Analysis shows 3 campaigns consuming 40% of budget but delivering only 12% of conversions. Shifting spend to top performers could improve ROAS by 2.3x.', priority: 'high', confidence: 'high', steps: ['Pause Campaign X and Campaign Y', 'Redistribute budget to top 3 performers', 'Monitor for 7 days and reassess'], timeline: '1-2 weeks', expected_impact: '+35% conversion rate' },
+    { title: 'Optimize creative rotation schedule', description: 'Creative fatigue detected — CTR dropped 28% over the past 14 days on your highest-spend ad sets. Refreshing creatives on a 10-day cycle could recover lost engagement.', priority: 'high', confidence: 'medium', steps: ['Audit current creative assets', 'Develop 3-4 new variations', 'Implement A/B testing framework'], timeline: '2-3 weeks', expected_impact: '+22% CTR recovery' },
+    { title: 'Expand into high-intent audience segments', description: 'Lookalike analysis reveals untapped segments with 3.1x higher predicted conversion probability. Current targeting misses 60% of potential high-value customers.', priority: 'medium', confidence: 'medium', steps: ['Build lookalike audiences from top converters', 'Start with 5% budget allocation', 'Scale based on 14-day performance'], timeline: '3-4 weeks', expected_impact: '+18% new customer acquisition' },
+  ]
+
+  if (showPreview) {
+    return (
+      <div className="rounded-xl overflow-hidden animate-fade-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+        <div className="p-3 sm:p-4 flex items-center justify-between gap-2" style={{ borderBottom: '1px solid var(--border-light)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(124, 58, 237, 0.1)' }}>
+              <Target className="w-5 h-5" style={{ color: '#7c3aed' }} />
+            </div>
+            <div>
+              <h3 className="text-sm font-display font-semibold" style={{ color: 'var(--text-primary)' }}>AI Recommendations</h3>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Actionable next steps powered by AI</p>
+            </div>
+          </div>
+        </div>
+        <div className="relative">
+          <div className="p-4 space-y-3 blur-sm pointer-events-none select-none opacity-60">
+            {fakeRecs.map((rec, i) => (
+              <div key={i} className="p-4 rounded-xl" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderLeft: '4px solid #7c3aed' }}>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <CheckCircle2 className="w-4 h-4" style={{ color: '#7c3aed' }} />
+                  <h4 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{rec.title}</h4>
+                </div>
+                <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>{rec.description}</p>
+                <div className="space-y-1">
+                  {rec.steps.map((step, si) => (
+                    <div key={si} className="flex items-start gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                      <ArrowRight className="w-3 h-3 mt-0.5 shrink-0" style={{ color: '#7c3aed' }} />
+                      <span>{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(var(--bg-primary-rgb, 255,255,255), 0.3)', backdropFilter: 'blur(2px)' }}>
+            <div className="text-center p-6">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: 'linear-gradient(135deg, #1c1917, #292524)' }}>
+                <Lock className="w-6 h-6" style={{ color: '#d4a574' }} />
+              </div>
+              <h3 className="text-sm font-display font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>AI Recommendations</h3>
+              <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>Get expert-level, actionable recommendations for your data. Available on Pro ($19/mo).</p>
+              <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-display font-semibold text-white" style={{ background: 'var(--accent)' }}>
+                Upgrade to Pro
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const fetchRecommendations = async () => {
     if (!schema || !rawData) return
@@ -297,14 +356,17 @@ export default function AIRecommendations() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          {recsRemaining !== Infinity && (
+            <UsageBadge remaining={recsRemaining} label="runs left" />
+          )}
           {recommendations.length > 0 && (
             <>
               <button onClick={handleExportPDF} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Export as PDF"><FileText className="w-3.5 h-3.5" /></button>
               <button onClick={handleExportWord} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Export as Word"><File className="w-3.5 h-3.5" /></button>
             </>
           )}
-          <button onClick={fetchRecommendations} disabled={loading}
+          <button onClick={fetchRecommendations} disabled={loading || recsRemaining === 0}
             className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg text-white hover:opacity-90 disabled:opacity-50 transition-colors shrink-0"
             style={{ background: '#7c3aed' }}>
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
