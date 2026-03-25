@@ -38,6 +38,7 @@ export default async function handler(req, res) {
       project_id: projectId,
     })
     if (error && !error.message.includes('duplicate')) return res.status(500).json({ error: error.message })
+    await auditLog(supabase, userId, 'sharing.project_grant', { teamId, targetUserId, projectId })
     return res.status(201).json({ success: true })
   }
 
@@ -54,6 +55,7 @@ export default async function handler(req, res) {
       .eq('user_id', targetUserId)
       .eq('project_id', projectId)
 
+    await auditLog(supabase, userId, 'sharing.project_revoke', { teamId, targetUserId, projectId })
     return res.status(204).end()
   }
 

@@ -64,5 +64,6 @@ export default async function handler(req, res) {
   // Auto-create dashboard state
   await supabase.from('dashboard_states').insert({ dataset_id: data.id })
 
+  await auditLog(supabase, userId, 'dataset.create', { datasetId: data.id, projectId, fileName })
   return res.status(201).json(data)
 }

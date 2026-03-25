@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { checkIPRateLimit } from '../lib/ipRateLimit.js'
 
 export const config = { runtime: 'edge' }
 
@@ -11,6 +12,10 @@ export default async function handler(req) {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } })
   }
+
+  // IP rate limit
+  const ipBlock = checkIPRateLimit(req, 5, 60_000, 'verify-code')
+  if (ipBlock) return ipBlock
 
   const supabaseUrl = process.env.SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY

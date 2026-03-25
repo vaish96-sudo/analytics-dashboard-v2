@@ -59,6 +59,7 @@ export default async function handler(req, res) {
     }).select().single()
 
     if (error) return res.status(500).json({ error: error.message })
+    await auditLog(supabase, userId, 'team.invite', { teamId, email: email.toLowerCase().trim(), role: role || 'viewer' })
     return res.status(201).json(data)
   }
 
@@ -102,6 +103,7 @@ export default async function handler(req, res) {
       .single()
 
     if (error) return res.status(500).json({ error: error.message })
+    await auditLog(supabase, userId, 'team.member_update', { memberId, updates: safeUpdates })
     return res.json(data)
   }
 
@@ -123,6 +125,7 @@ export default async function handler(req, res) {
 
     const { error } = await supabase.from('team_members').delete().eq('id', memberId)
     if (error) return res.status(500).json({ error: error.message })
+    await auditLog(supabase, userId, 'team.member_remove', { memberId, teamId: member.team_id })
     return res.status(204).end()
   }
 

@@ -40,6 +40,7 @@ export default async function handler(req, res) {
       client_name: clientName,
     })
     if (error && !error.message.includes('duplicate')) return res.status(500).json({ error: error.message })
+    await auditLog(supabase, userId, 'sharing.client_grant', { teamId, targetUserId, clientName })
     return res.status(201).json({ success: true })
   }
 
@@ -56,6 +57,7 @@ export default async function handler(req, res) {
       .eq('user_id', targetUserId)
       .eq('client_name', clientName)
 
+    await auditLog(supabase, userId, 'sharing.client_revoke', { teamId, targetUserId, clientName })
     return res.status(204).end()
   }
 

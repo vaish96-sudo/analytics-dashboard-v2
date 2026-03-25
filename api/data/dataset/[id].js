@@ -63,6 +63,7 @@ export default async function handler(req, res) {
     }
     const { error } = await supabase.from('datasets').delete().eq('id', datasetId)
     if (error) return res.status(500).json({ error: error.message })
+    await auditLog(supabase, userId, 'dataset.delete', { datasetId })
     return res.status(204).end()
   }
 

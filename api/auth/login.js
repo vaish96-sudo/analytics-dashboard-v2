@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { checkIPRateLimit } from '../lib/ipRateLimit.js'
 
 export const config = { runtime: 'edge' }
 

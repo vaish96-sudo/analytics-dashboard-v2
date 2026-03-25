@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { validateSession } from '../lib/validateSession.js'
+import { checkIPRateLimit } from '../lib/ipRateLimit.js'
 
 export const config = { runtime: 'edge' }
 
@@ -7,6 +8,10 @@ export default async function handler(req) {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } })
   }
+
+  // IP rate limit: 10 invites per minute
+  const ipBlock = checkIPRateLimit(req, 10, 60_000, 'send-invite')
+  if (ipBlock) return ipBlock
 
   const resendKey = process.env.RESEND_API_KEY
   const fromEmail = process.env.FROM_EMAIL || 'Northern Bird <onboarding@resend.dev>'

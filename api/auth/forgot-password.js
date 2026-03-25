@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { checkIPRateLimit } from '../lib/ipRateLimit.js'
 
 export const config = { runtime: 'edge' }
 
@@ -14,6 +15,11 @@ export default async function handler(req) {
 
   const supabaseUrl = process.env.SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY
+
+  // IP rate limit: 3 reset requests per minute per IP
+  const ipBlock = checkIPRateLimit(req, 3, 60_000, 'forgot-password')
+  if (ipBlock) return ipBlock
+
   if (!supabaseUrl || !supabaseKey) {
     return new Response(JSON.stringify({ error: 'Database not configured' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }

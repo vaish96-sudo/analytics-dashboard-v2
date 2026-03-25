@@ -67,6 +67,7 @@ export default async function handler(req, res) {
       .single()
 
     if (error) return res.status(500).json({ error: error.message })
+    await auditLog(supabase, userId, 'profile.update', { fields: Object.keys(safeUpdates) })
     return res.json(data)
   }
 

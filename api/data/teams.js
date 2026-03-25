@@ -54,6 +54,7 @@ export default async function handler(req, res) {
       invited_email: (await supabase.from('users').select('email').eq('id', userId).single()).data?.email,
     })
 
+    await auditLog(supabase, userId, 'team.create', { teamId: newTeam.id, name: name.trim() })
     return res.status(201).json(newTeam)
   }
 
