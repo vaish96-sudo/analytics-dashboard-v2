@@ -80,8 +80,7 @@ function MessageBubble({ message }) {
 export default function AskAI({ conversationId: externalConvId, onConversationChange }) {
   const { schema, rawData, aggregateUnfiltered, columnsByType, activeDatasetId } = useData()
   const { activeProjectId } = useProject()
-  const { hasRemaining, remaining, incrementUsage, tier, profile } = useTier()
-  const branding = { companyName: profile?.custom_company_name || '', logoUrl: profile?.custom_logo_url || '' }
+  const { hasRemaining, remaining, incrementUsage, tier } = useTier()
 
   const [conversationId, setConversationId] = useState(externalConvId || null)
   const [messages, setMessages] = useState([])
@@ -216,10 +215,10 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
             </button>
             {messages.length > 0 && (
               <>
-                <button onClick={() => exportToPDF({ type: 'chat', messages }, 'AI_Conversation', branding)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Export as PDF">
+                <button onClick={() => exportToPDF({ type: 'chat', messages }, 'AI_Conversation')} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Export as PDF">
                   <FileText className="w-4 h-4" />
                 </button>
-                <button onClick={() => exportToWord({ type: 'chat', messages }, 'AI_Conversation', branding)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Export as Word">
+                <button onClick={() => exportToWord({ type: 'chat', messages }, 'AI_Conversation')} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Export as Word">
                   <File className="w-4 h-4" />
                 </button>
               </>

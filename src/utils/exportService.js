@@ -334,7 +334,7 @@ export async function exportToPDF(content, title = 'Northern Bird Report', brand
 
 
 // === MAIN EXPORT FUNCTION ===
-export async function exportDashboardReport({ projectName, fileName, rowCount, schema, rawData, globalFilters, insights, columnsByType, reportBuilderState, branding = {} }) {
+export async function exportDashboardReport({ projectName, fileName, rowCount, schema, rawData, globalFilters, insights, columnsByType, reportBuilderState }) {
   // Build KPIs
   const kpis = []
   if (schema && rawData) {
@@ -430,7 +430,7 @@ export async function exportDashboardReport({ projectName, fileName, rowCount, s
     type: 'dashboard_report', projectName, fileName, rowCount,
     filters: globalFilters, kpis, insights: insights || [],
     dataOverview, topBreakdowns, builderSummary, builderData,
-  }, `${projectName || 'Dashboard'} Report`, branding)
+  }, `${projectName || 'Dashboard'} Report`)
 }
 
 

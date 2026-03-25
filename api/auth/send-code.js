@@ -114,6 +114,6 @@ export default async function handler(req) {
       expiresIn: 600, // seconds, for UI countdown
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   } catch (err) {
-    return new Response(JSON.stringify({ error: 'Something went wrong. Please try again.' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ error: err.message || 'Something went wrong. Please try again.' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 }

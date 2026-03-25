@@ -3,7 +3,7 @@ import { useProject } from '../context/ProjectContext'
 import { useData } from '../context/DataContext'
 import { useTier } from '../context/TierContext'
 import {
-  FolderPlus, Upload, FileSpreadsheet, Globe, ArrowRight, ArrowLeft, Loader2, AlertCircle, Link2, Building2, User, Plus
+  FolderPlus, Upload, FileSpreadsheet, Globe, ArrowRight, ArrowLeft, Loader2, AlertCircle, Link2, Building2, Plus
 } from 'lucide-react'
 
 export default function ProjectWizard({ onComplete, onCancel }) {
@@ -11,9 +11,9 @@ export default function ProjectWizard({ onComplete, onCancel }) {
   const { loadData } = useData()
   const { tier } = useTier()
   const isAgency = tier === 'agency'
-  const [wizardStep, setWizardStep] = useState('name') // name | client | source | connect-api
+  const [wizardStep, setWizardStep] = useState('name') // name | source | connect-api
   const [projectName, setProjectName] = useState('')
-  const [clientName, setClientName] = useState('') // '' = personal
+  const [clientName, setClientName] = useState('')
   const [newClientName, setNewClientName] = useState('')
   const [showNewClient, setShowNewClient] = useState(false)
   const [sourceType, setSourceType] = useState(null)
@@ -21,11 +21,10 @@ export default function ProjectWizard({ onComplete, onCancel }) {
   const [error, setError] = useState(null)
   const fileRef = useRef(null)
 
-  // Gather existing client names from projects
+  // Get unique client names from existing projects
   const existingClients = useMemo(() => {
-    const names = new Set()
-    projects.forEach(p => { if (p.client_name) names.add(p.client_name) })
-    return Array.from(names).sort()
+    const names = [...new Set(projects.map(p => p.client_name).filter(Boolean))]
+    return names.sort()
   }, [projects])
 
   // API connector state
@@ -36,15 +35,15 @@ export default function ProjectWizard({ onComplete, onCancel }) {
 
   const handleCreateProject = async (dataSourceType, dataSourceMeta = {}) => {
     if (!projectName.trim()) { setError('Please enter a project name'); return null }
+    const finalClientName = showNewClient ? newClientName.trim() : clientName
     setLoading(true)
     setError(null)
     try {
-      const finalClientName = showNewClient ? newClientName.trim() : clientName
       const project = await createProject({
         name: projectName.trim(),
+        clientName: finalClientName || null,
         dataSourceType,
         dataSourceMeta,
-        clientName: finalClientName || null,
       })
       return project
     } catch (err) {
@@ -162,10 +161,10 @@ export default function ProjectWizard({ onComplete, onCancel }) {
             <FolderPlus className="w-6 h-6 text-accent" />
           </div>
           <h1 className="text-xl sm:text-2xl font-display font-bold text-slate-900">
-            {wizardStep === 'name' ? 'Create New Project' : wizardStep === 'client' ? 'Assign to Client' : wizardStep === 'source' ? 'Connect Data' : 'API Connector'}
+            {wizardStep === 'name' ? 'Create New Project' : wizardStep === 'source' ? 'Connect Data' : 'API Connector'}
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            {wizardStep === 'name' ? 'Give your project a name' : wizardStep === 'client' ? 'Which client is this for?' : wizardStep === 'source' ? 'Choose how to bring in your data' : 'Enter your API details'}
+            {wizardStep === 'name' ? 'Give your project a name' : wizardStep === 'source' ? 'Choose how to bring in your data' : 'Enter your API details'}
           </p>
         </div>
 
@@ -178,16 +177,46 @@ export default function ProjectWizard({ onComplete, onCancel }) {
                 <input type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)}
                   placeholder="e.g. Q1 Campaign Analysis" autoFocus
                   className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-                  onKeyDown={(e) => { if (e.key === 'Enter' && projectName.trim()) setWizardStep(isAgency ? 'client' : 'source') }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && projectName.trim()) setWizardStep('source') }}
                 />
               </div>
+
+              {/* Client assignment for Agency tier */}
+              {isAgency && (
+                <div>
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-2">
+                    <Building2 className="w-3.5 h-3.5 text-slate-400" /> Client (optional)
+                  </label>
+                  {!showNewClient ? (
+                    <div className="space-y-2">
+                      <select value={clientName} onChange={(e) => setClientName(e.target.value)}
+                        className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20">
+                        <option value="">Personal project (no client)</option>
+                        {existingClients.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <button onClick={() => setShowNewClient(true)}
+                        className="flex items-center gap-1.5 text-xs text-accent hover:text-accent-dark font-medium">
+                        <Plus className="w-3 h-3" /> New client
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <input type="text" value={newClientName} onChange={(e) => setNewClientName(e.target.value)}
+                        placeholder="Client name (e.g. Nike, Adidas)"
+                        className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
+                      <button onClick={() => { setShowNewClient(false); setNewClientName('') }}
+                        className="text-xs text-slate-500 hover:text-slate-700">Choose existing client</button>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex items-center justify-between pt-2">
                 {onCancel && (
                   <button onClick={onCancel} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
                     <ArrowLeft className="w-4 h-4" /> Cancel
                   </button>
                 )}
-                <button onClick={() => setWizardStep(isAgency ? 'client' : 'source')} disabled={!projectName.trim()}
+                <button onClick={() => setWizardStep('source')} disabled={!projectName.trim()}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-display font-semibold bg-accent hover:bg-accent-dark text-white transition-all disabled:opacity-50 ml-auto">
                   Next <ArrowRight className="w-4 h-4" />
                 </button>
@@ -195,75 +224,10 @@ export default function ProjectWizard({ onComplete, onCancel }) {
             </div>
           )}
 
-          {/* Step 2 (Agency only): Client Assignment */}
-          {wizardStep === 'client' && (
-            <div className="space-y-3">
-              <button onClick={() => setWizardStep('name')} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-2">
-                <ArrowLeft className="w-4 h-4" /> Back
-              </button>
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-3">Assign "{projectName}" to a client</p>
-
-              {/* Personal project option */}
-              <button onClick={() => { setClientName(''); setShowNewClient(false); setWizardStep('source') }}
-                className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left hover:shadow-sm transition-all bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300`}>
-                <div className="w-10 h-10 rounded-lg bg-white/80 flex items-center justify-center shrink-0">
-                  <User className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Personal Project</p>
-                  <p className="text-xs opacity-70">No client — appears under My Projects</p>
-                </div>
-              </button>
-
-              {/* Existing clients */}
-              {existingClients.map(name => (
-                <button key={name} onClick={() => { setClientName(name); setShowNewClient(false); setWizardStep('source') }}
-                  className="w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left hover:shadow-sm transition-all bg-purple-50 text-purple-600 border-purple-200 hover:border-purple-300">
-                  <div className="w-10 h-10 rounded-lg bg-white/80 flex items-center justify-center shrink-0">
-                    <Building2 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{name}</p>
-                    <p className="text-xs opacity-70">{projects.filter(p => p.client_name === name).length} existing projects</p>
-                  </div>
-                </button>
-              ))}
-
-              {/* New client */}
-              {!showNewClient ? (
-                <button onClick={() => setShowNewClient(true)}
-                  className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-dashed text-left hover:shadow-sm transition-all text-emerald-600 border-emerald-300 hover:bg-emerald-50">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
-                    <Plus className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">New Client</p>
-                    <p className="text-xs opacity-70">Create a new client folder</p>
-                  </div>
-                </button>
-              ) : (
-                <div className="p-4 rounded-xl border-2 border-emerald-300 bg-emerald-50 space-y-3">
-                  <label className="text-sm font-medium text-slate-700 block">Client name</label>
-                  <input type="text" value={newClientName} onChange={(e) => setNewClientName(e.target.value)}
-                    placeholder="e.g. Acme Corp" autoFocus
-                    className="w-full px-4 py-3 text-sm bg-white border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-                    onKeyDown={(e) => { if (e.key === 'Enter' && newClientName.trim()) { setClientName(''); setWizardStep('source') } }} />
-                  <div className="flex gap-2">
-                    <button onClick={() => setShowNewClient(false)} className="px-3 py-2 text-xs text-slate-500 hover:text-slate-700">Cancel</button>
-                    <button onClick={() => { setClientName(''); setWizardStep('source') }} disabled={!newClientName.trim()}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white disabled:opacity-50">
-                      Continue <ArrowRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 2/3: Data Source */}
+          {/* Step 2: Data Source */}
           {wizardStep === 'source' && (
             <div className="space-y-3">
-              <button onClick={() => setWizardStep(isAgency ? 'client' : 'name')} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-2">
+              <button onClick={() => setWizardStep('name')} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-2">
                 <ArrowLeft className="w-4 h-4" /> Back
               </button>
               <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-3">Data source for "{projectName}"</p>

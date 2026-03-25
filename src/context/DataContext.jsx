@@ -686,5 +686,6 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
     insightsLoaded: localDashboardState.insightsLoaded || false,
     recommendations: localDashboardState.recommendations || [],
     chatHistory: localDashboardState.chatHistory || [],
+    widgetOrder: localDashboardState.widget_order || null,
   }}>{children}</DataContext.Provider>
 }

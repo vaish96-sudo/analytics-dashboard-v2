@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useData } from '../context/DataContext'
 import { useProject } from '../context/ProjectContext'
-import { useTier } from '../context/TierContext'
 import { useTheme } from '../context/ThemeContext'
 import { exportDashboardReport } from '../utils/exportService'
 import KPICards from './KPICards'
@@ -12,11 +11,11 @@ import AIHub from './AIHub'
 import AIChartBuilder from './AIChartBuilder'
 import CustomMetrics from './CustomMetrics'
 import GlobalFilterBar from './GlobalFilterBar'
+import DraggableWidgets from './DraggableWidgets'
 import UserProfile from './UserProfile'
 import ScheduledReports from './ScheduledReports'
 import TierBadge from './TierBadge'
 import LogoMark from './LogoMark'
-import DraggableGrid, { useGridLayout } from './DraggableGrid'
 import {
   LayoutDashboard, Table2, Wand2, Sparkles,
   FileSpreadsheet, Upload, ChevronRight, Settings, Menu, X, ChevronDown,
@@ -137,27 +136,12 @@ function ProjectSwitcher({ onGoHome }) {
 }
 
 export default function Dashboard({ user, onLogout, onNewProject, onGoHome, initialConversationId, onConversationConsumed }) {
-  const { rowCount, columnsByType, setStep, datasets, activeTab, setActiveTab, rawData, schema, fileName, globalFilters, insights, reportBuilderState, updateDatasetState, activeDatasetId } = useData()
+  const { rowCount, columnsByType, setStep, datasets, activeTab, setActiveTab, rawData, schema, fileName, globalFilters, insights, reportBuilderState } = useData()
   const { activeProject, projects, selectProject } = useProject()
-  const { profile } = useTier()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activeConversationId, setActiveConversationId] = useState(null)
   const [exporting, setExporting] = useState(false)
   const menuRef = useRef(null)
-
-  // Grid layout for overview tab (P3)
-  const savedLayoutConfig = datasets.find(d => d.id === activeDatasetId)?.dashboard_states?.[0]?.layout_config
-  const { layout: gridLayout, updateLayout } = useGridLayout(savedLayoutConfig)
-
-  const handleLayoutChange = useCallback((newLayout) => {
-    const ordered = updateLayout(newLayout)
-    // Persist to dashboard state
-    if (activeDatasetId && activeDatasetId !== '__pending__') {
-      import('../lib/projectService').then(ps => {
-        ps.saveDashboardState(activeDatasetId, { layout_config: ordered }).catch(() => {})
-      })
-    }
-  }, [activeDatasetId, updateLayout])
 
   // When navigating from AllChats with a specific conversation
   useEffect(() => {
@@ -179,7 +163,6 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
 
   const handleExportReport = async () => {
     setExporting(true)
-    const branding = { companyName: profile?.custom_company_name || '', logoUrl: profile?.custom_logo_url || '' }
     try {
       await exportDashboardReport({
         projectName: activeProject?.name,
@@ -191,7 +174,6 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
         insights,
         columnsByType,
         reportBuilderState,
-        branding,
       })
     } catch (err) {
       console.error('Export failed:', err)
@@ -369,11 +351,11 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
           {showFilterBar && <GlobalFilterBar />}
           <div className="space-y-4 lg:space-y-6">
             {activeTab === 'overview' && (
-              <DraggableGrid layout={gridLayout} onLayoutChange={handleLayoutChange}>
-                <div data-grid-id="kpi"><KPICards /></div>
-                <div data-grid-id="ai_charts"><AIChartBuilder /></div>
-                <div data-grid-id="auto_charts"><AutoCharts /></div>
-              </DraggableGrid>
+              <DraggableWidgets storageKey="widget_order">
+                <div data-widget-id="kpis"><KPICards /></div>
+                <div data-widget-id="ai-chart-builder"><AIChartBuilder /></div>
+                <div data-widget-id="auto-charts"><AutoCharts /></div>
+              </DraggableWidgets>
             )}
             {activeTab === 'builder' && <><CustomMetrics /><ReportBuilder /></>}
             {activeTab === 'data' && <DataTable />}
