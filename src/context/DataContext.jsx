@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useProject } from './ProjectContext'
 import * as projectService from '../lib/projectService'
+import { callClaudeAPI } from '../utils/claudeClient.js'
 
 const DataContext = createContext(null)
 
@@ -97,7 +98,6 @@ export function DataProvider({ children }) {
       const firstDs = datasets[0]
       setActiveDatasetId(firstDs.id)
       const raw = firstDs.dashboard_states?.[0] || {}
-      console.log('Loading project dashboard state — insights:', (raw.insights || []).length, 'ai_charts:', (raw.ai_charts || []).length, 'filters:', Object.keys(raw.global_filters || {}).length)
       setLocalDashboardState({
         global_filters: raw.global_filters || {},
         chartsState: raw.charts_state || {},
@@ -137,7 +137,6 @@ export function DataProvider({ children }) {
           const data = await downloadRawData(ds.raw_data_path)
           if (mounted && data.length > 0) {
             fullDataCacheRef.current[ds.id] = data
-            console.log('Downloaded raw data for', ds.file_name, '→', data.length, 'rows')
           }
         } catch (err) {
           console.error('Failed to download raw data for', ds.file_name, ':', err.message)
@@ -200,6 +199,60 @@ export function DataProvider({ children }) {
   // Custom metrics — computed columns that appear everywhere
   const customMetrics = localDashboardState.customMetrics || []
 
+  // Safe math expression parser — no eval/Function, recursive descent
+  // Supports: +, -, *, /, parentheses, numbers (including decimals and negatives)
+  function safeMathEval(expr) {
+    let pos = 0
+    const str = expr.replace(/\s+/g, '')
+
+    function parseExpr() {
+      let result = parseTerm()
+      while (pos < str.length && (str[pos] === '+' || str[pos] === '-')) {
+        const op = str[pos++]
+        const right = parseTerm()
+        result = op === '+' ? result + right : result - right
+      }
+      return result
+    }
+
+    function parseTerm() {
+      let result = parseFactor()
+      while (pos < str.length && (str[pos] === '*' || str[pos] === '/')) {
+        const op = str[pos++]
+        const right = parseFactor()
+        result = op === '*' ? result * right : (right !== 0 ? result / right : 0)
+      }
+      return result
+    }
+
+    function parseFactor() {
+      // Handle unary minus
+      if (str[pos] === '-') { pos++; return -parseFactor() }
+      if (str[pos] === '+') { pos++; return parseFactor() }
+
+      // Handle parentheses
+      if (str[pos] === '(') {
+        pos++ // skip '('
+        const result = parseExpr()
+        if (str[pos] === ')') pos++ // skip ')'
+        return result
+      }
+
+      // Parse number
+      const start = pos
+      while (pos < str.length && (str[pos] >= '0' && str[pos] <= '9' || str[pos] === '.')) pos++
+      if (pos === start) return 0
+      return parseFloat(str.slice(start, pos)) || 0
+    }
+
+    try {
+      const result = parseExpr()
+      return isFinite(result) ? result : 0
+    } catch {
+      return 0
+    }
+  }
+
   // Safe formula evaluator — supports column references, +, -, *, /, parentheses, numbers
   function evaluateFormula(formula, row, schemaRef) {
     if (!formula) return 0
@@ -212,16 +265,13 @@ export function DataProvider({ children }) {
       let expr = formula
       metricCols.forEach(([col]) => {
         const val = parseFloat(String(row[col] ?? 0).replace(/[,$%]/g, '')) || 0
-        // Use word boundary matching to avoid partial replacements
         expr = expr.replaceAll(col, String(val))
       })
 
       // Validate: only allow numbers, operators, parentheses, spaces, dots
       if (!/^[\d\s+\-*/().]+$/.test(expr)) return 0
 
-      // Evaluate safely using Function constructor (no access to globals)
-      const result = new Function(`"use strict"; return (${expr})`)()
-      return isFinite(result) ? result : 0
+      return safeMathEval(expr)
     } catch {
       return 0
     }
@@ -324,20 +374,14 @@ CRITICAL RULES:
 Respond with ONLY a JSON object (no markdown, no backticks) mapping column names to {type, label}:
 {"column_name": {"type": "dimension", "label": "Column Name"}, ...}`
 
-      const res = await fetch('/api/claude', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      try {
+        const { text } = await callClaudeAPI({
           system,
           messages: [{ role: 'user', content: `Classify these columns:\n${colList}` }],
           max_tokens: 1500,
-          model: 'claude-sonnet-4-6',
-        }),
-      })
+          feature: 'column_tagging',
+        })
 
-      if (res.ok) {
-        const result = await res.json()
-        const text = result.content?.map(c => c.text || '').join('') || ''
         const aiSchema = JSON.parse(text.replace(/```json|```/g, '').trim())
 
         // Validate and merge — only update if AI returned valid types for all columns
@@ -356,11 +400,9 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
             })
             return updated
           })
-          console.log('AI schema tagging complete')
         }
-      }
+      } catch { /* AI tagging failed — heuristic schema already set above */ }
     } catch (err) {
-      console.log('AI tagging failed, using basic heuristic:', err.message)
     } finally {
       setSchemaLoading(false)
     }
@@ -469,7 +511,6 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
       if (stateStr === lastSavedRef.current) return
       lastSavedRef.current = stateStr
 
-      console.log('Debounced save for dataset:', dsId, 'filters:', Object.keys(localDashboardState.global_filters || {}).length, 'ai_charts:', (localDashboardState.aiCharts || []).length)
 
       try {
         await projectService.saveDashboardState(dsId, stateToSave)
@@ -535,10 +576,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
 
           // Evaluate the expression safely
           if (!/^[\d\s+\-*.()]+$/.test(evalStr)) return 0
-          try {
-            const result = new Function(`"use strict"; return (${evalStr})`)()
-            return isFinite(result) ? result : 0
-          } catch { return 0 }
+          return safeMathEval(evalStr)
         }
 
         const numerator = evalExpr(parts[0], rows)
@@ -612,7 +650,6 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
     try {
       await projectService.saveDashboardState(dsId, stateToSave)
       lastSavedRef.current = JSON.stringify(stateToSave)
-      console.log('Flush save for dataset:', dsId, 'filters:', Object.keys(st.global_filters || {}).length, 'ai_charts:', (st.aiCharts || []).length)
     } catch (err) {
       console.error('Failed to flush save:', err)
     }

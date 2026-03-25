@@ -64,6 +64,8 @@ export default async function handler(req) {
       column_count: headers.length,
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    // M5: Sanitize error — never expose access tokens in error messages
+    const safeMsg = (err.message || 'Unknown error').replace(/Bearer\s+\S+/gi, 'Bearer [REDACTED]')
+    return new Response(JSON.stringify({ error: safeMsg }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 }

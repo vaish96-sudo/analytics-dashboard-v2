@@ -11,7 +11,7 @@ import {
   Plus, ChevronDown, ChevronUp, Check,
 } from 'lucide-react'
 
-const API_URL = '/api/claude'
+import { callClaudeAPI } from '../utils/claudeClient.js'
 
 // ─── AI Call ──────────────────────────────────────────────────────
 async function parseChartRequest(prompt, schema) {
@@ -43,24 +43,13 @@ Rules:
 - For "table" type, include all relevant metric columns.
 - If the request doesn't match available data, respond: {"error": "reason"}`
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      system,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 300,
-      model: 'claude-sonnet-4-6',
-    }),
+  const { text } = await callClaudeAPI({
+    system,
+    messages: [{ role: 'user', content: prompt }],
+    max_tokens: 300,
+    feature: 'chart_builder',
   })
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.error || 'AI request failed')
-  }
-
-  const data = await res.json()
-  const text = data.content?.map(c => c.text || '').join('') || ''
   const cleaned = text.replace(/```json|```/g, '').trim()
   return JSON.parse(cleaned)
 }

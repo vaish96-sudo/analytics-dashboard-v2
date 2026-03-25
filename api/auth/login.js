@@ -2,6 +2,22 @@ import { createClient } from '@supabase/supabase-js'
 
 export const config = { runtime: 'edge' }
 
+// --- Rate limiting (in-memory, per Edge instance) ---
+const loginAttempts = new Map()
+const WINDOW_MS = 300_000 // 5 minutes
+const MAX_ATTEMPTS = 10   // 10 attempts per 5 min per IP
+
+function checkLoginRateLimit(ip) {
+  const now = Date.now()
+  const entry = loginAttempts.get(ip)
+  if (!entry || now - entry.windowStart > WINDOW_MS) {
+    loginAttempts.set(ip, { windowStart: now, count: 1 })
+    return true
+  }
+  entry.count++
+  return entry.count <= MAX_ATTEMPTS
+}
+
 async function verifyPassword(password, stored) {
   const parts = stored.split(':')
   if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false
@@ -30,6 +46,12 @@ function generateToken() {
 export default async function handler(req) {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } })
+  }
+
+  // M1: Rate limit by IP
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  if (!checkLoginRateLimit(ip)) {
+    return new Response(JSON.stringify({ error: 'Too many login attempts. Please try again in a few minutes.' }), { status: 429, headers: { 'Content-Type': 'application/json' } })
   }
 
   const supabaseUrl = process.env.SUPABASE_URL

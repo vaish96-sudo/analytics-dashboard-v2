@@ -3,7 +3,7 @@ import { useData } from '../context/DataContext'
 import { Target, Loader2, RefreshCw, AlertTriangle, CheckCircle2, ArrowRight, Clock, FileText, File, Shield } from 'lucide-react'
 import { exportToPDF, exportToWord } from '../utils/exportService'
 
-const API_URL = '/api/claude'
+import { callClaudeAPI } from '../utils/claudeClient.js'
 const PRIORITY_STYLES = {
   high: { color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', label: 'High Priority' },
   medium: { color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', label: 'Medium' },
@@ -217,7 +217,6 @@ export default function AIRecommendations() {
 
       const industry = detectIndustry(schema)
       setDetectedIndustry(industry)
-      console.log('Detected industry:', industry)
 
       let systemPrompt
       if (industry === 'advertising') {
@@ -226,25 +225,12 @@ export default function AIRecommendations() {
         systemPrompt = buildGeneralPrompt(cols, industry) + RESPONSE_FORMAT
       }
 
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system: systemPrompt,
-          messages: [{ role: 'user', content: `Dataset: ${rawData.length} rows, ${metrics.length} metrics, ${dimensions.length} dimensions.\n\nData Summary:\n${summaryParts.join('\n')}\n\nProvide 5-6 actionable recommendations.` }],
-          max_tokens: 3000,
-          model: 'claude-opus-4-6',
-        }),
+      const { text } = await callClaudeAPI({
+        system: systemPrompt,
+        messages: [{ role: 'user', content: `Dataset: ${rawData.length} rows, ${metrics.length} metrics, ${dimensions.length} dimensions.\n\nData Summary:\n${summaryParts.join('\n')}\n\nProvide 5-6 actionable recommendations.` }],
+        max_tokens: 3000,
+        feature: 'recommendations',
       })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || `API error ${res.status}`)
-      }
-
-      const result = await res.json()
-      const text = result.content?.map(c => c.text || '').join('') || ''
-      setUsedModel('Claude Opus 4.6')
 
       try {
         const cleaned = text.replace(/```json|```/g, '').trim()

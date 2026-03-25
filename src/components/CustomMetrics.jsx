@@ -22,7 +22,7 @@ function useCustomMetricColors() {
   }
 }
 
-const API_URL = '/api/claude'
+import { callClaudeAPI } from '../utils/claudeClient.js'
 
 // ─── Formula display: replace col keys with labels ───────────────
 function formulaToDisplay(formula, schema) {
@@ -76,24 +76,13 @@ CRITICAL RULES:
 Respond with ONLY a JSON array (no markdown, no backticks):
 [{"name":"Metric Name","formula":"col_a / (col_b + col_c)","aggregation":"sum|ratio|average","description":"What this measures and why it matters.","suffix":"%" or "" or "$"}]`
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      system,
-      messages: [{ role: 'user', content: 'Suggest custom metrics for this dataset.' }],
-      max_tokens: 800,
-      model: 'claude-sonnet-4-6',
-    }),
+  const { text } = await callClaudeAPI({
+    system,
+    messages: [{ role: 'user', content: 'Suggest custom metrics for this dataset.' }],
+    max_tokens: 800,
+    feature: 'custom_metric',
   })
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.error || 'AI request failed')
-  }
-
-  const data = await res.json()
-  const text = data.content?.map(c => c.text || '').join('') || ''
   return JSON.parse(text.replace(/```json|```/g, '').trim())
 }
 

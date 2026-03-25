@@ -65,9 +65,7 @@ export async function getProject(projectId) {
       if (matched.length > 0) {
         ds.dashboard_states = matched
         const st = matched[0]
-        console.log('DB READ for dataset', ds.id, '→ filters:', Object.keys(st.global_filters || {}).length, 'insights:', (st.insights || []).length, 'ai_charts:', (st.ai_charts || []).length)
       } else {
-        console.log('No dashboard_states row for dataset', ds.id, '— creating one')
         const { data: newRow } = await supabase
           .from('dashboard_states')
           .insert({ dataset_id: ds.id })
@@ -115,7 +113,6 @@ export async function createDataset(projectId, { fileName, schemaDef, rowCount, 
   if (typeof CompressionStream !== 'undefined') {
     const stream = new Blob([jsonStr]).stream().pipeThrough(new CompressionStream('gzip'))
     uploadBlob = await new Response(stream).blob()
-    console.log(`Compressed: ${(jsonStr.length / 1024 / 1024).toFixed(1)}MB → ${(uploadBlob.size / 1024 / 1024).toFixed(1)}MB`)
   } else {
     uploadBlob = new Blob([jsonStr], { type: 'application/gzip' })
   }
@@ -130,7 +127,6 @@ export async function createDataset(projectId, { fileName, schemaDef, rowCount, 
     if (uploadErr) throw new Error(`Failed to upload data: ${uploadErr.message}`)
   }
 
-  console.log('Uploaded to Storage:', storagePath, `(${rawData.length} rows, ${(uploadBlob.size / 1024 / 1024).toFixed(1)}MB)`)
 
   const { data, error } = await supabase
     .from('datasets')
@@ -175,7 +171,6 @@ async function uploadResumable(storagePath, blob) {
     const totalSize = blob.size
     let offset = 0
 
-    console.log(`Starting resumable upload: ${(totalSize / 1024 / 1024).toFixed(1)}MB in ${Math.ceil(totalSize / chunkSize)} chunks`)
 
     // Step 1: Create the upload
     const createXhr = new XMLHttpRequest()
@@ -199,12 +194,10 @@ async function uploadResumable(storagePath, blob) {
         return
       }
 
-      console.log('TUS upload created, sending chunks...')
 
       // Step 2: Upload chunks
       function uploadNextChunk() {
         if (offset >= totalSize) {
-          console.log('TUS upload complete')
           resolve()
           return
         }
@@ -227,7 +220,6 @@ async function uploadResumable(storagePath, blob) {
           }
           offset = end
           const pct = Math.round((offset / totalSize) * 100)
-          console.log(`Upload progress: ${pct}% (${(offset / 1024 / 1024).toFixed(1)}MB / ${(totalSize / 1024 / 1024).toFixed(1)}MB)`)
           uploadNextChunk()
         }
 
@@ -253,7 +245,6 @@ async function uploadResumable(storagePath, blob) {
 export async function downloadRawData(rawDataPath) {
   if (!rawDataPath) return []
 
-  console.log('Downloading raw data from Storage:', rawDataPath)
 
   const { data, error } = await supabase.storage
     .from('datasets')
@@ -277,7 +268,6 @@ export async function downloadRawData(rawDataPath) {
     }
 
     const parsed = JSON.parse(text)
-    console.log('Downloaded and parsed', parsed.length, 'rows')
     return parsed
   } catch (err) {
     console.error('Failed to parse downloaded data:', err.message)
@@ -339,7 +329,6 @@ export async function saveDashboardState(datasetId, state) {
 
   // If no row existed, insert one
   if (!data || data.length === 0) {
-    console.log('DB WRITE: no row found for dataset', datasetId, '— inserting new row')
     const { data: inserted, error: insertErr } = await supabase
       .from('dashboard_states')
       .insert({ dataset_id: datasetId, ...safeState })
@@ -348,16 +337,13 @@ export async function saveDashboardState(datasetId, state) {
       console.error('DB WRITE insert error:', insertErr.message)
       throw new Error(insertErr.message)
     }
-    console.log('DB WRITE: inserted new row', inserted?.[0]?.id)
   } else {
-    console.log('DB WRITE for dataset', datasetId, '→ filters:', Object.keys(safeState.global_filters || {}).length, 'ai_charts:', (safeState.ai_charts || []).length, 'updated row:', data[0]?.id)
   }
 
   return true
 }
 
 export async function saveInsightsOnly(datasetId, insights, insightsLoaded) {
-  console.log('saveInsightsOnly called with datasetId:', datasetId, 'insights count:', insights?.length)
   
   // Just do a direct update — we know the row exists from the JOIN query
   const { data, error, count } = await supabase
@@ -369,7 +355,6 @@ export async function saveInsightsOnly(datasetId, insights, insightsLoaded) {
     .eq('dataset_id', datasetId)
     .select('id, insights_loaded')
 
-  console.log('saveInsightsOnly result:', { data, error, count })
   
   if (error) {
     console.error('saveInsightsOnly error:', error)
@@ -387,7 +372,6 @@ export async function saveInsightsOnly(datasetId, insights, insightsLoaded) {
         insights_loaded: insightsLoaded 
       })
     if (insertErr) console.error('saveInsightsOnly insert error:', insertErr)
-    else console.log('saveInsightsOnly: inserted new row')
   }
   
   return true

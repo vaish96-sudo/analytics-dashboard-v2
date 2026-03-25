@@ -20,7 +20,7 @@ export default function AIInsights() {
     try {
       const result = await getInsights(schema, rawData, aggregateUnfiltered)
       const insightsData = result.insights || result
-      setUsedModel(result.model || null)
+      setUsedModel(result.model || 'Claude')
 
       // Update local state for immediate display
       updateDatasetState('insights', insightsData)
@@ -31,7 +31,6 @@ export default function AIInsights() {
         try {
           const { saveInsightsOnly } = await import('../lib/projectService')
           await saveInsightsOnly(activeDatasetId, insightsData, true)
-          console.log('Insights saved to Supabase directly')
         } catch (saveErr) {
           console.error('Failed to save insights to Supabase:', saveErr)
         }

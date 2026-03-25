@@ -43,10 +43,9 @@ export default async function handler(req) {
         reset_token_expires: expires.toISOString(),
       }).eq('id', user.id)
 
-      // TODO: Send actual email with reset link
-      // For now, log the token (remove in production)
-      console.log(`Password reset token for ${email}: ${resetToken}`)
-      console.log(`Reset link: ${process.env.APP_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`)
+      // TODO: Integrate a transactional email service (e.g. Resend, SendGrid, AWS SES)
+      // to send the reset link: `${process.env.APP_URL}/reset-password?token=${resetToken}`
+      // SECURITY: Never log tokens to console in any environment.
     }
 
     return new Response(JSON.stringify({

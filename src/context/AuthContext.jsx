@@ -1,4 +1,3 @@
-const DEV_MODE = import.meta.env.DEV
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
@@ -93,26 +92,6 @@ export function AuthProvider({ children }) {
   const signup = useCallback(async (email, password, name) => {
     setError(null)
     try {
-      if (DEV_MODE) {
-        const { data: existing } = await supabase.from('users').select('id').eq('email', email.toLowerCase()).single()
-        if (existing) throw new Error('An account with this email already exists')
-
-        const { data: newUser, error: createErr } = await supabase
-          .from('users')
-          .insert({ email: email.toLowerCase(), password_hash: 'dev-mode', name: name || null, email_verified: true })
-          .select('id, email, name, company, avatar_url, email_verified')
-          .single()
-        if (createErr) throw new Error(createErr.message)
-
-        const token = 'dev-token-' + Date.now()
-        await supabase.from('sessions').insert({ user_id: newUser.id, token, expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() })
-
-        setUser(newUser)
-        setSessionToken(token)
-        saveSession(token, newUser)
-        return { user: newUser, token }
-      }
-
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -133,22 +112,6 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     setError(null)
     try {
-      if (DEV_MODE) {
-        const { data: userData, error: findErr } = await supabase
-          .from('users')
-          .select('id, email, name, company, avatar_url, email_verified')
-          .eq('email', email.toLowerCase())
-          .single()
-        if (findErr || !userData) throw new Error('Invalid email or password')
-
-const token = 'dev-token-' + Date.now()
-        await supabase.from('sessions').insert({ user_id: userData.id, token, expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() })
-        setUser(userData)
-        setSessionToken(token)
-        saveSession(token, userData)
-        return { user: userData, token }
-      }
-
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -185,6 +148,29 @@ const token = 'dev-token-' + Date.now()
     } catch (err) { setError(err.message); throw err }
   }, [])
 
+  const sendCode = useCallback(async (email) => {
+    setError(null)
+    try {
+      const res = await fetch('/api/auth/send-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to send code')
+      return data
+    } catch (err) { setError(err.message); throw err }
+  }, [])
+
+  const verifyCode = useCallback(async (email, code, name) => {
+    setError(null)
+    try {
+      const res = await fetch('/api/auth/verify-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, code, name }) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Verification failed')
+      setUser(data.user)
+      setSessionToken(data.token)
+      saveSession(data.token, data.user)
+      return data
+    } catch (err) { setError(err.message); throw err }
+  }, [])
+
   const resetPassword = useCallback(async (token, newPassword) => {
     setError(null)
     try {
@@ -216,6 +202,7 @@ const token = 'dev-token-' + Date.now()
     <AuthContext.Provider value={{
       user, sessionToken, loading, error, isAuthenticated: !!user,
       signup, login, logout, forgotPassword, resetPassword, updateProfile, setError,
+      sendCode, verifyCode,
     }}>
       {children}
     </AuthContext.Provider>

@@ -44,9 +44,38 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ error: 'Invalid URL' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
     }
 
-    // Block internal/private IPs
+    // Block internal/private IPs and cloud metadata endpoints
     const hostname = parsedUrl.hostname.toLowerCase()
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.startsWith('172.')) {
+    const blockedPatterns = [
+      // Localhost
+      'localhost',
+      '127.0.0.1',
+      '[::1]',
+      '0.0.0.0',
+      // Private IPv4 ranges
+      /^192\.168\./,
+      /^10\./,
+      /^172\.(1[6-9]|2\d|3[01])\./,
+      // Link-local
+      /^169\.254\./,
+      // AWS/cloud metadata endpoint (CRITICAL on Vercel)
+      '169.254.169.254',
+      // IPv6 private/reserved
+      /^\[?fd[0-9a-f]{2}:/i,
+      /^\[?fc[0-9a-f]{2}:/i,
+      /^\[?fe80:/i,
+      /^\[?::1\]?$/,
+      /^\[?::ffff:127\./i,
+      /^\[?0+:0+:0+:0+:0+:0+:0+:0*1\]?$/,
+    ]
+
+    const isBlocked = blockedPatterns.some(pattern => {
+      if (typeof pattern === 'string') return hostname === pattern
+      return pattern.test(hostname)
+    })
+
+    // Also block non-http(s) schemes
+    if (isBlocked || !['http:', 'https:'].includes(parsedUrl.protocol)) {
       return new Response(JSON.stringify({ error: 'Cannot fetch from internal/private addresses' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
     }
 

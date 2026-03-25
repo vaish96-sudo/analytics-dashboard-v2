@@ -1,6 +1,9 @@
 const API_URL = '/api/claude'
-const MODEL_SONNET = 'claude-sonnet-4-6'
-const MODEL_OPUS = 'claude-opus-4-6'
+
+// Get session token for authenticated API calls
+function getSessionToken() {
+  try { return localStorage.getItem('nb_session_token') } catch { return null }
+}
 
 function buildSchemaPrompt(schema) {
   const cols = Object.entries(schema)
@@ -70,30 +73,31 @@ Provide a clear, concise, actionable answer. Use specific numbers from the data.
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)) }
 
-async function callClaude(system, messages, maxTokens = 1024, model = MODEL_SONNET, retries = 3) {
-  let actualModel = model
-  for (let attempt = 0; attempt < retries; attempt++) {
+async function callClaude(system, messages, maxTokens = 1024, feature = 'ask_ai', retries = 2) {
+  const token = getSessionToken()
+  if (!token) throw new Error('Not authenticated. Please log in again.')
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const res = await fetch(API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ system, messages, max_tokens: maxTokens, model: actualModel }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ system, messages, max_tokens: maxTokens, feature }),
       })
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'API request failed' }))
         const errMsg = err.error || `API error ${res.status}`
 
-        if ((res.status === 529 || res.status === 503 || errMsg.toLowerCase().includes('overloaded')) && attempt < retries - 1) {
+        if (res.status === 401) throw new Error('Session expired. Please log in again.')
+        if (res.status === 429) throw new Error('Rate limit exceeded. Please wait a moment.')
+
+        if ((res.status === 529 || res.status === 503 || errMsg.toLowerCase().includes('overloaded')) && attempt < retries) {
           await sleep((attempt + 1) * 3000)
           continue
-        }
-
-        // If Opus fails, fallback to Sonnet
-        if (actualModel === MODEL_OPUS && attempt === retries - 1) {
-          console.log('Opus failed, falling back to Sonnet')
-          actualModel = MODEL_SONNET
-          return callClaude(system, messages, maxTokens, MODEL_SONNET, 2)
         }
 
         throw new Error(errMsg)
@@ -101,24 +105,18 @@ async function callClaude(system, messages, maxTokens = 1024, model = MODEL_SONN
 
       const data = await res.json()
 
-      if (data.error?.type === 'overloaded_error' && attempt < retries - 1) {
+      if (data.error?.type === 'overloaded_error' && attempt < retries) {
         await sleep((attempt + 1) * 3000)
         continue
       }
 
       const text = data.content?.map(c => c.text || '').join('') || ''
-      return { text, usage: data.usage || {}, model: actualModel }
+      return { text, usage: data.usage || {} }
     } catch (err) {
-      if (attempt < retries - 1 && (err.message.includes('overloaded') || err.message.includes('fetch'))) {
+      if (attempt < retries && (err.message.includes('overloaded') || err.message.includes('fetch'))) {
         await sleep((attempt + 1) * 3000)
         continue
       }
-
-      if (actualModel === MODEL_OPUS) {
-        console.log('Opus failed, falling back to Sonnet')
-        return callClaude(system, messages, maxTokens, MODEL_SONNET, 2)
-      }
-
       throw err
     }
   }
@@ -127,7 +125,7 @@ async function callClaude(system, messages, maxTokens = 1024, model = MODEL_SONN
 
 export async function askAI(question, schema, rawData, aggregateFn, history = []) {
   const { system: sys1, messages: msgs1 } = buildQueryPrompt(question, schema, history)
-  const call1 = await callClaude(sys1, msgs1, 500, MODEL_SONNET)
+  const call1 = await callClaude(sys1, msgs1, 500, 'query_plan')
 
   let queryPlan
   try {
@@ -162,7 +160,7 @@ export async function askAI(question, schema, rawData, aggregateFn, history = []
   mets.forEach(m => { totals[m] = results.reduce((sum, row) => sum + (parseFloat(row[m]) || 0), 0) })
 
   const { system: sys2, messages: msgs2 } = buildAnswerPrompt(question, schema, results, totals, history)
-  const call2 = await callClaude(sys2, msgs2, 1024, MODEL_SONNET)
+  const call2 = await callClaude(sys2, msgs2, 1024, 'ask_ai')
 
   const totalInput = (call1.usage.input_tokens || 0) + (call2.usage.input_tokens || 0)
   const totalOutput = (call1.usage.output_tokens || 0) + (call2.usage.output_tokens || 0)
@@ -198,18 +196,16 @@ export async function getInsights(schema, rawData, aggregateFn) {
 
 Be specific with numbers. Think like a senior strategist presenting to a C-suite executive.`
 
-  // Try Opus first, falls back to Sonnet automatically
+  // Server determines model based on 'insights' feature
   const call = await callClaude(system, [
     { role: 'user', content: `Data summary (${rawData.length} total rows):\n${summaryParts.join('\n')}\n\nProvide 4-5 strategic insights.` }
-  ], 1500, MODEL_OPUS)
-
-  const modelLabel = call.model === MODEL_OPUS ? 'Claude Opus 4.6' : 'Claude Sonnet 4.6'
+  ], 1500, 'insights')
 
   try {
     const cleaned = call.text.replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(cleaned)
-    return { insights: parsed, model: modelLabel }
+    return { insights: parsed }
   } catch {
-    return { insights: [{ type: 'alert', title: 'Analysis Error', description: call.text, impact: 'medium' }], model: modelLabel }
+    return { insights: [{ type: 'alert', title: 'Analysis Error', description: call.text, impact: 'medium' }] }
   }
 }

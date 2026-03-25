@@ -3,6 +3,7 @@ import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, X
 import { useData } from '../context/DataContext'
 import { CHART_COLORS, smartFormat, truncate } from '../utils/formatters'
 import { BarChart3, TrendingUp, PieChart as PieIcon, AreaChart as AreaIcon, Maximize2, Minimize2 } from 'lucide-react'
+import { callClaudeAPI } from '../utils/claudeClient.js'
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -229,20 +230,13 @@ CRITICAL RULES:
 Respond with ONLY a JSON array (no markdown, no backticks):
 [{"type":"bar|line|pie|area","dim":"column_name","met":"column_name"}]`
 
-    fetch('/api/claude', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system,
-        messages: [{ role: 'user', content: 'Pick the 4 most insightful chart combinations.' }],
-        max_tokens: 400,
-        model: 'claude-sonnet-4-6',
-      }),
+    callClaudeAPI({
+      system,
+      messages: [{ role: 'user', content: 'Pick the 4 most insightful chart combinations.' }],
+      max_tokens: 400,
+      feature: 'chart_builder',
     })
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (!data) return
-        const text = data.content?.map(c => c.text || '').join('') || ''
+      .then(({ text }) => {
         try {
           const configs = JSON.parse(text.replace(/```json|```/g, '').trim())
           const validTypes = ['bar', 'line', 'pie', 'area']
@@ -254,10 +248,8 @@ Respond with ONLY a JSON array (no markdown, no backticks):
           )
           if (valid.length >= 2) {
             setAiChartConfigs(valid.slice(0, 4))
-            console.log('Smart charts:', valid.map(c => `${schema[c.met]?.label} by ${schema[c.dim]?.label} (${c.type})`).join(', '))
           }
         } catch (e) {
-          console.log('Smart chart parsing failed:', e.message)
         }
       })
       .catch(() => {})

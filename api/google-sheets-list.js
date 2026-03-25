@@ -32,6 +32,7 @@ export default async function handler(req) {
 
     return new Response(JSON.stringify({ files: data.files || [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    const safeMsg = (err.message || 'Unknown error').replace(/Bearer\s+\S+/gi, 'Bearer [REDACTED]')
+    return new Response(JSON.stringify({ error: safeMsg }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 }
