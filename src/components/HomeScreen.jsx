@@ -3,6 +3,7 @@ import LogoMark from './LogoMark'
 import { useAuth } from '../context/AuthContext'
 import { useProject } from '../context/ProjectContext'
 import { useTheme } from '../context/ThemeContext'
+import { api } from '../lib/api'
 import { useTier } from '../context/TierContext'
 import {
   FolderOpen, FolderPlus, Upload, FileSpreadsheet, Globe, LogOut,
@@ -92,11 +93,9 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
   useEffect(() => {
     if (profile?.team_id) { setOwnedTeamId(profile.team_id); return }
     if (!isAgency || !user?.id) return
-    import('../lib/supabase').then(({ supabase }) => {
-      supabase.from('teams').select('id').eq('owner_id', user.id).single().then(({ data }) => {
-        if (data) setOwnedTeamId(data.id)
-      })
-    })
+    api.get('/api/data/teams').then(teamData => {
+      if (teamData?.id) setOwnedTeamId(teamData.id)
+    }).catch(() => {})
   }, [user?.id, isAgency, profile?.team_id])
 
   const toggleProject = (id) => {
@@ -120,12 +119,7 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
   const handleRenameClient = async (oldName, newName) => {
     if (!newName.trim() || newName.trim() === oldName) { setEditingClientOld(null); return }
     try {
-      const { supabase } = await import('../lib/supabase')
-      if (oldName === 'Uncategorized') {
-        await supabase.from('projects').update({ client_name: newName.trim() }).is('client_name', null).eq('user_id', user.id)
-      } else {
-        await supabase.from('projects').update({ client_name: newName.trim() }).eq('client_name', oldName).eq('user_id', user.id)
-      }
+      await api.patch('/api/data/rename-client', { oldName, newName: newName.trim() })
       window.location.reload()
     } catch {}
     setEditingClientOld(null)
@@ -134,8 +128,7 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
   // Move project to a different client
   const handleMoveProject = async (projectId, newClientName) => {
     try {
-      const { supabase } = await import('../lib/supabase')
-      await supabase.from('projects').update({ client_name: newClientName || null }).eq('id', projectId)
+      await api.patch(`/api/data/project/${projectId}`, { client_name: newClientName || null })
       window.location.reload()
     } catch {}
   }

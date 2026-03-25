@@ -1,0 +1,54 @@
+import { validateSession } from '../lib/validateSession.js'
+
+export default async function handler(req, res) {
+  const session = await validateSession(req)
+  if (!session) return res.status(401).json({ error: 'Unauthorized' })
+  const { userId, supabase } = session
+
+  if (req.method === 'GET') {
+    const projectId = req.query.project_id
+    if (!projectId) return res.status(400).json({ error: 'Missing project_id' })
+
+    // Ownership check
+    const { data: project } = await supabase
+      .from('projects')
+      .select('user_id')
+      .eq('id', projectId)
+      .single()
+
+    if (!project || project.user_id !== userId) return res.status(403).json({ error: 'Access denied' })
+
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('id, title, dataset_id, created_at, updated_at')
+      .eq('project_id', projectId)
+      .order('updated_at', { ascending: false })
+
+    if (error) return res.status(500).json({ error: error.message })
+    return res.json(data || [])
+  }
+
+  if (req.method === 'POST') {
+    const { projectId, datasetId } = req.body || {}
+    if (!projectId) return res.status(400).json({ error: 'Missing projectId' })
+
+    const { data: project } = await supabase
+      .from('projects')
+      .select('user_id')
+      .eq('id', projectId)
+      .single()
+
+    if (!project || project.user_id !== userId) return res.status(403).json({ error: 'Access denied' })
+
+    const { data, error } = await supabase
+      .from('conversations')
+      .insert({ project_id: projectId, dataset_id: datasetId || null })
+      .select()
+      .single()
+
+    if (error) return res.status(500).json({ error: error.message })
+    return res.status(201).json(data)
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' })
+}

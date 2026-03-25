@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useTier } from '../context/TierContext'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 import { TIER_CONFIG, TIER_ORDER } from '../lib/tierConfig'
 import { User, Mail, Building2, Camera, Save, Loader2, CheckCircle, Sun, Moon, Monitor, Crown, Shield, Zap, Lock, Upload, Trash2, FileText, Sparkles } from 'lucide-react'
 import TeamManager from './TeamManager'
@@ -19,11 +19,9 @@ export default function UserProfile() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState(null)
 
-  // White-label fields
   const [customLogo, setCustomLogo] = useState(profile?.custom_logo_url || '')
   const [customCompany, setCustomCompany] = useState(profile?.custom_company_name || '')
 
-  // Playbook
   const [playbook, setPlaybook] = useState(profile?.custom_ai_playbook || '')
   const [playbookSaving, setPlaybookSaving] = useState(false)
   const [playbookSaved, setPlaybookSaved] = useState(false)
@@ -64,13 +62,13 @@ export default function UserProfile() {
     if (file.size > 5 * 1024 * 1024) { setError('Logo must be under 5MB'); return }
 
     try {
-      const ext = file.name.split('.').pop()
-      const path = `${user.id}/logo.${ext}`
-      const { error: uploadErr } = await supabase.storage.from('logos').upload(path, file, { upsert: true })
-      if (uploadErr) throw uploadErr
-      const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(path)
-      setCustomLogo(publicUrl)
-      await updateProfileField({ custom_logo_url: publicUrl })
+      const formData = new FormData()
+      formData.append('logo', file)
+      const result = await api.upload('/api/data/upload-logo', formData)
+      if (result?.url) {
+        setCustomLogo(result.url)
+        await updateProfileField({ custom_logo_url: result.url })
+      }
     } catch (err) { setError(err.message || 'Failed to upload logo') }
   }
 
@@ -163,7 +161,6 @@ export default function UserProfile() {
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Your subscription and usage this month</p>
         </div>
         <div className="p-4 sm:p-6 space-y-4">
-          {/* Current plan badge */}
           <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--bg-overlay)', border: '1px solid var(--border)' }}>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #1c1917, #292524)' }}>
@@ -177,7 +174,6 @@ export default function UserProfile() {
             <span className="px-3 py-1 rounded-full text-xs font-medium" style={{ background: 'linear-gradient(135deg, #1c1917, #292524)', color: '#d4a574' }}>Active</span>
           </div>
 
-          {/* Usage meters */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: 'Ask AI', used: profile?.ai_queries_used || 0, limit: limitLabel('askAiQueries') },
@@ -193,7 +189,6 @@ export default function UserProfile() {
             ))}
           </div>
 
-          {/* Upgrade prompt for non-agency */}
           {tier !== 'agency' && (
             <div className="p-4 rounded-xl text-center" style={{ background: 'linear-gradient(135deg, rgba(28,25,23,0.03), rgba(41,37,36,0.06))', border: '1px solid var(--border)' }}>
               <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Need more? Upgrade your plan for higher limits and premium features.</p>
@@ -205,7 +200,7 @@ export default function UserProfile() {
         </div>
       </div>
 
-      {/* Feature 2: White-Label (Enterprise) */}
+      {/* White-Label (Enterprise) */}
       <div className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-slate-100">
           <div className="flex items-center gap-2">
@@ -215,7 +210,6 @@ export default function UserProfile() {
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Your branding on exported reports</p>
         </div>
         <div className={`p-4 sm:p-6 space-y-4 ${!can('whiteLabel') ? 'opacity-50 pointer-events-none' : ''}`}>
-          {/* Logo upload */}
           <div>
             <label className="text-sm font-medium flex items-center gap-1.5 mb-1.5" style={{ color: 'var(--text-secondary)' }}>
               <Upload className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} /> Company logo
@@ -237,7 +231,6 @@ export default function UserProfile() {
               )}
             </div>
           </div>
-          {/* Company name override */}
           <div>
             <label className="text-sm font-medium flex items-center gap-1.5 mb-1.5" style={{ color: 'var(--text-secondary)' }}>
               <Building2 className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} /> Brand name on reports
@@ -253,7 +246,7 @@ export default function UserProfile() {
         </div>
       </div>
 
-      {/* Feature 1: Custom AI Playbook (Enterprise) */}
+      {/* AI Playbook (Enterprise) */}
       <div className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-slate-100">
           <div className="flex items-center gap-2">
@@ -280,7 +273,7 @@ export default function UserProfile() {
         </div>
       </div>
 
-      {/* Feature 4: Team Management */}
+      {/* Team Management */}
       {config.teamSeats > 0 && (
         <div className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 sm:p-6 border-b border-slate-100">

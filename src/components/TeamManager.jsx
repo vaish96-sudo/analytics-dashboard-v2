@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useTier } from '../context/TierContext'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 import { Users, UserPlus, Mail, Shield, Trash2, Loader2, CheckCircle, Clock, X, Crown } from 'lucide-react'
 
 const ROLE_LABELS = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer' }
@@ -9,7 +9,7 @@ const ROLE_DESCRIPTIONS = { admin: 'Manage members + edit', editor: 'Create and 
 
 export default function TeamManager() {
   const { user } = useAuth()
-  const { profile, can, config } = useTier()
+  const { profile, can, config, updateProfileField } = useTier()
   const [team, setTeam] = useState(null)
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -27,11 +27,11 @@ export default function TeamManager() {
   const loadTeam = useCallback(async () => {
     if (!profile?.team_id) { setLoading(false); return }
     try {
-      const { data: teamData } = await supabase.from('teams').select('*').eq('id', profile.team_id).single()
+      const teamData = await api.get('/api/data/teams')
       if (teamData) {
         setTeam(teamData)
         setTeamName(teamData.name)
-        const { data: memberData } = await supabase.from('team_members').select('*, users:user_id(email, name)').eq('team_id', teamData.id)
+        const memberData = await api.get(`/api/data/team-members?team_id=${teamData.id}`)
         setMembers(memberData || [])
       }
     } catch {} finally { setLoading(false) }
@@ -43,12 +43,10 @@ export default function TeamManager() {
     if (!teamName.trim()) return
     setCreating(true); setError(null)
     try {
-      const { data: newTeam, error: err } = await supabase.from('teams').insert({ name: teamName.trim(), owner_id: user.id }).select().single()
-      if (err) throw err
-      await supabase.from('user_profiles').update({ team_id: newTeam.id, role: 'owner' }).eq('id', user.id)
-      // Add owner as active member
-      await supabase.from('team_members').insert({ team_id: newTeam.id, user_id: user.id, role: 'admin', status: 'active', invited_email: user.email })
+      const newTeam = await api.post('/api/data/teams', { name: teamName.trim() })
       setTeam(newTeam)
+      // Update local profile with team_id
+      await updateProfileField({ team_id: newTeam.id, role: 'owner' })
       await loadTeam()
     } catch (err) { setError(err.message) } finally { setCreating(false) }
   }
@@ -58,21 +56,14 @@ export default function TeamManager() {
     if (memberCount >= maxSeats && maxSeats > 0) { setError(`Your plan includes ${maxSeats} team seats. Upgrade for more.`); return }
     setInviting(true); setError(null)
     try {
-      // Check if already invited
       const existing = members.find(m => m.invited_email?.toLowerCase() === inviteEmail.toLowerCase().trim())
       if (existing) { setError('This email has already been invited'); setInviting(false); return }
 
-      // Check if user exists
-      const { data: existingUser } = await supabase.from('users').select('id').eq('email', inviteEmail.toLowerCase().trim()).single()
-
-      const { error: err } = await supabase.from('team_members').insert({
-        team_id: team.id,
-        user_id: existingUser?.id || null,
+      await api.post('/api/data/team-members', {
+        teamId: team.id,
+        email: inviteEmail.toLowerCase().trim(),
         role: inviteRole,
-        status: 'pending',
-        invited_email: inviteEmail.toLowerCase().trim(),
       })
-      if (err) throw err
 
       // Send invite email
       const sessionToken = localStorage.getItem('nb_session_token')
@@ -96,14 +87,14 @@ export default function TeamManager() {
 
   const handleRemoveMember = async (memberId) => {
     try {
-      await supabase.from('team_members').delete().eq('id', memberId)
+      await api.del(`/api/data/team-members?member_id=${memberId}`)
       await loadTeam()
     } catch {}
   }
 
   const handleChangeRole = async (memberId, newRole) => {
     try {
-      await supabase.from('team_members').update({ role: newRole }).eq('id', memberId)
+      await api.patch('/api/data/team-members', { memberId, updates: { role: newRole } })
       await loadTeam()
     } catch {}
   }
@@ -140,7 +131,6 @@ export default function TeamManager() {
           <h4 className="text-sm font-display font-semibold" style={{ color: 'var(--text-primary)' }}>{team.name}</h4>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{memberCount} of {maxSeats} seats used</p>
         </div>
-        {/* Seat usage bar */}
         <div className="w-24 h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-overlay)' }}>
           <div className="h-full rounded-full transition-all" style={{ width: `${maxSeats > 0 ? Math.min(100, (memberCount / maxSeats) * 100) : 0}%`, background: memberCount >= maxSeats ? '#ef4444' : 'var(--accent)' }} />
         </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useData } from '../context/DataContext'
 import { useTier } from '../context/TierContext'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { Calendar, Mail, Clock, Trash2, Loader2, Plus, CheckCircle, Send, ToggleLeft, ToggleRight } from 'lucide-react'
 
@@ -15,7 +15,6 @@ export default function ScheduledReports() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
-  // Form state
   const [frequency, setFrequency] = useState('weekly')
   const [recipients, setRecipients] = useState('')
   const [includeInsights, setIncludeInsights] = useState(true)
@@ -25,7 +24,7 @@ export default function ScheduledReports() {
   const loadReports = useCallback(async () => {
     if (!activeDatasetId || activeDatasetId === '__pending__') { setLoading(false); return }
     try {
-      const { data } = await supabase.from('scheduled_reports').select('*').eq('dataset_id', activeDatasetId).order('created_at', { ascending: false })
+      const data = await api.get(`/api/data/scheduled-reports?dataset_id=${activeDatasetId}`)
       setReports(data || [])
     } catch {} finally { setLoading(false) }
   }, [activeDatasetId])
@@ -45,18 +44,12 @@ export default function ScheduledReports() {
     if (emailList.length === 0) { setError('Add at least one recipient email'); return }
     setSaving(true); setError(null)
     try {
-      const { error: err } = await supabase.from('scheduled_reports').insert({
-        dataset_id: activeDatasetId,
-        created_by: user.id,
+      await api.post('/api/data/scheduled-reports', {
+        datasetId: activeDatasetId,
         frequency,
         recipients: emailList,
-        include_insights: includeInsights,
-        include_recommendations: includeRecommendations,
-        include_kpis: includeKpis,
-        next_send_at: calcNextSend(frequency),
-        enabled: true,
+        sections: { include_insights: includeInsights, include_recommendations: includeRecommendations, include_kpis: includeKpis },
       })
-      if (err) throw err
       setShowForm(false)
       setRecipients('')
       await loadReports()
@@ -65,14 +58,14 @@ export default function ScheduledReports() {
 
   const toggleEnabled = async (id, currentEnabled) => {
     try {
-      await supabase.from('scheduled_reports').update({ enabled: !currentEnabled }).eq('id', id)
+      await api.patch('/api/data/scheduled-reports', { reportId: id, updates: { enabled: !currentEnabled } })
       await loadReports()
     } catch {}
   }
 
   const handleDelete = async (id) => {
     try {
-      await supabase.from('scheduled_reports').delete().eq('id', id)
+      await api.del(`/api/data/scheduled-reports?report_id=${id}`)
       await loadReports()
     } catch {}
   }
@@ -98,7 +91,6 @@ export default function ScheduledReports() {
       </div>
 
       <div className="p-4 space-y-3">
-        {/* Create form */}
         {showForm && (
           <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--bg-overlay)', border: '1px solid var(--border)' }}>
             <div>
@@ -144,7 +136,6 @@ export default function ScheduledReports() {
           </div>
         )}
 
-        {/* Existing schedules */}
         {loading ? (
           <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--accent)' }} /></div>
         ) : reports.length === 0 && !showForm ? (

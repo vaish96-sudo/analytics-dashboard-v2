@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useAuth } from './AuthContext'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 import { canUse, getLimit, withinLimit, limitDisplay, getTierConfig, getNextTier, TIER_CONFIG } from '../lib/tierConfig'
 
 const TierContext = createContext(null)
@@ -16,36 +16,18 @@ export function TierProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Load user profile on login
   useEffect(() => {
     if (!user?.id) { setProfile(null); setLoading(false); return }
-    loadProfile(user.id)
+    loadProfile()
   }, [user?.id])
 
-  const loadProfile = async (userId) => {
+  const loadProfile = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-
-      if (error || !data) {
-        // Profile doesn't exist yet — use free defaults
-        setProfile({ id: userId, tier: 'free', ai_queries_used: 0, insights_runs_used: 0, recommendations_runs_used: 0, ai_suggest_runs_used: 0 })
-      } else {
-        // Check if usage needs monthly reset
-        if (data.usage_reset_at && new Date(data.usage_reset_at) < new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)) {
-          data.ai_queries_used = 0
-          data.insights_runs_used = 0
-          data.recommendations_runs_used = 0
-          data.ai_suggest_runs_used = 0
-        }
-        setProfile(data)
-      }
+      const data = await api.get('/api/data/user-profile')
+      setProfile(data)
     } catch {
-      setProfile({ id: userId, tier: 'free', ai_queries_used: 0, insights_runs_used: 0, recommendations_runs_used: 0, ai_suggest_runs_used: 0 })
+      setProfile({ id: user?.id, tier: 'free', ai_queries_used: 0, insights_runs_used: 0, recommendations_runs_used: 0, ai_suggest_runs_used: 0 })
     } finally {
       setLoading(false)
     }
@@ -54,10 +36,8 @@ export function TierProvider({ children }) {
   const tier = profile?.tier || 'free'
   const config = getTierConfig(tier)
 
-  // Check if a boolean feature is available
   const can = useCallback((feature) => canUse(tier, feature), [tier])
 
-  // Check if a counted feature has remaining uses
   const hasRemaining = useCallback((feature) => {
     const usageMap = {
       askAiQueries: profile?.ai_queries_used || 0,
@@ -70,7 +50,6 @@ export function TierProvider({ children }) {
     return withinLimit(tier, feature, used)
   }, [tier, profile])
 
-  // Get remaining count for a feature
   const remaining = useCallback((feature) => {
     const limit = getLimit(tier, feature)
     if (limit === -1) return Infinity
@@ -84,7 +63,6 @@ export function TierProvider({ children }) {
     return Math.max(0, limit - used)
   }, [tier, profile])
 
-  // Increment usage counter (call after successful AI request)
   const incrementUsage = useCallback(async (feature) => {
     if (!profile?.id) return
     const columnMap = {
@@ -100,23 +78,20 @@ export function TierProvider({ children }) {
     setProfile(prev => prev ? { ...prev, [column]: newVal } : prev)
 
     try {
-      await supabase.from('user_profiles').update({ [column]: newVal }).eq('id', profile.id)
+      await api.patch('/api/data/user-profile', { [column]: newVal })
     } catch { /* non-blocking */ }
   }, [profile])
 
-  // Update profile fields (for settings: playbook, logo, company name, onboarding)
   const updateProfileField = useCallback(async (updates) => {
     if (!profile?.id) return
     setProfile(prev => prev ? { ...prev, ...updates } : prev)
     try {
-      await supabase.from('user_profiles').update(updates).eq('id', profile.id)
+      await api.patch('/api/data/user-profile', updates)
     } catch { /* non-blocking */ }
   }, [profile])
 
-  // Get the display label for a limit
   const limitLabel = useCallback((key) => limitDisplay(tier, key), [tier])
 
-  // Get upgrade tier info
   const nextTier = getNextTier(tier)
   const nextTierConfig = nextTier ? TIER_CONFIG[nextTier] : null
 
@@ -134,7 +109,7 @@ export function TierProvider({ children }) {
       limitLabel,
       nextTier,
       nextTierConfig,
-      reloadProfile: () => user?.id && loadProfile(user.id),
+      reloadProfile: loadProfile,
     }}>
       {children}
     </TierContext.Provider>

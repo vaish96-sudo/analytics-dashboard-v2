@@ -1,25 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../context/AuthContext'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 import { grantProjectAccess, revokeProjectAccess } from '../lib/projectService'
 import { FolderOpen, Check, X, Loader2 } from 'lucide-react'
 
-/**
- * Share menu for an individual project — lets the agency owner
- * grant/revoke access for specific team members at the project level.
- * Rendered as a portal to avoid sidebar overflow clipping.
- */
 export default function ProjectShareMenu({ projectId, projectName, teamId, onClose, anchorRef }) {
   const { user } = useAuth()
   const [members, setMembers] = useState([])
-  const [access, setAccess] = useState({}) // userId → boolean
+  const [access, setAccess] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(null)
   const [pos, setPos] = useState({ top: 0, left: 0 })
   const ref = useRef(null)
 
-  // Position the menu next to the anchor button
   useEffect(() => {
     if (!anchorRef?.current) return
     const updatePos = () => {
@@ -28,43 +22,30 @@ export default function ProjectShareMenu({ projectId, projectName, teamId, onClo
       const menuHeight = 260
       let top = rect.top
       let left = rect.right + 8
-      if (left + menuWidth > window.innerWidth - 8) {
-        left = rect.left - menuWidth - 8
-      }
-      if (top + menuHeight > window.innerHeight - 8) {
-        top = Math.max(8, window.innerHeight - menuHeight - 8)
-      }
+      if (left + menuWidth > window.innerWidth - 8) left = rect.left - menuWidth - 8
+      if (top + menuHeight > window.innerHeight - 8) top = Math.max(8, window.innerHeight - menuHeight - 8)
       setPos({ top, left })
     }
     updatePos()
     window.addEventListener('resize', updatePos)
     window.addEventListener('scroll', updatePos, true)
-    return () => {
-      window.removeEventListener('resize', updatePos)
-      window.removeEventListener('scroll', updatePos, true)
-    }
+    return () => { window.removeEventListener('resize', updatePos); window.removeEventListener('scroll', updatePos, true) }
   }, [anchorRef])
 
-  // Close on outside click
   useEffect(() => {
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target) &&
-          !(anchorRef?.current && anchorRef.current.contains(e.target))) {
-        onClose?.()
-      }
+      if (ref.current && !ref.current.contains(e.target) && !(anchorRef?.current && anchorRef.current.contains(e.target))) onClose?.()
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [onClose, anchorRef])
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose?.() }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [onClose])
 
-  // Load team members and their access
   useEffect(() => {
     if (!teamId) return
     loadData()
@@ -73,24 +54,18 @@ export default function ProjectShareMenu({ projectId, projectName, teamId, onClo
   const loadData = async () => {
     setLoading(true)
     try {
-      // Get team members (exclude owner)
-      const { data: memberData } = await supabase
-        .from('team_members')
-        .select('user_id, invited_email, role, status, users:user_id(name, email)')
-        .eq('team_id', teamId)
-        .neq('user_id', user.id)
+      const memberData = await api.get(`/api/data/team-members?team_id=${teamId}`)
+      const filtered = (memberData || []).filter(m => m.user_id !== user.id)
 
-      // Get current access for this project
-      const { data: accessData } = await supabase
-        .from('project_access')
-        .select('user_id')
-        .eq('team_id', teamId)
-        .eq('project_id', projectId)
+      let accessData = []
+      try {
+        accessData = await api.get(`/api/data/project-access?teamId=${teamId}&projectId=${projectId}`)
+      } catch {}
 
       const accessMap = {}
-      ;(accessData || []).forEach(a => { accessMap[a.user_id] = true })
+      ;(Array.isArray(accessData) ? accessData : []).forEach(a => { accessMap[a.user_id] = true })
 
-      setMembers(memberData || [])
+      setMembers(filtered)
       setAccess(accessMap)
     } catch {} finally { setLoading(false) }
   }
@@ -111,7 +86,6 @@ export default function ProjectShareMenu({ projectId, projectName, teamId, onClo
 
   const activeMembers = members.filter(m => m.status === 'active' && m.user_id)
   const sharedCount = Object.keys(access).length
-
   const displayName = projectName?.length > 20 ? projectName.slice(0, 20) + '…' : projectName
 
   const menu = (

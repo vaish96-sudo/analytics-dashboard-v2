@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { useAuth } from './AuthContext'
+import { api } from '../lib/api'
 import * as projectService from '../lib/projectService'
 
 const ProjectContext = createContext(null)
@@ -19,7 +20,6 @@ export function ProjectProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [projectLoading, setProjectLoading] = useState(false)
 
-  // Load project list on mount / user change
   useEffect(() => {
     if (!user) {
       setProjects([])
@@ -43,7 +43,6 @@ export function ProjectProvider({ children }) {
       setProjects(list)
       setSharedProjects(shared)
 
-      // Restore last active project from localStorage
       const savedId = localStorage.getItem('nb_active_project')
       if (savedId && list.some(p => p.id === savedId)) {
         await selectProject(savedId)
@@ -110,7 +109,6 @@ export function ProjectProvider({ children }) {
     }
   }, [activeProjectId, activeProject])
 
-  // Dataset operations within active project
   const addDatasetToProject = useCallback(async ({ fileName, schemaDef, rowCount, rawData }) => {
     if (!activeProjectId) throw new Error('No active project')
 
@@ -121,7 +119,6 @@ export function ProjectProvider({ children }) {
       rawData,
     })
 
-    // Refresh project
     await selectProject(activeProjectId)
     return dataset
   }, [activeProjectId, selectProject])
@@ -131,24 +128,18 @@ export function ProjectProvider({ children }) {
     await selectProject(activeProjectId)
   }, [activeProjectId, selectProject])
 
-  // Check if the active project is a shared project (belongs to someone else)
   const isSharedView = activeProject && user && activeProject.user_id !== user.id
-  
-  // For shared projects, check the user's role via team_members
+
+  // Get shared role via API
   const [sharedRole, setSharedRole] = useState(null)
   useEffect(() => {
     if (!isSharedView || !user?.id) { setSharedRole(null); return }
-    import('../lib/supabase').then(({ supabase }) => {
-      supabase.from('team_members')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .single()
-        .then(({ data }) => setSharedRole(data?.role || 'viewer'))
-    })
+    // Fetch the user's team membership role from the API
+    api.get('/api/data/user-profile')
+      .then(profile => setSharedRole(profile?.role || 'viewer'))
+      .catch(() => setSharedRole('viewer'))
   }, [isSharedView, user?.id])
 
-  // canEdit: owner always can, shared users only if editor/admin
   const canEdit = !isSharedView || sharedRole === 'admin' || sharedRole === 'editor'
 
   return (

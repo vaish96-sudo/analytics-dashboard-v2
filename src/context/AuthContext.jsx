@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 
 const AuthContext = createContext(null)
 
@@ -46,11 +46,9 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const saved = loadSession()
     if (saved && saved.user) {
-      // Immediately restore from cache (no flash to login)
       setUser(saved.user)
       setSessionToken(saved.token)
       setLoading(false)
-      // Then validate in background
       validateSessionBackground(saved.token)
     } else {
       setLoading(false)
@@ -59,13 +57,11 @@ export function AuthProvider({ children }) {
 
   const validateSessionBackground = async (token) => {
     try {
-      const { data, error: err } = await supabase
-        .from('sessions')
-        .select('user_id, expires_at')
-        .eq('token', token)
-        .single()
+      const res = await fetch('/api/data/validate-session', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
 
-      if (err || !data || new Date(data.expires_at) < new Date()) {
+      if (!res.ok) {
         // Session expired — log out silently
         setUser(null)
         setSessionToken(null)
@@ -73,16 +69,10 @@ export function AuthProvider({ children }) {
         return
       }
 
-      // Refresh user data
-      const { data: userData, error: userErr } = await supabase
-        .from('users')
-        .select('id, email, name, company, avatar_url, email_verified')
-        .eq('id', data.user_id)
-        .single()
-
-      if (!userErr && userData) {
-        setUser(userData)
-        saveSession(token, userData)
+      const data = await res.json()
+      if (data.user) {
+        setUser(data.user)
+        saveSession(token, data.user)
       }
     } catch {
       // Network error — keep cached session, don't log out
@@ -131,7 +121,12 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     if (sessionToken) {
-      try { await supabase.from('sessions').delete().eq('token', sessionToken) } catch {}
+      try {
+        await fetch('/api/data/logout', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${sessionToken}` },
+        })
+      } catch {}
     }
     setUser(null)
     setSessionToken(null)
@@ -185,13 +180,16 @@ export function AuthProvider({ children }) {
     if (!user) return
     setError(null)
     try {
-      const { data, error: err } = await supabase
-        .from('users')
-        .update({ name: updates.name, company: updates.company, avatar_url: updates.avatar_url })
-        .eq('id', user.id)
-        .select('id, email, name, company, avatar_url, email_verified')
-        .single()
-      if (err) throw new Error(err.message)
+      const res = await fetch('/api/data/update-user', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({ name: updates.name, company: updates.company, avatar_url: updates.avatar_url }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Update failed')
       setUser(data)
       saveSession(sessionToken, data)
       return data

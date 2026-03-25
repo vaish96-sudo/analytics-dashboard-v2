@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useTier } from '../context/TierContext'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 import { Users, Check, X, Loader2 } from 'lucide-react'
 
 export default function PendingInvites() {
   const { user } = useAuth()
-  const { reloadProfile } = useTier()
+  const { reloadProfile, updateProfileField } = useTier()
   const [invites, setInvites] = useState([])
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(null)
@@ -18,30 +18,31 @@ export default function PendingInvites() {
 
   const loadInvites = async () => {
     try {
-      const { data } = await supabase
-        .from('team_members')
-        .select('id, team_id, role, invited_email, teams:team_id(name, owner_id)')
-        .eq('invited_email', user.email.toLowerCase())
-        .eq('status', 'pending')
-
-      setInvites(data || [])
+      // Use a dedicated pending-invites query — for now we check via team-members
+      // We need the server to support filtering by invited_email
+      // Workaround: fetch all team memberships and filter client-side
+      // Actually, we need a dedicated endpoint. Let's use a query param approach.
+      const res = await fetch(`/api/data/pending-invites`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('nb_session_token')}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setInvites(data || [])
+      }
     } catch {} finally { setLoading(false) }
   }
 
   const handleAccept = async (invite) => {
     setProcessing(invite.id)
     try {
-      // Update team_member status and link user_id
-      await supabase.from('team_members')
-        .update({ status: 'active', user_id: user.id })
-        .eq('id', invite.id)
+      await api.patch('/api/data/team-members', {
+        memberId: invite.id,
+        updates: { status: 'active' },
+      })
 
       // Update user profile with team_id
-      await supabase.from('user_profiles')
-        .update({ team_id: invite.team_id, role: invite.role })
-        .eq('id', user.id)
+      await updateProfileField({ team_id: invite.team_id, role: invite.role })
 
-      // Reload profile to get new team context
       reloadProfile?.()
       await loadInvites()
     } catch {} finally { setProcessing(null) }
@@ -50,9 +51,10 @@ export default function PendingInvites() {
   const handleDecline = async (invite) => {
     setProcessing(invite.id)
     try {
-      await supabase.from('team_members')
-        .update({ status: 'declined' })
-        .eq('id', invite.id)
+      await api.patch('/api/data/team-members', {
+        memberId: invite.id,
+        updates: { status: 'declined' },
+      })
       await loadInvites()
     } catch {} finally { setProcessing(null) }
   }
@@ -69,7 +71,7 @@ export default function PendingInvites() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-              Team invite: <strong>{inv.teams?.name || 'A team'}</strong>
+              Team invite: <strong>{inv.teams?.name || inv.team_name || 'A team'}</strong>
             </p>
             <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
               Role: {inv.role === 'admin' ? 'Admin' : inv.role === 'editor' ? 'Editor' : 'Viewer'}
