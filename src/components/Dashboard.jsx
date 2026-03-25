@@ -13,6 +13,7 @@ import CustomMetrics from './CustomMetrics'
 import GlobalFilterBar from './GlobalFilterBar'
 import UserProfile from './UserProfile'
 import ScheduledReports from './ScheduledReports'
+import TierBadge from './TierBadge'
 import LogoMark from './LogoMark'
 import {
   LayoutDashboard, Table2, Wand2, Sparkles,
@@ -60,15 +61,6 @@ function ThemeToggleFull() {
         </button>
       ))}
     </div>
-  )
-}
-
-function PremiumBadge() {
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold tracking-wide"
-      style={{ background: 'linear-gradient(135deg, #1c1917, #292524)', color: '#d4a574', border: '1px solid rgba(212, 165, 116, 0.2)', letterSpacing: '0.05em' }}>
-      <Crown className="w-2.5 h-2.5" style={{ color: '#c9956b' }} />Pro
-    </span>
   )
 }
 
@@ -200,7 +192,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
               <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>NORTHERN BIRD</span>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-[9px] font-display font-semibold tracking-[0.25em] uppercase" style={{ color: 'var(--accent)' }}>Analytics</span>
-                <PremiumBadge />
+                <TierBadge />
               </div>
             </div>
           </div>
@@ -289,7 +281,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
           <div className="flex items-center gap-2">
             <LogoMark className="w-7 h-7 object-contain" />
             <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>NORTHERN BIRD</span>
-            <PremiumBadge />
+            <TierBadge />
           </div>
           <div className="flex items-center gap-1">
             <button onClick={handleExportReport} disabled={exporting} className="p-2" style={{ color: 'var(--accent)' }} title="Export report">

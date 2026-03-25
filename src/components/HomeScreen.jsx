@@ -1,12 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import LogoMark from './LogoMark'
 import { useAuth } from '../context/AuthContext'
 import { useProject } from '../context/ProjectContext'
 import { useTheme } from '../context/ThemeContext'
+import { useTier } from '../context/TierContext'
 import {
   FolderOpen, FolderPlus, Upload, FileSpreadsheet, Globe, LogOut,
   ChevronRight, Loader2, Search, Database, MessageSquare, Lightbulb, Sun, Moon, Monitor,
-  Crown, Menu, X, User, Settings, Trash2, ChevronDown, Plus
+  Crown, Menu, X, User, Settings, Trash2, ChevronDown, Plus, Users, Building2
 } from 'lucide-react'
 
 function getGreeting() {
@@ -34,6 +35,8 @@ function timeAgo(dateStr) {
 const PROJECT_COLORS = ['bg-blue-500', 'bg-emerald-500', 'bg-orange-500', 'bg-purple-500', 'bg-pink-500', 'bg-teal-500']
 const FOLDER_COLORS = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899', '#14b8a6']
 
+import TierBadge from './TierBadge'
+
 function ThemeToggle() {
   const { mode, setTheme } = useTheme()
   const options = [
@@ -55,36 +58,41 @@ function ThemeToggle() {
   )
 }
 
-function PremiumBadge() {
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold tracking-wide"
-      style={{
-        background: 'linear-gradient(135deg, #1c1917, #292524)',
-        color: '#d4a574',
-        border: '1px solid rgba(212, 165, 116, 0.2)',
-        letterSpacing: '0.05em',
-      }}>
-      <Crown className="w-2.5 h-2.5" style={{ color: '#c9956b' }} />
-      Pro
-    </span>
-  )
-}
-
 export default function HomeScreen({ onOpenProject, onNewProject, onSettings, onShowChats, onShowInsights }) {
   const { user, logout } = useAuth()
   const { projects, loading, deleteProject } = useProject()
+  const { tier } = useTier()
   const [searchQuery, setSearchQuery] = useState('')
   const [activeView, setActiveView] = useState(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [chatCount, setChatCount] = useState(null)
   const [insightCount, setInsightCount] = useState(null)
   const [expandedProjects, setExpandedProjects] = useState({})
+  const [expandedClients, setExpandedClients] = useState({})
   const projectsRef = useRef(null)
   const menuRef = useRef(null)
+
+  const isAgency = tier === 'agency'
 
   const toggleProject = (id) => {
     setExpandedProjects(prev => ({ ...prev, [id]: !prev[id] }))
   }
+
+  const toggleClient = (name) => {
+    setExpandedClients(prev => ({ ...prev, [name]: !prev[name] }))
+  }
+
+  // Group projects by client_name for Agency tier
+  const clientGroups = useMemo(() => {
+    if (!isAgency) return null
+    const groups = {}
+    projects.forEach(p => {
+      const client = p.client_name || 'Uncategorized'
+      if (!groups[client]) groups[client] = []
+      groups[client].push(p)
+    })
+    return groups
+  }, [projects, isAgency])
 
   const userName = user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'there'
   const initials = (user?.name || user?.email || '?')[0].toUpperCase()
@@ -142,7 +150,7 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
               <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>NORTHERN BIRD</span>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-[9px] font-display font-semibold tracking-[0.25em] uppercase" style={{ color: 'var(--accent)' }}>Analytics</span>
-                <PremiumBadge />
+                <TierBadge />
               </div>
             </div>
           </div>
@@ -157,7 +165,9 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
         </div>
 
         <div className="flex-1 overflow-y-auto p-3">
-          <p className="text-[10px] font-medium uppercase tracking-wider px-2 mb-2" style={{ color: 'var(--text-muted)' }}>Projects</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider px-2 mb-2" style={{ color: 'var(--text-muted)' }}>
+            {isAgency ? 'Clients & Projects' : 'Projects'}
+          </p>
           <div className="space-y-0.5">
             {loading ? (
               <div className="flex items-center justify-center py-8">
@@ -165,13 +175,76 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
               </div>
             ) : projects.length === 0 ? (
               <p className="text-xs px-2 py-4" style={{ color: 'var(--text-muted)' }}>No projects yet</p>
+            ) : isAgency && clientGroups ? (
+              /* Agency view: projects grouped by client */
+              Object.entries(clientGroups).map(([clientName, clientProjects]) => {
+                const isClientExpanded = expandedClients[clientName] !== false
+                return (
+                  <div key={clientName} className="mb-1">
+                    <button onClick={() => toggleClient(clientName)}
+                      className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-left transition-colors"
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <ChevronRight className={`w-3 h-3 shrink-0 transition-transform ${isClientExpanded ? 'rotate-90' : ''}`} style={{ color: 'var(--text-muted)' }} />
+                      <Building2 className="w-3.5 h-3.5 shrink-0" style={{ color: '#8b5cf6' }} />
+                      <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{clientName}</span>
+                      <span className="text-[9px] ml-auto shrink-0" style={{ color: 'var(--text-muted)' }}>{clientProjects.length}</span>
+                    </button>
+                    {isClientExpanded && (
+                      <div className="ml-4 pl-2 space-y-0.5" style={{ borderLeft: '2px solid rgba(139, 92, 246, 0.2)' }}>
+                        {clientProjects.map((p, i) => {
+                          const ds = p.datasets || []
+                          const isExpanded = expandedProjects[p.id]
+                          return (
+                            <div key={p.id}>
+                              <div className="group flex items-center gap-0.5 rounded-lg transition-colors"
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <button onClick={() => toggleProject(p.id)}
+                                  className="p-1 shrink-0" style={{ color: 'var(--text-muted)' }}>
+                                  <ChevronRight className={`w-2.5 h-2.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                </button>
+                                <button onClick={() => onOpenProject(p.id)}
+                                  className="flex-1 flex items-center gap-2 py-1.5 pr-1 text-left min-w-0">
+                                  <FolderOpen className="w-3 h-3 shrink-0" style={{ color: FOLDER_COLORS[i % FOLDER_COLORS.length] }} />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</p>
+                                    <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{ds.length} files · {timeAgo(p.updated_at)}</p>
+                                  </div>
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this project?')) deleteProject(p.id) }}
+                                  className="p-1 mr-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0" style={{ color: 'var(--text-muted)' }}>
+                                  <Trash2 className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
+                              {isExpanded && (
+                                <div className="ml-4 pl-2 space-y-0.5" style={{ borderLeft: '1px solid var(--border-light)' }}>
+                                  {ds.map(d => (
+                                    <button key={d.id} onClick={() => onOpenProject(p.id)}
+                                      className="w-full flex items-center gap-2 px-2 py-1 rounded-md text-left transition-colors"
+                                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
+                                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                      <FileSpreadsheet className="w-2.5 h-2.5 shrink-0" style={{ color: '#10b981' }} />
+                                      <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{d.file_name}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
             ) : (
+              /* Standard view: flat project list */
               projects.slice(0, 15).map((p, i) => {
                 const ds = p.datasets || []
                 const isExpanded = expandedProjects[p.id]
                 return (
                   <div key={p.id}>
-                    {/* Project folder row */}
                     <div className="group flex items-center gap-0.5 rounded-lg transition-colors"
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -192,7 +265,6 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                         <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
-                    {/* Expanded datasets */}
                     {isExpanded && (
                       <div className="ml-5 pl-2 space-y-0.5" style={{ borderLeft: '1px solid var(--border-light)' }}>
                         {ds.map(d => (
@@ -247,7 +319,7 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
           <div className="flex items-center gap-2">
             <LogoMark className="w-7 h-7 object-contain" />
             <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>NORTHERN BIRD</span>
-            <PremiumBadge />
+            <TierBadge />
           </div>
           <div className="flex items-center gap-1">
             <button onClick={onNewProject} className="p-2 rounded-lg" style={{ color: 'var(--accent)' }}>

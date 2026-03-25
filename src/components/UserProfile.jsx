@@ -193,8 +193,8 @@ export default function UserProfile() {
             ))}
           </div>
 
-          {/* Upgrade prompt for non-enterprise */}
-          {tier !== 'enterprise' && (
+          {/* Upgrade prompt for non-agency */}
+          {tier !== 'agency' && (
             <div className="p-4 rounded-xl text-center" style={{ background: 'linear-gradient(135deg, rgba(28,25,23,0.03), rgba(41,37,36,0.06))', border: '1px solid var(--border)' }}>
               <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Need more? Upgrade your plan for higher limits and premium features.</p>
               <button className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-display font-semibold text-white" style={{ background: 'var(--accent)' }}>

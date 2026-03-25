@@ -179,7 +179,7 @@ export default function AIRecommendations() {
 
   // Blurred preview for tiers without recommendations access
   const showPreview = !hasRemaining('recommendationsRuns') && (recommendations?.length || 0) === 0
-  const isLocked = !can('showRecommendationsPreview') === false && !hasRemaining('recommendationsRuns') && tier !== 'pro' && tier !== 'agency' && tier !== 'enterprise'
+  const isLocked = tier === 'free' && !hasRemaining('recommendationsRuns')
 
   const fetchRecommendations = async () => {
     if (!schema || !rawData) return

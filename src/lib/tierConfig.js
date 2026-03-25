@@ -1,4 +1,5 @@
 // ─── Tier Configuration ─────────────────────────────────────────
+// 3 tiers: Free (get hooked) → Pro (power user) → Agency (multi-client)
 // -1 = unlimited
 
 export const TIER_CONFIG = {
@@ -15,28 +16,6 @@ export const TIER_CONFIG = {
     customMetrics: false,
     exportPdf: false,
     exportWord: false,
-    exportExcel: true,
-    scheduledReports: false,
-    teamSeats: 0,
-    whiteLabel: false,
-    customPlaybook: false,
-    connectors: false,
-    clientPortal: false,
-    showRecommendationsPreview: true,
-  },
-  starter: {
-    label: 'Starter',
-    price: 29,
-    maxProjects: 5,
-    maxDatasets: 5,
-    maxRowsPerDataset: 50000,
-    askAiQueries: 50,
-    insightsRuns: 5,
-    recommendationsRuns: 0,
-    aiSuggestRuns: 10,
-    customMetrics: true,
-    exportPdf: true,
-    exportWord: true,
     exportExcel: true,
     scheduledReports: false,
     teamSeats: 0,
@@ -65,7 +44,7 @@ export const TIER_CONFIG = {
     whiteLabel: false,
     customPlaybook: false,
     connectors: true,
-    clientPortal: true,
+    clientPortal: false,
     showRecommendationsPreview: false,
   },
   agency: {
@@ -90,28 +69,6 @@ export const TIER_CONFIG = {
     clientPortal: true,
     showRecommendationsPreview: false,
   },
-  enterprise: {
-    label: 'Enterprise',
-    price: 1250,
-    maxProjects: -1,
-    maxDatasets: -1,
-    maxRowsPerDataset: -1,
-    askAiQueries: -1,
-    insightsRuns: -1,
-    recommendationsRuns: -1,
-    aiSuggestRuns: -1,
-    customMetrics: true,
-    exportPdf: true,
-    exportWord: true,
-    exportExcel: true,
-    scheduledReports: true,
-    teamSeats: 10,
-    whiteLabel: true,
-    customPlaybook: true,
-    connectors: true,
-    clientPortal: true,
-    showRecommendationsPreview: false,
-  },
 }
 
 /** Check if a boolean feature is enabled for a tier */
@@ -129,11 +86,11 @@ export function getLimit(tier, key) {
 /** Check if current usage is within the tier limit */
 export function withinLimit(tier, key, currentUsage) {
   const limit = getLimit(tier, key)
-  if (limit === -1) return true // unlimited
+  if (limit === -1) return true
   return currentUsage < limit
 }
 
-/** Display string for a limit (-1 → "Unlimited", 0 → "—") */
+/** Display string for a limit */
 export function limitDisplay(tier, key) {
   const limit = getLimit(tier, key)
   if (limit === -1) return 'Unlimited'
@@ -147,9 +104,9 @@ export function getTierConfig(tier) {
 }
 
 /** All tier keys in order */
-export const TIER_ORDER = ['free', 'starter', 'pro', 'agency', 'enterprise']
+export const TIER_ORDER = ['free', 'pro', 'agency']
 
-/** Get the next tier up (for upgrade prompts) */
+/** Get the next tier up */
 export function getNextTier(currentTier) {
   const idx = TIER_ORDER.indexOf(currentTier)
   if (idx === -1 || idx >= TIER_ORDER.length - 1) return null
