@@ -1,0 +1,98 @@
+import React, { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
+import { useTier } from '../context/TierContext'
+import { supabase } from '../lib/supabase'
+import { Users, Check, X, Loader2 } from 'lucide-react'
+
+export default function PendingInvites() {
+  const { user } = useAuth()
+  const { reloadProfile } = useTier()
+  const [invites, setInvites] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [processing, setProcessing] = useState(null)
+
+  useEffect(() => {
+    if (!user?.email) { setLoading(false); return }
+    loadInvites()
+  }, [user?.email])
+
+  const loadInvites = async () => {
+    try {
+      const { data } = await supabase
+        .from('team_members')
+        .select('id, team_id, role, invited_email, teams:team_id(name, owner_id)')
+        .eq('invited_email', user.email.toLowerCase())
+        .eq('status', 'pending')
+
+      setInvites(data || [])
+    } catch {} finally { setLoading(false) }
+  }
+
+  const handleAccept = async (invite) => {
+    setProcessing(invite.id)
+    try {
+      // Update team_member status and link user_id
+      await supabase.from('team_members')
+        .update({ status: 'active', user_id: user.id })
+        .eq('id', invite.id)
+
+      // Update user profile with team_id
+      await supabase.from('user_profiles')
+        .update({ team_id: invite.team_id, role: invite.role })
+        .eq('id', user.id)
+
+      // Reload profile to get new team context
+      reloadProfile?.()
+      await loadInvites()
+    } catch {} finally { setProcessing(null) }
+  }
+
+  const handleDecline = async (invite) => {
+    setProcessing(invite.id)
+    try {
+      await supabase.from('team_members')
+        .update({ status: 'declined' })
+        .eq('id', invite.id)
+      await loadInvites()
+    } catch {} finally { setProcessing(null) }
+  }
+
+  if (loading || invites.length === 0) return null
+
+  return (
+    <div className="space-y-2 mb-4">
+      {invites.map(inv => (
+        <div key={inv.id} className="flex items-center gap-3 p-3 rounded-xl animate-slide-up"
+          style={{ background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(99, 102, 241, 0.05))', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(139, 92, 246, 0.15)' }}>
+            <Users className="w-4 h-4" style={{ color: '#8b5cf6' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+              Team invite: <strong>{inv.teams?.name || 'A team'}</strong>
+            </p>
+            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              Role: {inv.role === 'admin' ? 'Admin' : inv.role === 'editor' ? 'Editor' : 'Viewer'}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {processing === inv.id ? (
+              <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--accent)' }} />
+            ) : (
+              <>
+                <button onClick={() => handleAccept(inv)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-white" style={{ background: '#8b5cf6' }}>
+                  <Check className="w-3 h-3" /> Accept
+                </button>
+                <button onClick={() => handleDecline(inv)}
+                  className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }}>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}

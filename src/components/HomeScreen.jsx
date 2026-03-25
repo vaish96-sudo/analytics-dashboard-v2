@@ -36,6 +36,7 @@ const PROJECT_COLORS = ['bg-blue-500', 'bg-emerald-500', 'bg-orange-500', 'bg-pu
 const FOLDER_COLORS = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899', '#14b8a6']
 
 import TierBadge from './TierBadge'
+import PendingInvites from './PendingInvites'
 
 function ThemeToggle() {
   const { mode, setTheme } = useTheme()
@@ -463,6 +464,9 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
               Here's your analytics overview.
             </p>
           </div>
+
+          {/* Pending team invites */}
+          <PendingInvites />
 
           {/* Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8 animate-slide-up">

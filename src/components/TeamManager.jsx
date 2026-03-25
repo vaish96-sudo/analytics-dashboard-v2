@@ -73,6 +73,22 @@ export default function TeamManager() {
         invited_email: inviteEmail.toLowerCase().trim(),
       })
       if (err) throw err
+
+      // Send invite email
+      const sessionToken = localStorage.getItem('nb_session_token')
+      try {
+        await fetch('/api/auth/send-invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+          body: JSON.stringify({
+            to_email: inviteEmail.toLowerCase().trim(),
+            team_name: team.name,
+            inviter_name: user.name || user.email,
+            role: inviteRole,
+          }),
+        })
+      } catch { /* Email failure shouldn't block the invite creation */ }
+
       setInviteEmail('')
       await loadTeam()
     } catch (err) { setError(err.message) } finally { setInviting(false) }
