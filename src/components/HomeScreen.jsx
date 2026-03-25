@@ -37,6 +37,7 @@ const FOLDER_COLORS = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899', '#
 
 import TierBadge from './TierBadge'
 import PendingInvites from './PendingInvites'
+import ClientShareMenu from './ClientShareMenu'
 
 function ThemeToggle() {
   const { mode, setTheme } = useTheme()
@@ -62,7 +63,7 @@ function ThemeToggle() {
 export default function HomeScreen({ onOpenProject, onNewProject, onSettings, onShowChats, onShowInsights }) {
   const { user, logout } = useAuth()
   const { projects, sharedProjects, loading, deleteProject, renameProject } = useProject()
-  const { tier } = useTier()
+  const { tier, profile } = useTier()
   const [searchQuery, setSearchQuery] = useState('')
   const [activeView, setActiveView] = useState(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -76,6 +77,7 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
   const [editingClientName, setEditingClientName] = useState('')
   const [dragProjectId, setDragProjectId] = useState(null)
   const [dropTarget, setDropTarget] = useState(null)
+  const [shareMenuClient, setShareMenuClient] = useState(null)
   const projectsRef = useRef(null)
   const menuRef = useRef(null)
 
@@ -286,7 +288,7 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                 const isClientExpanded = expandedClients[clientName] !== false
                 const isEditingClient = editingClientOld === clientName
                 return (
-                  <div key={clientName} className="mb-1"
+                  <div key={clientName} className="mb-1 group/client"
                     onDragOver={(e) => handleDragOver(e, clientName)}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, clientName)}
@@ -300,16 +302,29 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                           className="flex-1 text-xs font-semibold px-1 py-0.5 rounded nb-input" />
                       </div>
                     ) : (
-                      <button onClick={() => toggleClient(clientName)}
-                        onDoubleClick={(e) => { e.stopPropagation(); setEditingClientOld(clientName); setEditingClientName(clientName) }}
-                        className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-left transition-colors"
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                        <ChevronRight className={`w-3 h-3 shrink-0 transition-transform ${isClientExpanded ? 'rotate-90' : ''}`} style={{ color: 'var(--text-muted)' }} />
-                        <Building2 className="w-3.5 h-3.5 shrink-0" style={{ color: '#8b5cf6' }} />
-                        <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{clientName}</span>
-                        <span className="text-[9px] ml-auto shrink-0" style={{ color: 'var(--text-muted)' }}>{clientProjects.length}</span>
-                      </button>
+                      <div className="relative flex items-center">
+                        <button onClick={() => toggleClient(clientName)}
+                          onDoubleClick={(e) => { e.stopPropagation(); setEditingClientOld(clientName); setEditingClientName(clientName) }}
+                          className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-left transition-colors"
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-overlay)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <ChevronRight className={`w-3 h-3 shrink-0 transition-transform ${isClientExpanded ? 'rotate-90' : ''}`} style={{ color: 'var(--text-muted)' }} />
+                          <Building2 className="w-3.5 h-3.5 shrink-0" style={{ color: '#8b5cf6' }} />
+                          <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{clientName}</span>
+                          <span className="text-[9px] ml-auto shrink-0" style={{ color: 'var(--text-muted)' }}>{clientProjects.length}</span>
+                        </button>
+                        {profile?.team_id && (
+                          <button onClick={(e) => { e.stopPropagation(); setShareMenuClient(shareMenuClient === clientName ? null : clientName) }}
+                            className="p-1 rounded opacity-40 hover:opacity-100 transition-opacity shrink-0 mr-1"
+                            style={{ color: shareMenuClient === clientName ? '#8b5cf6' : 'var(--text-muted)' }}
+                            title={`Share "${clientName}" with team members`}>
+                            <Users className="w-3 h-3" />
+                          </button>
+                        )}
+                        {shareMenuClient === clientName && profile?.team_id && (
+                          <ClientShareMenu clientName={clientName} teamId={profile.team_id} onClose={() => setShareMenuClient(null)} />
+                        )}
+                      </div>
                     )}
                     {isClientExpanded && (
                       <div className="ml-4 pl-2 space-y-0.5" style={{ borderLeft: '2px solid rgba(139, 92, 246, 0.2)' }}>

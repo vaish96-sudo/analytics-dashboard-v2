@@ -35,7 +35,7 @@ export async function listProjects(userId) {
   return data || []
 }
 
-// Load projects shared with user via team membership
+// Load projects shared with user via client-level access
 export async function listSharedProjects(userId) {
   // Find teams this user belongs to
   const { data: memberships } = await supabase
@@ -46,7 +46,6 @@ export async function listSharedProjects(userId) {
 
   if (!memberships || memberships.length === 0) return []
 
-  // Find team owners
   const teamIds = memberships.map(m => m.team_id)
   const { data: teams } = await supabase
     .from('teams')
@@ -55,11 +54,17 @@ export async function listSharedProjects(userId) {
 
   if (!teams || teams.length === 0) return []
 
-  // Load projects from team owners (excluding user's own)
+  // Check for client-level access
+  const { data: accessRules } = await supabase
+    .from('client_access')
+    .select('client_name, team_id')
+    .eq('user_id', userId)
+
   const ownerIds = teams.map(t => t.owner_id).filter(id => id !== userId)
   if (ownerIds.length === 0) return []
 
-  const { data: projects } = await supabase
+  // Load all projects from team owners
+  const { data: allProjects } = await supabase
     .from('projects')
     .select(`
       id, name, client_name, user_id, data_source_type, data_source_meta, created_at, updated_at,
@@ -68,7 +73,46 @@ export async function listSharedProjects(userId) {
     .in('user_id', ownerIds)
     .order('updated_at', { ascending: false })
 
-  return (projects || []).map(p => ({ ...p, _shared: true, _teamName: teams.find(t => t.owner_id === p.user_id)?.name }))
+  if (!allProjects) return []
+
+  // If client_access rules exist, filter to only accessible clients
+  // If no rules exist (legacy), show everything (backward compatible)
+  let filtered = allProjects
+  if (accessRules && accessRules.length > 0) {
+    const accessibleClients = new Set(accessRules.map(r => r.client_name))
+    filtered = allProjects.filter(p => accessibleClients.has(p.client_name || 'Uncategorized'))
+  }
+
+  return filtered.map(p => ({ ...p, _shared: true, _teamName: teams.find(t => t.owner_id === p.user_id)?.name }))
+}
+
+// Get client names that a team member has access to
+export async function getClientAccess(userId, teamId) {
+  const { data } = await supabase
+    .from('client_access')
+    .select('client_name')
+    .eq('user_id', userId)
+    .eq('team_id', teamId)
+  return (data || []).map(r => r.client_name)
+}
+
+// Grant a team member access to a client folder
+export async function grantClientAccess(teamId, userId, clientName) {
+  const { error } = await supabase.from('client_access').insert({
+    team_id: teamId,
+    user_id: userId,
+    client_name: clientName,
+  })
+  if (error && !error.message.includes('duplicate')) throw error
+}
+
+// Revoke a team member's access to a client folder
+export async function revokeClientAccess(teamId, userId, clientName) {
+  await supabase.from('client_access')
+    .delete()
+    .eq('team_id', teamId)
+    .eq('user_id', userId)
+    .eq('client_name', clientName)
 }
 
 export async function getProject(projectId) {
