@@ -131,6 +131,26 @@ export function ProjectProvider({ children }) {
     await selectProject(activeProjectId)
   }, [activeProjectId, selectProject])
 
+  // Check if the active project is a shared project (belongs to someone else)
+  const isSharedView = activeProject && user && activeProject.user_id !== user.id
+  
+  // For shared projects, check the user's role via team_members
+  const [sharedRole, setSharedRole] = useState(null)
+  useEffect(() => {
+    if (!isSharedView || !user?.id) { setSharedRole(null); return }
+    import('../lib/supabase').then(({ supabase }) => {
+      supabase.from('team_members')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .single()
+        .then(({ data }) => setSharedRole(data?.role || 'viewer'))
+    })
+  }, [isSharedView, user?.id])
+
+  // canEdit: owner always can, shared users only if editor/admin
+  const canEdit = !isSharedView || sharedRole === 'admin' || sharedRole === 'editor'
+
   return (
     <ProjectContext.Provider value={{
       projects,
@@ -146,6 +166,9 @@ export function ProjectProvider({ children }) {
       renameProject,
       addDatasetToProject,
       removeDatasetFromProject,
+      isSharedView,
+      sharedRole,
+      canEdit,
     }}>
       {children}
     </ProjectContext.Provider>

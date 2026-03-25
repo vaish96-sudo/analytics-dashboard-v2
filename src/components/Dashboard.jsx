@@ -4,7 +4,7 @@ import { useProject } from '../context/ProjectContext'
 import { useTheme } from '../context/ThemeContext'
 import { exportDashboardReport } from '../utils/exportService'
 import KPICards, { useKPIData, SingleKPICard } from './KPICards'
-import AutoCharts from './AutoCharts'
+import AutoCharts, { ChartCard, useAutoChartData } from './AutoCharts'
 import DataTable from './DataTable'
 import ReportBuilder from './ReportBuilder'
 import AIHub from './AIHub'
@@ -19,7 +19,7 @@ import LogoMark from './LogoMark'
 import {
   LayoutDashboard, Table2, Wand2, Sparkles,
   FileSpreadsheet, Upload, ChevronRight, Settings, Menu, X, ChevronDown,
-  Plus, Trash2, LogOut, Home, Sun, Moon, Monitor, FileDown, Crown, Loader2, FolderOpen
+  Plus, Trash2, LogOut, Home, Sun, Moon, Monitor, FileDown, Crown, Loader2, FolderOpen, Users
 } from 'lucide-react'
 
 const TABS = [
@@ -67,7 +67,7 @@ function ThemeToggleFull() {
 
 function ProjectSwitcher({ onGoHome }) {
   const { datasets, activeDatasetId, switchDataset, removeDataset, setStep } = useData()
-  const { projects, activeProject, selectProject } = useProject()
+  const { projects, activeProject, selectProject, canEdit } = useProject()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   useEffect(() => { const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h) }, [])
@@ -98,7 +98,7 @@ function ProjectSwitcher({ onGoHome }) {
                 {datasets.map(ds => (
                   <div key={ds.id} className="flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer" style={{ color: ds.id === activeDatasetId ? 'var(--accent)' : 'var(--text-secondary)', background: ds.id === activeDatasetId ? 'var(--border-accent)' : 'transparent' }}>
                     <button onClick={() => { switchDataset(ds.id); setOpen(false) }} className="flex-1 text-left truncate">{ds.fileName}</button>
-                    {datasets.length > 1 && <button onClick={(e) => { e.stopPropagation(); removeDataset(ds.id) }} className="p-1 shrink-0 hover:text-red-500" style={{ color: 'var(--text-muted)' }}><Trash2 className="w-3 h-3" /></button>}
+                    {canEdit && datasets.length > 1 && <button onClick={(e) => { e.stopPropagation(); removeDataset(ds.id) }} className="p-1 shrink-0 hover:text-red-500" style={{ color: 'var(--text-muted)' }}><Trash2 className="w-3 h-3" /></button>}
                   </div>
                 ))}
               </div>
@@ -137,7 +137,7 @@ function ProjectSwitcher({ onGoHome }) {
 
 export default function Dashboard({ user, onLogout, onNewProject, onGoHome, initialConversationId, onConversationConsumed }) {
   const { rowCount, columnsByType, setStep, datasets, activeTab, setActiveTab, rawData, schema, fileName, globalFilters, insights, reportBuilderState } = useData()
-  const { activeProject, projects, selectProject } = useProject()
+  const { activeProject, projects, selectProject, canEdit, isSharedView } = useProject()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activeConversationId, setActiveConversationId] = useState(null)
   const [exporting, setExporting] = useState(false)
@@ -348,6 +348,13 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
               </h1>
             )}
           </div>
+          {isSharedView && (
+            <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg text-xs"
+              style={{ background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.2)', color: '#8b5cf6' }}>
+              <Users className="w-3.5 h-3.5 shrink-0" />
+              <span>Shared project{!canEdit ? ' — view only' : ''}</span>
+            </div>
+          )}
           {showFilterBar && <GlobalFilterBar />}
           <div className="space-y-4 lg:space-y-6">
             {activeTab === 'overview' && <OverviewGrid />}
@@ -375,9 +382,10 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
   )
 }
 
-/** Overview tab: individual KPI cards + chart sections in one draggable grid */
+/** Overview tab: individual KPI cards + individual charts in one draggable grid */
 function OverviewGrid() {
   const kpis = useKPIData()
+  const chartData = useAutoChartData()
   const { widgetOrder, updateDatasetState } = useData()
   const hiddenWidgets = Array.isArray(widgetOrder) ? [] : (widgetOrder?.hidden || [])
 
@@ -388,8 +396,15 @@ function OverviewGrid() {
     updateDatasetState('widget_order', { order: orderArr, hidden: next })
   }
 
-  // Filter out hidden widgets
   const isHidden = (id) => hiddenWidgets.includes(id)
+
+  // Build friendly label for hidden widget restore buttons
+  const friendlyName = (id) => {
+    if (id.startsWith('kpi-')) return id.replace('kpi-', '')
+    if (id.startsWith('chart-')) return `Chart ${parseInt(id.replace('chart-', '')) + 1}`
+    if (id === 'ai-chart-builder') return 'AI Visual Builder'
+    return id
+  }
 
   return (
     <>
@@ -398,14 +413,15 @@ function OverviewGrid() {
           <span className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'var(--text-muted)' }}>Hidden:</span>
           {hiddenWidgets.map(id => (
             <button key={id} onClick={() => toggleHide(id)}
-              className="text-[10px] px-2 py-1 rounded-lg transition-colors"
+              className="text-[10px] px-2 py-1 rounded-lg transition-colors hover:opacity-80"
               style={{ background: 'var(--bg-overlay)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
-              + {id.replace('kpi-', '').replace('auto-charts', 'Charts').replace('ai-chart-builder', 'AI Charts')}
+              + {friendlyName(id)}
             </button>
           ))}
         </div>
       )}
       <DraggableWidgets storageKey="widget_order" onHide={toggleHide}>
+        {/* Individual KPI cards */}
         {kpis.map((kpi, i) => (
           !isHidden(`kpi-${kpi.col}`) && (
             <div key={`kpi-${kpi.col}`} data-widget-id={`kpi-${kpi.col}`} data-widget-size="small">
@@ -413,12 +429,32 @@ function OverviewGrid() {
             </div>
           )
         )).filter(Boolean)}
+
+        {/* AI Chart Builder */}
         {!isHidden('ai-chart-builder') && (
           <div data-widget-id="ai-chart-builder" data-widget-size="large"><AIChartBuilder /></div>
         )}
-        {!isHidden('auto-charts') && (
-          <div data-widget-id="auto-charts" data-widget-size="large"><AutoCharts /></div>
-        )}
+
+        {/* Individual auto-generated charts */}
+        {chartData.charts.map((ch, i) => (
+          !isHidden(`chart-${i}`) && (
+            <div key={`chart-${chartData.activeDatasetId}-${i}`} data-widget-id={`chart-${i}`} data-widget-size="medium">
+              <ChartCard
+                index={i}
+                defaultType={ch.type}
+                defaultDim={ch.dim}
+                defaultMet={ch.met}
+                savedState={chartData.chartsState[i]}
+                onStateChange={chartData.handleChartStateChange}
+                onBarClick={chartData.handleBarClick}
+                globalFilters={chartData.globalFilters}
+                schema={chartData.schema}
+                columnsByType={chartData.columnsByType}
+                aggregate={chartData.aggregate}
+              />
+            </div>
+          )
+        )).filter(Boolean)}
       </DraggableWidgets>
     </>
   )

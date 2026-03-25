@@ -287,3 +287,76 @@ Respond with ONLY a JSON array (no markdown, no backticks):
     </div>
   )
 }
+
+/** Hook: returns chart configs and all props needed to render individual ChartCards */
+export function useAutoChartData() {
+  const { rawData, schema, columnsByType, aggregate, activeDatasetId, updateDatasetState, globalFilters, setGlobalFilters, chartsState } = useData()
+  const [aiChartConfigs, setAiChartConfigs] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const aiRequestedRef = useRef(null)
+  const userModifiedRef = useRef(false)
+
+  const handleChartStateChange = useCallback((index, state) => {
+    userModifiedRef.current = true
+    updateDatasetState('chartsState', { ...chartsState, [index]: state })
+  }, [chartsState, updateDatasetState])
+
+  const dimCardinalities = useMemo(() => {
+    if (!rawData || !columnsByType) return {}
+    const result = {}
+    const allDims = [...columnsByType.dimensions, ...columnsByType.dates]
+    allDims.forEach(dim => { result[dim] = new Set(rawData.map(r => r[dim])).size })
+    return result
+  }, [rawData, columnsByType])
+
+  const basicCharts = useMemo(() => {
+    if (!rawData || !schema) return []
+    const { dimensions, metrics, dates } = columnsByType
+    const c = []
+    const rankedDims = [...dimensions].sort((a, b) => {
+      const ca = dimCardinalities[a] || 0, cb = dimCardinalities[b] || 0
+      const scoreA = ca >= 2 && ca <= 15 ? 100 - Math.abs(ca - 6) : ca > 15 ? 20 : 0
+      const scoreB = cb >= 2 && cb <= 15 ? 100 - Math.abs(cb - 6) : cb > 15 ? 20 : 0
+      return scoreB - scoreA
+    }).filter(d => (dimCardinalities[d] || 0) >= 2)
+    const rankedDates = dates.filter(d => (dimCardinalities[d] || 0) >= 2)
+    if (rankedDims[0] && metrics[0]) c.push({ type: 'bar', dim: rankedDims[0], met: metrics[0] })
+    if (rankedDates[0] && metrics[0]) c.push({ type: 'line', dim: rankedDates[0], met: metrics[0] })
+    if (rankedDims[0] && metrics[0] && (dimCardinalities[rankedDims[0]] || 0) <= 8) c.push({ type: 'pie', dim: rankedDims[0], met: metrics[0] })
+    else if (rankedDims[1] && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[1], met: metrics[1] })
+    if (rankedDims.length > 1 && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[1], met: metrics[1] })
+    else if (rankedDims[0] && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[0], met: metrics[1] })
+    const seen = new Set()
+    return c.filter(ch => { const key = `${ch.dim}-${ch.met}-${ch.type}`; if (seen.has(key)) return false; seen.add(key); return true }).slice(0, 4)
+  }, [rawData, schema, columnsByType, dimCardinalities])
+
+  const handleBarClick = useCallback((dimension, value) => {
+    setGlobalFilters(prev => {
+      const current = prev[dimension] || []
+      if (current.includes(value)) {
+        const next = current.filter(v => v !== value)
+        const result = { ...prev }
+        if (next.length === 0) delete result[dimension]
+        else result[dimension] = next
+        return result
+      } else {
+        return { ...prev, [dimension]: [value] }
+      }
+    })
+  }, [setGlobalFilters])
+
+  const charts = aiChartConfigs || basicCharts
+
+  return {
+    charts,
+    chartsState,
+    handleChartStateChange,
+    handleBarClick,
+    globalFilters,
+    schema,
+    columnsByType,
+    aggregate,
+    activeDatasetId,
+    aiLoading,
+  }
+}
