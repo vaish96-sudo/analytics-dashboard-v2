@@ -3,7 +3,7 @@ import { useData } from '../context/DataContext'
 import LogoMark from './LogoMark'
 import { FileSpreadsheet, Loader2, ArrowLeft, RefreshCw, Search, AlertCircle } from 'lucide-react'
 
-export default function GoogleSheetsPicker({ accessToken, onBack }) {
+export default function GoogleSheetsPicker({ accessToken, onBack, onDone }) {
   const { loadData } = useData()
   const [sheets, setSheets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -55,6 +55,8 @@ export default function GoogleSheetsPicker({ accessToken, onBack }) {
         throw new Error('The spreadsheet appears to be empty.')
       }
       loadData(data.rows, sheet.name + '.gsheet')
+      // Close the picker so the column tagger can show
+      onDone?.()
     } catch (err) {
       setError(err.message)
       setLoadingSheet(null)

@@ -170,7 +170,7 @@ function AppContent() {
   }
 
   if (showSheetsPicker && googleToken) {
-    return <GoogleSheetsPicker accessToken={googleToken} onBack={() => setShowSheetsPicker(false)} />
+    return <GoogleSheetsPicker accessToken={googleToken} onBack={() => setShowSheetsPicker(false)} onDone={() => setShowSheetsPicker(false)} />
   }
 
   // All Chats page
