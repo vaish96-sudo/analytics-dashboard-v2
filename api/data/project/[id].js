@@ -1,4 +1,4 @@
-import { validateSession } from '../lib/validateSession.js'
+import { validateSession } from '../../lib/validateSession.js'
 
 export default async function handler(req, res) {
   const session = await validateSession(req)

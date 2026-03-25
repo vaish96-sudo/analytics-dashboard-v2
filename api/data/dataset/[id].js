@@ -1,4 +1,4 @@
-import { validateSession } from '../lib/validateSession.js'
+import { validateSession } from '../../lib/validateSession.js'
 import { gunzipSync } from 'zlib'
 
 export const config = { maxDuration: 60 }
