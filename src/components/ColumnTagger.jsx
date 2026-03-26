@@ -47,15 +47,17 @@ function SummaryPill({ colName, def, onChangeType }) {
   const config = TYPE_CONFIG[def.type]
   const Icon = config.icon
   return (
-    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium cursor-grab active:cursor-grabbing ${config.bg} ${config.color} ${config.border} group relative`}
+    <div className={`inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1.5 rounded-lg border text-xs font-medium ${config.bg} ${config.color} ${config.border} group relative`}
       draggable
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', colName); e.dataTransfer.effectAllowed = 'move'; e.target.style.opacity = '0.4' }}
       onDragEnd={(e) => { e.target.style.opacity = '1' }}
-      title={`${def.label} — classified as ${config.label}. Drag to another category or click to change.`}>
+      title={`${def.label} — drag to move or use dropdown to change type`}>
       <Icon className="w-3 h-3" />
-      <span>{def.label}</span>
-      <select value={def.type} onChange={(e) => onChangeType(e.target.value)}
-        className="appearance-none bg-transparent border-none text-inherit font-medium focus:outline-none cursor-pointer pr-1 text-[10px] opacity-0 group-hover:opacity-100 w-0 group-hover:w-auto transition-all"
+      <span className="cursor-grab active:cursor-grabbing">{def.label}</span>
+      <select value={def.type} onChange={(e) => { e.stopPropagation(); onChangeType(e.target.value) }}
+        onClick={(e) => e.stopPropagation()}
+        className="ml-1 px-1 py-0.5 rounded text-[10px] font-semibold cursor-pointer focus:outline-none focus:ring-1 focus:ring-current"
+        style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid currentColor', color: 'inherit' }}
         title="Change column type">
         <option value="dimension">Category</option>
         <option value="metric">Number</option>

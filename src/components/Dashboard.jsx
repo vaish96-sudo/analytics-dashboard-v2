@@ -137,7 +137,7 @@ function ProjectSwitcher({ onGoHome }) {
 }
 
 export default function Dashboard({ user, onLogout, onNewProject, onGoHome, initialConversationId, onConversationConsumed }) {
-  const { rowCount, columnsByType, setStep, datasets, activeTab, setActiveTab, rawData, schema, fileName, globalFilters, insights, reportBuilderState } = useData()
+  const { rowCount, columnsByType, setStep, editSchema, datasets, activeTab, setActiveTab, rawData, schema, fileName, globalFilters, insights, reportBuilderState } = useData()
   const { activeProject, projects, selectProject, canEdit, isSharedView } = useProject()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activeConversationId, setActiveConversationId] = useState(null)
@@ -251,7 +251,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
             <span>{columnsByType.metrics.length}M {columnsByType.dimensions.length}D</span>
           </div>
           <div className="flex items-center gap-2 mt-3">
-            <button onClick={() => setStep('tag')} className="flex items-center gap-1.5 text-xs transition-colors" style={{ color: 'var(--text-muted)' }}>
+            <button onClick={editSchema} className="flex items-center gap-1.5 text-xs transition-colors" style={{ color: 'var(--text-muted)' }}>
               <Settings className="w-3 h-3" />Adjust columns
             </button>
             <span style={{ color: 'var(--text-muted)' }}>·</span>
