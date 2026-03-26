@@ -695,10 +695,22 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
 
   const openProject = useCallback(() => { setStep('dashboard') }, [])
 
+  // Edit schema from dashboard — restore pending state so the tagger can modify it
+  const editSchema = useCallback(() => {
+    const ds = datasets.find(d => d.id === activeDatasetId)
+    if (ds) {
+      // Populate pending state from the active dataset so updateColumnSchema works
+      setPendingData(fullDataCacheRef.current[ds.id] || ds.rawData || [])
+      setPendingFileName(ds.fileName)
+      setPendingSchema(ds.schema ? { ...ds.schema } : baseSchema ? { ...baseSchema } : null)
+    }
+    setStep('tag')
+  }, [datasets, activeDatasetId, baseSchema])
+
   return <DataContext.Provider value={{
     rawData, filteredRawData, fileName, schema, step, setStep, activeTab, setActiveTab,
     globalFilters, setGlobalFilters, hasGlobalFilters,
-    loadData, cancelTagging, confirmTagging, updateColumnSchema, removeColumn, columnsByType, schemaLoading,
+    loadData, cancelTagging, confirmTagging, editSchema, updateColumnSchema, removeColumn, columnsByType, schemaLoading,
     confirmLoading, confirmError, dataLoading,
     aggregate, aggregateUnfiltered, getUniqueValues, rowCount, filteredRowCount,
     datasets, activeDatasetId, activeDataset, switchDataset, removeDataset, updateDatasetState,
