@@ -5,16 +5,27 @@ import { smartFormat } from '../utils/formatters'
 const BORDER_COLORS = ['border-blue-400', 'border-sky-400', 'border-orange-400', 'border-emerald-400', 'border-purple-400', 'border-pink-400']
 const LABEL_COLORS = ['text-blue-600', 'text-sky-600', 'text-orange-600', 'text-emerald-600', 'text-purple-600', 'text-pink-600']
 
-/** Hook to get computed KPI data */
+/** Hook to get computed KPI data — respects template kpiOrder when available */
 export function useKPIData() {
-  const { filteredRawData, schema, columnsByType } = useData()
+  const { filteredRawData, schema, columnsByType, templateResult } = useData()
   return useMemo(() => {
     if (!filteredRawData || !schema) return []
-    return columnsByType.metrics.slice(0, 6).map(col => {
+
+    // Use template-ordered metrics if available, otherwise default order
+    let orderedMetrics = columnsByType.metrics
+    if (templateResult?.kpiOrder?.length > 0) {
+      // Filter kpiOrder to only include columns that actually exist in current metrics
+      const validOrder = templateResult.kpiOrder.filter(col => columnsByType.metrics.includes(col))
+      // Append any metrics not in template order
+      const remaining = columnsByType.metrics.filter(col => !validOrder.includes(col))
+      orderedMetrics = [...validOrder, ...remaining]
+    }
+
+    return orderedMetrics.slice(0, 6).map(col => {
       const values = filteredRawData.map(r => { const v = r[col]; return typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[,$%]/g, '')) }).filter(v => !isNaN(v))
       return { col, label: schema[col].label, total: values.reduce((a, b) => a + b, 0), isCustom: !!schema[col]?.isCustom }
     })
-  }, [filteredRawData, schema, columnsByType.metrics])
+  }, [filteredRawData, schema, columnsByType.metrics, templateResult])
 }
 
 /** Single KPI card — rendered individually in the drag grid */

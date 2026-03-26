@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useMemo, useEf
 import { useProject } from './ProjectContext'
 import * as projectService from '../lib/projectService'
 import { callClaudeAPI } from '../utils/claudeClient.js'
-import { detectTemplate, applyTemplate } from '../lib/templates'
+import { detectTemplate, applyTemplate, applyTemplateToSchema } from '../lib/templates'
 
 const DataContext = createContext(null)
 
@@ -363,6 +363,12 @@ export function DataProvider({ children }) {
     return result
   }, [schema])
 
+  // Compute template result (kpiOrder, insightFocus) from active template + current schema
+  const templateResult = useMemo(() => {
+    if (!activeTemplate || !schema || !columnsByType) return null
+    return applyTemplate(activeTemplate, schema, columnsByType)
+  }, [activeTemplate, schema, columnsByType])
+
   const rowCount = rawData ? rawData.length : 0
   const filteredRowCount = filteredRawData ? filteredRawData.length : 0
 
@@ -437,11 +443,16 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
       setSchemaLoading(false)
     }
 
-    // Auto-detect template from column names
+    // Auto-detect template from column names and use it to improve classification
     try {
       const colNames = Object.keys(data[0] || {})
       const detected = detectTemplate(colNames)
-      if (detected) setActiveTemplate(detected.template)
+      if (detected) {
+        setActiveTemplate(detected.template)
+        // Use template's suggestedSchema to improve heuristic classification
+        // This runs AFTER AI tagging, so it only overrides where template has strong signal
+        finalSchema = applyTemplateToSchema(detected.template, finalSchema)
+      }
     } catch {}
 
     // Auto-confirm: skip the tagger and go straight to building the dashboard
@@ -733,7 +744,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
   return <DataContext.Provider value={{
     rawData, filteredRawData, fileName, schema, step, setStep, activeTab, setActiveTab,
     globalFilters, setGlobalFilters, hasGlobalFilters,
-    loadData, cancelTagging, confirmTagging, editSchema, updateColumnSchema, removeColumn, columnsByType, schemaLoading, activeTemplate,
+    loadData, cancelTagging, confirmTagging, editSchema, updateColumnSchema, removeColumn, columnsByType, schemaLoading, activeTemplate, templateResult,
     confirmLoading, confirmError, dataLoading,
     aggregate, aggregateUnfiltered, getUniqueValues, rowCount, filteredRowCount,
     datasets, activeDatasetId, activeDataset, switchDataset, removeDataset, updateDatasetState,

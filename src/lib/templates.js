@@ -181,3 +181,100 @@ export function applyTemplate(template, schema, columnsByType) {
     templateName: template.name,
   }
 }
+
+/**
+ * Use template suggestedSchema to improve heuristic column classification.
+ * If the template says "spend" is a metric and we have a column named "ad_spend",
+ * trust the template over the heuristic.
+ */
+export function applyTemplateToSchema(template, heuristicSchema) {
+  if (!template || !heuristicSchema) return heuristicSchema
+
+  const updated = { ...heuristicSchema }
+  const colNames = Object.keys(updated)
+
+  colNames.forEach(col => {
+    const lower = col.toLowerCase().replace(/[_\s-]+/g, '')
+
+    // Check if template has a strong opinion about this column
+    const isDim = template.suggestedSchema.dimensions.some(p => {
+      const pl = p.replace(/[_\s-]+/g, '')
+      return lower.includes(pl) || pl.includes(lower)
+    })
+    const isMet = template.suggestedSchema.metrics.some(p => {
+      const pl = p.replace(/[_\s-]+/g, '')
+      return lower.includes(pl) || pl.includes(lower)
+    })
+    const isDate = template.suggestedSchema.dates.some(p => {
+      const pl = p.replace(/[_\s-]+/g, '')
+      return lower.includes(pl) || pl.includes(lower)
+    })
+
+    // Only override if exactly one type matches (avoid ambiguity)
+    const matchCount = (isDim ? 1 : 0) + (isMet ? 1 : 0) + (isDate ? 1 : 0)
+    if (matchCount === 1) {
+      if (isMet) updated[col] = { ...updated[col], type: 'metric' }
+      else if (isDim) updated[col] = { ...updated[col], type: 'dimension' }
+      else if (isDate) updated[col] = { ...updated[col], type: 'date' }
+    }
+  })
+
+  return updated
+}
+
+/**
+ * Resolve template chartLayout hints to actual column names from the dataset.
+ * Returns an array of { type, dim, met } with real column names, or null if
+ * the hint can't be matched.
+ */
+export function resolveChartLayout(template, columnsByType, dimCardinalities) {
+  if (!template?.chartLayout || !columnsByType) return null
+
+  const allDims = [...columnsByType.dimensions, ...columnsByType.dates]
+
+  function findColumn(hint, candidates) {
+    if (!hint) return null
+    const hintLower = hint.replace(/[_\s-]+/g, '').toLowerCase()
+    // Exact-ish match first
+    const exact = candidates.find(c => {
+      const cl = c.toLowerCase().replace(/[_\s-]+/g, '')
+      return cl === hintLower || cl.includes(hintLower) || hintLower.includes(cl)
+    })
+    return exact || null
+  }
+
+  const resolved = []
+  const usedCombos = new Set()
+
+  template.chartLayout.forEach(hint => {
+    const dimCandidates = hint.dimHint === 'date' ? columnsByType.dates : allDims
+    let dim = findColumn(hint.dimHint, dimCandidates)
+    let met = findColumn(hint.metHint, columnsByType.metrics)
+
+    // Fallback: if dim hint is 'date' but no date columns, skip
+    if (!dim && hint.dimHint === 'date' && columnsByType.dates.length > 0) {
+      dim = columnsByType.dates[0]
+    }
+    // Fallback to first available dim/met if hint doesn't match
+    if (!dim && allDims.length > 0) dim = allDims[0]
+    if (!met && columnsByType.metrics.length > 0) met = columnsByType.metrics[0]
+
+    if (!dim || !met) return
+
+    // Validate cardinality for pie charts
+    const card = dimCardinalities?.[dim] || 0
+    let type = hint.type
+    if (type === 'pie' && (card < 2 || card > 8)) {
+      type = 'bar' // Degrade pie to bar if cardinality doesn't fit
+    }
+    if (card < 2) return // Skip useless single-value dimensions
+
+    const key = `${type}-${dim}-${met}`
+    if (usedCombos.has(key)) return
+    usedCombos.add(key)
+
+    resolved.push({ type, dim, met })
+  })
+
+  return resolved.length >= 2 ? resolved.slice(0, 4) : null
+}

@@ -188,7 +188,14 @@ export async function askAI(question, schema, rawData, aggregateFn, history = []
   }
 }
 
-export async function getInsights(schema, rawData, aggregateFn) {
+/**
+ * Generate AI insights for a dataset.
+ * @param {object} schema - Column schema
+ * @param {Array} rawData - Raw dataset rows
+ * @param {Function} aggregateFn - Aggregation function
+ * @param {string|null} insightFocus - Optional template-specific focus prompt (e.g. "Focus on campaign performance, ROAS trends...")
+ */
+export async function getInsights(schema, rawData, aggregateFn, insightFocus = null) {
   const metrics = Object.entries(schema).filter(([, d]) => d.type === 'metric').map(([col, d]) => ({ col, label: d.label }))
   const dimensions = Object.entries(schema).filter(([, d]) => d.type === 'dimension').map(([col, d]) => ({ col, label: d.label }))
 
@@ -206,10 +213,15 @@ export async function getInsights(schema, rawData, aggregateFn) {
       topData.map(r => `  ${r[dimensions[0].col]}: ${r[metrics[0].col]?.toLocaleString()}`).join('\n'))
   }
 
+  // Build the insight prompt — inject template focus if available
+  const focusInstruction = insightFocus
+    ? `\n\nDOMAIN FOCUS: ${insightFocus}\nTailor your insights to this specific domain. Use domain-relevant terminology and focus on the metrics and patterns most important to this type of analysis.`
+    : ''
+
   const system = buildSchemaPrompt(schema) + `\n\nYou are a world-class strategic analyst. Respond with ONLY a JSON array (no markdown, no backticks) of 4-5 insights:
 [{"type":"opportunity|trend|alert|recommendation","title":"Short title","description":"2-3 sentence actionable insight with specific numbers.","impact":"high|medium|low"}]
 
-Be specific with numbers. Think like a senior strategist presenting to a C-suite executive.`
+Be specific with numbers. Think like a senior strategist presenting to a C-suite executive.${focusInstruction}`
 
   // Server determines model based on 'insights' feature
   const call = await callClaude(system, [

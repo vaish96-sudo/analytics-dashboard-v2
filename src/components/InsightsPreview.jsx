@@ -16,9 +16,10 @@ const COLORS = {
  * InsightsPreview — shown at the top of the Overview tab.
  * Auto-generates insights on first dashboard load if they haven't been generated yet.
  * Shows top 3 insights in a compact card format.
+ * Now passes template insightFocus for domain-specific AI analysis.
  */
 export default function InsightsPreview() {
-  const { schema, rawData, aggregateUnfiltered, updateDatasetState, insights, insightsLoaded, activeDatasetId, setActiveTab } = useData()
+  const { schema, rawData, aggregateUnfiltered, updateDatasetState, insights, insightsLoaded, activeDatasetId, setActiveTab, templateResult } = useData()
   const { hasRemaining, incrementUsage } = useTier()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -41,7 +42,9 @@ export default function InsightsPreview() {
     setLoading(true)
     setError(null)
     try {
-      const result = await getInsights(schema, rawData, aggregateUnfiltered)
+      // Pass template insightFocus for domain-specific analysis
+      const insightFocus = templateResult?.insightFocus || null
+      const result = await getInsights(schema, rawData, aggregateUnfiltered, insightFocus)
       await incrementUsage('insightsRuns')
       const insightsData = result.insights || result
 
