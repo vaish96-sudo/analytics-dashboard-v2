@@ -107,39 +107,64 @@ export async function exportToPDF(content, title = 'Northern Bird Report', brand
 
     // ─── EXECUTIVE SUMMARY ───
     if (insights?.length > 0) {
-      need(30)
-      doc.setFillColor(250, 249, 247)
-      doc.setDrawColor(...GOLD)
-      doc.setLineWidth(0.5)
-      doc.roundedRect(m, y, mw, 2, 0, 0, 'F')
-      doc.line(m, y, m, y + 2)
-      y += 1
-
-      // Build a summary from the top insights
+      // Build structured summary
       const highImpact = insights.filter(i => i.impact === 'high')
+      const medImpact = insights.filter(i => i.impact === 'medium')
       const topItems = (highImpact.length > 0 ? highImpact : insights).slice(0, 3)
-      const summaryText = `This report covers ${(rowCount || 0).toLocaleString()} data points across ${dataOverview?.dimCount || 0} dimensions and ${dataOverview?.metCount || 0} metrics. ` +
-        `AI analysis identified ${insights.length} key findings. ` +
-        topItems.map((ins, i) => `(${i + 1}) ${ins.title}: ${ins.description.split('.')[0]}.`).join(' ')
 
+      const overviewLine = `This report analyzes ${(rowCount || 0).toLocaleString()} records across ${dataOverview?.dimCount || 0} dimensions and ${dataOverview?.metCount || 0} metrics.`
+      const findingsLine = `AI analysis identified ${insights.length} findings: ${highImpact.length} high priority${medImpact.length > 0 ? `, ${medImpact.length} medium priority` : ''}.`
+      const keyPoints = topItems.map((ins, i) => `${i + 1}. ${ins.title} — ${ins.description.split('.')[0]}.`)
+
+      doc.setFontSize(8)
+      const allText = [overviewLine, findingsLine, '', 'Key findings:', ...keyPoints].join('\n')
+      const summaryLines = doc.splitTextToSize(allText, mw - 12)
+      const summaryH = Math.max(24, summaryLines.length * 3.5 + 16)
+
+      need(summaryH + 6)
+
+      // Card background
       doc.setFillColor(252, 251, 249)
-      const summaryLines = doc.splitTextToSize(summaryText, mw - 8)
-      const summaryH = Math.max(18, summaryLines.length * 3.5 + 10)
-      need(summaryH + 4)
-      doc.roundedRect(m, y, mw, summaryH, 1.5, 1.5, 'F')
-      doc.setFillColor(...GOLD)
-      doc.rect(m + 0.5, y + 3, 0.8, summaryH - 6, 'F')
+      doc.setDrawColor(...BORDER)
+      doc.setLineWidth(0.25)
+      doc.roundedRect(m, y, mw, summaryH, 2, 2, 'FD')
 
-      text('EXECUTIVE SUMMARY', m + 5, y + 5.5, 7, 'bold', GOLD)
-      doc.setFontSize(7.5)
+      // Gold top accent line
+      doc.setFillColor(...GOLD)
+      doc.rect(m + 0.5, y + 0.5, mw - 1, 1.2, 'F')
+
+      // Header
+      text('EXECUTIVE SUMMARY', m + 6, y + 7, 8, 'bold', GOLD)
+
+      // Horizontal rule under header
+      doc.setDrawColor(230, 225, 215)
+      doc.setLineWidth(0.15)
+      doc.line(m + 6, y + 9, m + mw - 6, y + 9)
+
+      // Body text
+      doc.setFontSize(8)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(...BODY)
-      let sy = y + 10
+      let sy = y + 13
       summaryLines.forEach(line => {
-        doc.text(line, m + 5, sy)
+        if (line.startsWith('Key findings:')) {
+          doc.setFont('helvetica', 'bold')
+          doc.setTextColor(...DARK)
+          doc.text(line, m + 6, sy)
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(...BODY)
+        } else if (/^\d\./.test(line)) {
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(...DARK)
+          doc.text(line, m + 6, sy)
+          doc.setTextColor(...BODY)
+        } else {
+          doc.text(line, m + 6, sy)
+        }
         sy += 3.5
       })
-      y += summaryH + 4
+
+      y += summaryH + 5
     }
 
     // ─── KPI CARDS ───
@@ -177,34 +202,54 @@ export async function exportToPDF(content, title = 'Northern Bird Report', brand
       sectionHead('Strategic insights')
 
       insights.forEach((ins, i) => {
-        need(25)
-        // Impact pill
+        // Calculate space needed for this insight card
+        doc.setFontSize(8.5)
+        const descLines = doc.splitTextToSize(String(ins.description || ''), mw - 10)
+        const cardH = 8 + 5 + (descLines.length * 3.5) + 4
+        need(cardH + 6)
+
+        // Card background
+        const cardColor = ins.impact === 'high' ? [254, 242, 242] : ins.impact === 'medium' ? [255, 251, 235] : [248, 250, 252]
+        doc.setFillColor(...cardColor)
+        doc.roundedRect(m, y, mw, cardH, 1.5, 1.5, 'F')
+
+        // Left accent bar
+        const accentColor = ins.impact === 'high' ? RED : ins.impact === 'medium' ? AMBER : SLATE
+        doc.setFillColor(...accentColor)
+        doc.rect(m + 0.5, y + 3, 1, cardH - 6, 'F')
+
+        // Impact badge + Type — on first line
         const impact = (ins.impact || 'medium').toUpperCase()
-        const pillColor = ins.impact === 'high' ? RED : ins.impact === 'medium' ? AMBER : SLATE
-        const pillW = impact.length * 1.9 + 5
-        doc.setFillColor(...pillColor)
-        doc.roundedRect(m, y - 0.5, pillW, 4, 1.2, 1.2, 'F')
-        text(impact, m + 2.5, y + 2.5, 5.5, 'bold', WHITE)
+        const pillW = doc.getStringUnitWidth(impact) * 5.5 * 0.352 + 5
+        doc.setFillColor(...accentColor)
+        doc.roundedRect(m + 5, y + 2, pillW, 4.5, 1.2, 1.2, 'F')
+        text(impact, m + 7.5, y + 5.2, 5.5, 'bold', WHITE)
 
-        // Type label
-        const typeLabel = ins.type ? ` ${ins.type.toUpperCase()}` : ''
-        if (typeLabel) text(typeLabel, m + pillW + 2, y + 2.5, 5.5, 'normal', MUTED)
-        y += 6
+        const typeLabel = (ins.type || '').toUpperCase()
+        if (typeLabel) text(typeLabel, m + 5 + pillW + 3, y + 5.2, 5.5, 'normal', MUTED)
 
-        // Title
-        wrappedText(ins.title, 10.5, 'bold', DARK)
-        y += 1.5
+        // Title — on second line
+        let ty = y + 10
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(...DARK)
+        const titleLines = doc.splitTextToSize(String(ins.title || ''), mw - 10)
+        titleLines.forEach(line => {
+          doc.text(line, m + 5, ty)
+          ty += 4
+        })
+        ty += 1
 
         // Description
-        wrappedText(ins.description, 8.5, 'normal', BODY)
-        y += 4
+        doc.setFontSize(8.5)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(...BODY)
+        descLines.forEach(line => {
+          doc.text(line, m + 5, ty)
+          ty += 3.5
+        })
 
-        if (i < insights.length - 1) {
-          doc.setDrawColor(...BORDER)
-          doc.setLineWidth(0.1)
-          doc.line(m, y, m + 35, y)
-          y += 4
-        }
+        y += cardH + 3
       })
     } else {
       y += 4
