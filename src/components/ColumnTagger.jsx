@@ -57,7 +57,7 @@ function SummaryPill({ colName, def, onChangeType }) {
       <select value={def.type} onChange={(e) => { e.stopPropagation(); onChangeType(e.target.value) }}
         onClick={(e) => e.stopPropagation()}
         className="ml-1 px-1 py-0.5 rounded text-[10px] font-semibold cursor-pointer focus:outline-none focus:ring-1 focus:ring-current"
-        style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid currentColor', color: 'inherit' }}
+        style={{ background: 'var(--bg-surface)', border: '1px solid currentColor', color: 'inherit' }}
         title="Change column type">
         <option value="dimension">Category</option>
         <option value="metric">Number</option>
