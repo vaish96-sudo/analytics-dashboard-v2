@@ -57,7 +57,8 @@ export function checkOrigin(req, res) {
   // Browsers always send Origin on cross-origin requests
   if (!origin) return false
 
-  const isAllowed = allowed.some(a => origin.startsWith(a))
+  const isAllowed = allowed.some(a => origin.startsWith(a)) ||
+    (origin.includes('vercel.app') && origin.includes('analytics-dashboard'))
   if (!isAllowed) {
     res.status(403).json({ error: 'Forbidden: invalid origin' })
     return true // blocked
