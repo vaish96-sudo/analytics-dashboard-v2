@@ -105,6 +105,43 @@ export async function exportToPDF(content, title = 'Northern Bird Report', brand
       y += 5
     }
 
+    // ─── EXECUTIVE SUMMARY ───
+    if (insights?.length > 0) {
+      need(30)
+      doc.setFillColor(250, 249, 247)
+      doc.setDrawColor(...GOLD)
+      doc.setLineWidth(0.5)
+      doc.roundedRect(m, y, mw, 2, 0, 0, 'F')
+      doc.line(m, y, m, y + 2)
+      y += 1
+
+      // Build a summary from the top insights
+      const highImpact = insights.filter(i => i.impact === 'high')
+      const topItems = (highImpact.length > 0 ? highImpact : insights).slice(0, 3)
+      const summaryText = `This report covers ${(rowCount || 0).toLocaleString()} data points across ${dataOverview?.dimCount || 0} dimensions and ${dataOverview?.metCount || 0} metrics. ` +
+        `AI analysis identified ${insights.length} key findings. ` +
+        topItems.map((ins, i) => `(${i + 1}) ${ins.title}: ${ins.description.split('.')[0]}.`).join(' ')
+
+      doc.setFillColor(252, 251, 249)
+      const summaryLines = doc.splitTextToSize(summaryText, mw - 8)
+      const summaryH = Math.max(18, summaryLines.length * 3.5 + 10)
+      need(summaryH + 4)
+      doc.roundedRect(m, y, mw, summaryH, 1.5, 1.5, 'F')
+      doc.setFillColor(...GOLD)
+      doc.rect(m + 0.5, y + 3, 0.8, summaryH - 6, 'F')
+
+      text('EXECUTIVE SUMMARY', m + 5, y + 5.5, 7, 'bold', GOLD)
+      doc.setFontSize(7.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...BODY)
+      let sy = y + 10
+      summaryLines.forEach(line => {
+        doc.text(line, m + 5, sy)
+        sy += 3.5
+      })
+      y += summaryH + 4
+    }
+
     // ─── KPI CARDS ───
     if (kpis?.length > 0) {
       sectionHead('Key performance metrics')

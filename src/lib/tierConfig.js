@@ -44,7 +44,7 @@ export const TIER_CONFIG = {
     exportExcel: true,
     scheduledReports: false,
     teamSeats: 0,
-    whiteLabel: false,
+    whiteLabel: 'basic',
     customPlaybook: false,
     connectors: true,
     clientPortal: false,

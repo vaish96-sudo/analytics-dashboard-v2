@@ -86,6 +86,7 @@ export function DataProvider({ children }) {
   const [pendingFileName, setPendingFileName] = useState(null)
   const [pendingSchema, setPendingSchema] = useState(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
+  const [autoConfirmReady, setAutoConfirmReady] = useState(false)
   const [confirmError, setConfirmError] = useState(null)
 
   // Cache for full raw data — either uploaded this session or downloaded from Storage
@@ -369,12 +370,16 @@ export function DataProvider({ children }) {
     if (!data || data.length === 0) return
     setPendingData(data)
     setPendingFileName(name)
-    // Use basic heuristic first for instant feedback
-    setPendingSchema(buildAutoSchema(data))
-    setStep('tag')
+    // Use basic heuristic first
+    const heuristicSchema = buildAutoSchema(data)
+    setPendingSchema(heuristicSchema)
+    
+    // Show a loading state instead of the tagger
+    setStep('building')
 
-    // Then run AI tagging in background for better accuracy
+    // Run AI tagging in background for better accuracy
     setSchemaLoading(true)
+    let finalSchema = heuristicSchema
     try {
       const columns = Object.keys(data[0])
       const samples = {}
@@ -408,22 +413,19 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
 
         const aiSchema = JSON.parse(text.replace(/```json|```/g, '').trim())
 
-        // Validate and merge — only update if AI returned valid types for all columns
         const validTypes = ['dimension', 'metric', 'date', 'ignore']
         const isValid = columns.every(col => aiSchema[col] && validTypes.includes(aiSchema[col].type))
 
         if (isValid) {
-          setPendingSchema(prev => {
-            if (!prev) return prev
-            const updated = {}
-            columns.forEach(col => {
-              updated[col] = {
-                type: aiSchema[col]?.type || prev[col]?.type || 'dimension',
-                label: aiSchema[col]?.label || prev[col]?.label || col,
-              }
-            })
-            return updated
+          const updated = {}
+          columns.forEach(col => {
+            updated[col] = {
+              type: aiSchema[col]?.type || heuristicSchema[col]?.type || 'dimension',
+              label: aiSchema[col]?.label || heuristicSchema[col]?.label || col,
+            }
           })
+          finalSchema = updated
+          setPendingSchema(updated)
         }
       } catch (aiErr) { 
         console.warn('AI column tagging failed, using heuristic:', aiErr.message) 
@@ -432,6 +434,11 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
     } finally {
       setSchemaLoading(false)
     }
+
+    // Auto-confirm: skip the tagger and go straight to building the dashboard
+    // setPendingSchema needs to be set before this runs
+    setPendingSchema(finalSchema)
+    setAutoConfirmReady(true)
   }, [])
 
   const cancelTagging = useCallback(() => {
@@ -464,6 +471,15 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
       setConfirmLoading(false)
     }
   }, [pendingData, pendingSchema, pendingFileName, activeProjectId, addDatasetToProject])
+
+  // Auto-confirm: when loadData finishes AI tagging, auto-build the dashboard
+  useEffect(() => {
+    if (!autoConfirmReady) return
+    setAutoConfirmReady(false)
+    if (pendingData && pendingSchema && activeProjectId) {
+      confirmTagging()
+    }
+  }, [autoConfirmReady])
 
   const switchDataset = useCallback((id) => {
     setActiveDatasetId(id)

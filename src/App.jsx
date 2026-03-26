@@ -218,6 +218,21 @@ function AppContent() {
 
   if (step === 'tag') return <ColumnTagger onConfirm={confirmTagging} />
   if (step === 'upload') return <FileUpload />
+  
+  // Building step — auto-classifying and saving dataset
+  if (step === 'building') {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+        <div className="text-center animate-fade-in">
+          <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(37,99,235,0.15))' }}>
+            <svg className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4m-3.93 7.07l-2.83-2.83M7.76 7.76L4.93 4.93"/></svg>
+          </div>
+          <h2 className="text-lg font-display font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Building your dashboard</h2>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>AI is classifying your columns and setting up charts...</p>
+        </div>
+      </div>
+    )
+  }
 
   // Dashboard
   if (step === 'dashboard' && activeProject) {

@@ -161,23 +161,22 @@ export default function ProjectWizard({ onComplete, onCancel }) {
             <FolderPlus className="w-6 h-6 text-accent" />
           </div>
           <h1 className="text-xl sm:text-2xl font-display font-bold text-slate-900">
-            {wizardStep === 'name' ? 'Create New Project' : wizardStep === 'source' ? 'Connect Data' : 'API Connector'}
+            {wizardStep === 'connect-api' ? 'API Connector' : 'New Project'}
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            {wizardStep === 'name' ? 'Give your project a name' : wizardStep === 'source' ? 'Choose how to bring in your data' : 'Enter your API details'}
+            {wizardStep === 'connect-api' ? 'Enter your API details' : 'Name it and pick your data source'}
           </p>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
-          {/* Step 1: Name */}
-          {wizardStep === 'name' && (
-            <div className="space-y-4">
+          {/* Combined: Name + Source */}
+          {wizardStep !== 'connect-api' && (
+            <div className="space-y-5">
               <div>
                 <label className="text-sm font-medium text-slate-700 block mb-2">Project name</label>
                 <input type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)}
                   placeholder="e.g. Q1 Campaign Analysis" autoFocus
                   className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-                  onKeyDown={(e) => { if (e.key === 'Enter' && projectName.trim()) setWizardStep('source') }}
                 />
               </div>
 
@@ -210,55 +209,53 @@ export default function ProjectWizard({ onComplete, onCancel }) {
                   )}
                 </div>
               )}
-              <div className="flex items-center justify-between pt-2">
+
+              {/* Data source — shown inline, no separate step */}
+              {projectName.trim() && (
+                <div className="animate-fade-in">
+                  <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-3">Connect your data</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {sources.map(src => (
+                      <button key={src.id} disabled={loading}
+                        onClick={() => {
+                          setSourceType(src.id)
+                          if (src.id === 'file') fileRef.current?.click()
+                          else if (src.id === 'google_sheets') handleGoogleSheets()
+                          else if (src.id === 'api') setWizardStep('connect-api')
+                        }}
+                        className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left hover:shadow-sm transition-all ${src.color} hover:opacity-90 disabled:opacity-50`}>
+                        <div className="w-9 h-9 rounded-lg bg-white/80 flex items-center justify-center shrink-0">
+                          <src.icon className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">{src.label}</p>
+                          <p className="text-[10px] opacity-70">{src.desc}</p>
+                        </div>
+                        {loading && sourceType === src.id && <Loader2 className="w-4 h-4 animate-spin ml-auto" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Cancel button */}
+              <div className="flex items-center pt-1">
                 {onCancel && (
                   <button onClick={onCancel} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
                     <ArrowLeft className="w-4 h-4" /> Cancel
                   </button>
                 )}
-                <button onClick={() => setWizardStep('source')} disabled={!projectName.trim()}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-display font-semibold bg-accent hover:bg-accent-dark text-white transition-all disabled:opacity-50 ml-auto">
-                  Next <ArrowRight className="w-4 h-4" />
-                </button>
               </div>
             </div>
           )}
+          
+          <input ref={fileRef} type="file" accept=".csv,.tsv,.xlsx,.xls,.xlsm" className="hidden"
+            onChange={(e) => { const f = e.target.files[0]; if (f) handleFileSelect(f) }} />
 
-          {/* Step 2: Data Source */}
-          {wizardStep === 'source' && (
-            <div className="space-y-3">
-              <button onClick={() => setWizardStep('name')} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-2">
-                <ArrowLeft className="w-4 h-4" /> Back
-              </button>
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-3">Data source for "{projectName}"</p>
-              {sources.map(src => (
-                <button key={src.id} disabled={loading}
-                  onClick={() => {
-                    setSourceType(src.id)
-                    if (src.id === 'file') fileRef.current?.click()
-                    else if (src.id === 'google_sheets') handleGoogleSheets()
-                    else if (src.id === 'api') setWizardStep('connect-api')
-                  }}
-                  className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left hover:shadow-sm transition-all ${src.color} hover:opacity-90 disabled:opacity-50`}>
-                  <div className="w-10 h-10 rounded-lg bg-white/80 flex items-center justify-center shrink-0">
-                    <src.icon className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{src.label}</p>
-                    <p className="text-xs opacity-70">{src.desc}</p>
-                  </div>
-                  {loading && sourceType === src.id && <Loader2 className="w-4 h-4 animate-spin ml-auto" />}
-                </button>
-              ))}
-              <input ref={fileRef} type="file" accept=".csv,.tsv,.xlsx,.xls,.xlsm" className="hidden"
-                onChange={(e) => { const f = e.target.files[0]; if (f) handleFileSelect(f) }} />
-            </div>
-          )}
-
-          {/* Step 3: API Connector */}
+          {/* API Connector */}
           {wizardStep === 'connect-api' && (
             <form onSubmit={handleApiConnect} className="space-y-4">
-              <button type="button" onClick={() => setWizardStep('source')} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-2">
+              <button type="button" onClick={() => setWizardStep('name')} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-2">
                 <ArrowLeft className="w-4 h-4" /> Back
               </button>
               <div>

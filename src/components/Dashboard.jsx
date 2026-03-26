@@ -16,6 +16,7 @@ import UserProfile from './UserProfile'
 import ScheduledReports from './ScheduledReports'
 import TierBadge from './TierBadge'
 import LogoMark from './LogoMark'
+import InsightsPreview from './InsightsPreview'
 import {
   LayoutDashboard, Table2, Wand2, Sparkles,
   FileSpreadsheet, Upload, ChevronRight, Settings, Menu, X, ChevronDown,
@@ -251,7 +252,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
           </div>
           <div className="flex items-center gap-2 mt-3">
             <button onClick={() => setStep('tag')} className="flex items-center gap-1.5 text-xs transition-colors" style={{ color: 'var(--text-muted)' }}>
-              <Settings className="w-3 h-3" />Edit schema
+              <Settings className="w-3 h-3" />Adjust columns
             </button>
             <span style={{ color: 'var(--text-muted)' }}>·</span>
             <button onClick={() => setStep('upload')} className="flex items-center gap-1.5 text-xs transition-colors" style={{ color: 'var(--text-muted)' }}>
@@ -408,6 +409,7 @@ function OverviewGrid() {
 
   return (
     <>
+      <InsightsPreview />
       {hiddenWidgets.length > 0 && (
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <span className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'var(--text-muted)' }}>Hidden:</span>

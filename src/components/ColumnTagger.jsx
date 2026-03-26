@@ -154,9 +154,9 @@ export default function ColumnTagger({ onConfirm }) {
                 <div className="flex items-center gap-2 mb-3">
                   <Tag className="w-4 h-4 text-sky-600" />
                   <span className="text-xs font-semibold uppercase tracking-wider text-sky-600">
-                    Categories ({grouped.dimension.length})
+                    Things you group by ({grouped.dimension.length})
                   </span>
-                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>— things you group and filter by</span>
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>— names, regions, types, categories</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {grouped.dimension.map(item => (
@@ -176,9 +176,9 @@ export default function ColumnTagger({ onConfirm }) {
                 <div className="flex items-center gap-2 mb-3">
                   <Hash className="w-4 h-4 text-emerald-600" />
                   <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
-                    Numbers ({grouped.metric.length})
+                    Things you measure ({grouped.metric.length})
                   </span>
-                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>— values to sum, average, and chart</span>
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>— revenue, counts, amounts you sum or average</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {grouped.metric.map(item => (

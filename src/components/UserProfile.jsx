@@ -200,12 +200,12 @@ export default function UserProfile() {
         </div>
       </div>
 
-      {/* White-Label (Enterprise) */}
+      {/* White-Label (Pro + Enterprise) */}
       <div className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <h3 className="text-base font-display font-semibold" style={{ color: 'var(--text-primary)' }}>White Label</h3>
-            {!can('whiteLabel') && <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium" style={{ background: 'linear-gradient(135deg, #1c1917, #292524)', color: '#d4a574' }}><Lock className="w-2.5 h-2.5" /> Enterprise</span>}
+            {!can('whiteLabel') && <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium" style={{ background: 'linear-gradient(135deg, #1c1917, #292524)', color: '#d4a574' }}><Lock className="w-2.5 h-2.5" /> Pro</span>}
           </div>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Your branding on exported reports</p>
         </div>

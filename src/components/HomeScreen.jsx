@@ -692,6 +692,16 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
           <div className="mb-8 animate-slide-up" style={{ animationDelay: '80ms' }}>
             <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Quick actions</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button onClick={onNewProject} className="flex items-center gap-3 p-4 rounded-xl transition-all hover:shadow-md nb-card group relative overflow-hidden" style={{ border: '1.5px solid rgba(16,185,129,0.3)' }}>
+                <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Google Sheets</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Connect → dashboard in 60s</p>
+                </div>
+                <span className="absolute top-1.5 right-2 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Popular</span>
+              </button>
               <button onClick={onNewProject} className="flex items-center gap-3 p-4 rounded-xl transition-all hover:shadow-sm nb-card group">
                 <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
                   <Upload className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -699,15 +709,6 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
                 <div className="text-left">
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Upload file</p>
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>CSV, Excel, TSV</p>
-                </div>
-              </button>
-              <button onClick={onNewProject} className="flex items-center gap-3 p-4 rounded-xl transition-all hover:shadow-sm nb-card group">
-                <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
-                  <FileSpreadsheet className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Google Sheets</p>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Connect spreadsheet</p>
                 </div>
               </button>
               <button onClick={onNewProject} className="flex items-center gap-3 p-4 rounded-xl transition-all hover:shadow-sm nb-card group">
