@@ -1,15 +1,15 @@
 /**
  * Public Claude API endpoint for the /instant page.
  * No auth required, but heavily rate-limited by IP.
- * Only allows 'insights' feature with limited tokens.
+ * Used for column tagging + insights on the instant page.
  */
 
 export const config = { maxDuration: 60 }
 
-// IP-based rate limiting — 5 requests per hour per IP
+// IP-based rate limiting — 8 requests per hour per IP (column tagging + insights per session)
 const ipRateLimitMap = new Map()
 const IP_WINDOW_MS = 3600_000 // 1 hour
-const IP_MAX_REQUESTS = 5
+const IP_MAX_REQUESTS = 8
 
 function checkIpRateLimit(ip) {
   const now = Date.now()
@@ -55,8 +55,8 @@ export default async function handler(req, res) {
   try {
     const { messages, system, max_tokens = 300 } = req.body
 
-    // Only allow limited tokens for public endpoint
-    const safeMaxTokens = Math.min(Number(max_tokens) || 300, 500)
+    // Allow up to 1500 tokens (column tagging needs ~1200)
+    const safeMaxTokens = Math.min(Number(max_tokens) || 300, 1500)
 
     // Always use Sonnet for public endpoint (cheaper)
     const model = 'claude-sonnet-4-20250514'

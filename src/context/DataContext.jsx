@@ -25,15 +25,23 @@ function detectColumnType(values, colName) {
     // Smart check: even if values are numeric, some columns are dimensions
     const name = (colName || '').toLowerCase()
     
+    // Split into words — handles "Row ID", "order_id", "postalCode", "Postal Code" etc.
+    const words = name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_\-]+/g, ' ').split(/\s+/)
+    
     // Column names that are almost always dimensions even with numeric values
-    const dimensionNames = ['id', 'age', 'year', 'month', 'day', 'zip', 'zipcode', 'zip_code', 'postal',
+    const dimensionWords = ['id', 'age', 'year', 'month', 'day', 'zip', 'zipcode', 'postal',
       'code', 'phone', 'number', 'no', 'num', 'rank', 'ranking', 'rating', 'score', 'grade',
       'level', 'tier', 'floor', 'room', 'seat', 'size', 'group', 'class', 'category',
-      'region', 'zone', 'district', 'ward', 'block', 'batch', 'version']
-    if (dimensionNames.some(d => name === d || name.startsWith(d + '_') || name.endsWith('_' + d))) return 'dimension'
+      'region', 'zone', 'district', 'ward', 'block', 'batch', 'version',
+      'row', 'index', 'order', 'transaction', 'invoice', 'ticket']
+    if (words.some(w => dimensionWords.includes(w))) return 'dimension'
     
     // If there are very few unique values relative to rows, it's likely a dimension (e.g., age groups, ratings 1-5)
     const uniqueValues = new Set(sample.map(v => String(v).trim()))
+
+    // High cardinality numeric = likely an ID, not a metric (e.g., every row is unique)
+    if (uniqueValues.size > sample.length * 0.9) return 'dimension'
+
     if (uniqueValues.size <= Math.min(20, sample.length * 0.3)) return 'dimension'
     
     // Contains ranges like "20-30" or "100-200" — dimension
