@@ -2,7 +2,8 @@
   "buildCommand": "node ./node_modules/vite/bin/vite.js build",
   "rewrites": [
     { "source": "/auth/callback", "destination": "/index.html" },
-    { "source": "/reset-password", "destination": "/index.html" }
+    { "source": "/reset-password", "destination": "/index.html" },
+    { "source": "/instant", "destination": "/index.html" }
   ],
   "headers": [
     {
@@ -13,6 +14,12 @@
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
       ]
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/data/refresh-sheets",
+      "schedule": "0 6 * * *"
     }
   ]
 }
