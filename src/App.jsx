@@ -5,6 +5,7 @@ import { DataProvider, useData } from './context/DataContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { TierProvider, useTier } from './context/TierContext'
 import AuthScreen from './components/AuthScreen'
+import InstantDashboard from './components/InstantDashboard'
 import HomeScreen from './components/HomeScreen'
 import ProjectWizard from './components/ProjectWizard'
 import FileUpload from './components/FileUpload'
@@ -33,7 +34,16 @@ function GoogleAuthCallback({ onToken, onError }) {
     if (error) { onError(error === 'access_denied' ? 'Access was denied.' : error); window.history.replaceState({}, '', '/'); return }
     if (code) {
       fetch('/api/google-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, redirect_uri: REDIRECT_URI }) })
-        .then(r => r.json()).then(d => { if (d.error) onError(d.error); else onToken(d.access_token) }).catch(e => onError(e.message))
+        .then(r => r.json()).then(d => {
+          if (d.error) onError(d.error)
+          else {
+            // Store refresh token for auto-refresh
+            if (d.refresh_token) {
+              try { localStorage.setItem('nb_google_refresh_token', d.refresh_token) } catch {}
+            }
+            onToken(d.access_token)
+          }
+        }).catch(e => onError(e.message))
     }
     window.history.replaceState({}, '', '/')
   }, [])
@@ -261,6 +271,11 @@ function AppContent() {
 }
 
 export default function App() {
+  // Instant tool — no login required, standalone page
+  if (window.location.pathname === '/instant') {
+    return <ThemeProvider><InstantDashboard /></ThemeProvider>
+  }
+
   return (
     <ThemeProvider>
       <AuthProvider>

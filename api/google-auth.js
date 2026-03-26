@@ -39,6 +39,7 @@ export default async function handler(req) {
 
     return new Response(JSON.stringify({
       access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token || null,
       expires_in: tokenData.expires_in,
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   } catch (err) {

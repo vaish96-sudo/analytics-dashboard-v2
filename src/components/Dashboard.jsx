@@ -17,6 +17,7 @@ import ScheduledReports from './ScheduledReports'
 import TierBadge from './TierBadge'
 import LogoMark from './LogoMark'
 import InsightsPreview from './InsightsPreview'
+import AutoRefreshToggle from './AutoRefreshToggle'
 import {
   LayoutDashboard, Table2, Wand2, Sparkles,
   FileSpreadsheet, Upload, ChevronRight, Settings, Menu, X, ChevronDown,
@@ -214,7 +215,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
           )}
         </div>
 
-        {datasets.length > 0 && <div className="p-3" style={{ borderBottom: '1px solid var(--border-light)' }}><ProjectSwitcher onGoHome={onGoHome} /></div>}
+        {datasets.length > 0 && <div className="p-3" style={{ borderBottom: '1px solid var(--border-light)' }}><ProjectSwitcher onGoHome={onGoHome} /><div className="mt-2"><AutoRefreshToggle /></div></div>}
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {TABS.map(tab => (

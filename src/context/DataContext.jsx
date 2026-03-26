@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useMemo, useEf
 import { useProject } from './ProjectContext'
 import * as projectService from '../lib/projectService'
 import { callClaudeAPI } from '../utils/claudeClient.js'
+import { detectTemplate, applyTemplate } from '../lib/templates'
 
 const DataContext = createContext(null)
 
@@ -87,6 +88,7 @@ export function DataProvider({ children }) {
   const [pendingSchema, setPendingSchema] = useState(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [autoConfirmReady, setAutoConfirmReady] = useState(false)
+  const [activeTemplate, setActiveTemplate] = useState(null)
   const [confirmError, setConfirmError] = useState(null)
 
   // Cache for full raw data — either uploaded this session or downloaded from Storage
@@ -435,8 +437,14 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
       setSchemaLoading(false)
     }
 
+    // Auto-detect template from column names
+    try {
+      const colNames = Object.keys(data[0] || {})
+      const detected = detectTemplate(colNames)
+      if (detected) setActiveTemplate(detected.template)
+    } catch {}
+
     // Auto-confirm: skip the tagger and go straight to building the dashboard
-    // setPendingSchema needs to be set before this runs
     setPendingSchema(finalSchema)
     setAutoConfirmReady(true)
   }, [])
@@ -725,7 +733,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
   return <DataContext.Provider value={{
     rawData, filteredRawData, fileName, schema, step, setStep, activeTab, setActiveTab,
     globalFilters, setGlobalFilters, hasGlobalFilters,
-    loadData, cancelTagging, confirmTagging, editSchema, updateColumnSchema, removeColumn, columnsByType, schemaLoading,
+    loadData, cancelTagging, confirmTagging, editSchema, updateColumnSchema, removeColumn, columnsByType, schemaLoading, activeTemplate,
     confirmLoading, confirmError, dataLoading,
     aggregate, aggregateUnfiltered, getUniqueValues, rowCount, filteredRowCount,
     datasets, activeDatasetId, activeDataset, switchDataset, removeDataset, updateDatasetState,

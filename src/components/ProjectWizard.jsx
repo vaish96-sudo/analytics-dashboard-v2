@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useMemo } from 'react'
 import { useProject } from '../context/ProjectContext'
 import { useData } from '../context/DataContext'
 import { useTier } from '../context/TierContext'
+import { TEMPLATES } from '../lib/templates'
 import {
   FolderPlus, Upload, FileSpreadsheet, Globe, ArrowRight, ArrowLeft, Loader2, AlertCircle, Link2, Building2, Plus
 } from 'lucide-react'
@@ -10,6 +11,7 @@ export default function ProjectWizard({ onComplete, onCancel }) {
   const { createProject, projects } = useProject()
   const { loadData } = useData()
   const { tier } = useTier()
+  const [selectedTemplate, setSelectedTemplate] = useState(null)
   const isAgency = tier === 'agency'
   const [wizardStep, setWizardStep] = useState('name') // name | source | connect-api
   const [projectName, setProjectName] = useState('')
@@ -43,7 +45,7 @@ export default function ProjectWizard({ onComplete, onCancel }) {
         name: projectName.trim(),
         clientName: finalClientName || null,
         dataSourceType,
-        dataSourceMeta,
+        dataSourceMeta: { ...dataSourceMeta, templateId: selectedTemplate || 'auto' },
       })
       return project
     } catch (err) {
@@ -210,9 +212,27 @@ export default function ProjectWizard({ onComplete, onCancel }) {
                 </div>
               )}
 
-              {/* Data source — shown inline, no separate step */}
+              {/* Template picker — shown after name is entered */}
               {projectName.trim() && (
                 <div className="animate-fade-in">
+                  <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-2">Dashboard template (optional)</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+                    <button onClick={() => setSelectedTemplate(null)}
+                      className={`p-2.5 rounded-lg border-2 text-left transition-all text-xs ${!selectedTemplate ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                      <span className="text-sm">✨</span>
+                      <p className="font-medium text-slate-700 mt-0.5">Auto-detect</p>
+                      <p className="text-[10px] text-slate-400">AI picks the best layout</p>
+                    </button>
+                    {TEMPLATES.map(t => (
+                      <button key={t.id} onClick={() => setSelectedTemplate(t.id)}
+                        className={`p-2.5 rounded-lg border-2 text-left transition-all text-xs ${selectedTemplate === t.id ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                        <span className="text-sm">{t.icon}</span>
+                        <p className="font-medium text-slate-700 mt-0.5">{t.name}</p>
+                        <p className="text-[10px] text-slate-400">{t.description}</p>
+                      </button>
+                    ))}
+                  </div>
+
                   <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-3">Connect your data</p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {sources.map(src => (
