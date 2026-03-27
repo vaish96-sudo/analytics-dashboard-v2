@@ -22,29 +22,23 @@ function detectColumnType(values, colName) {
   const isNumeric = numericCount > sample.length * 0.8
 
   if (isNumeric) {
+    // Smart check: even if values are numeric, some columns are dimensions
     const name = (colName || '').toLowerCase()
+    
+    // Column names that are almost always dimensions even with numeric values
+    const dimensionNames = ['id', 'age', 'year', 'month', 'day', 'zip', 'zipcode', 'zip_code', 'postal',
+      'code', 'phone', 'number', 'no', 'num', 'rank', 'ranking',
+      'region', 'zone', 'district', 'ward', 'block', 'batch', 'version']
+    if (dimensionNames.some(d => name === d || name.startsWith(d + '_') || name.endsWith('_' + d))) return 'dimension'
+    
+    // Word-split check for multi-word columns like "Row ID", "Postal Code", "Age"
     const words = name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_\-]+/g, ' ').split(/\s+/)
+    if (words.some(w => ['id', 'age', 'zip', 'postal', 'code', 'phone'].includes(w))) return 'dimension'
     
-    // ID-like words — these make numeric columns into dimensions (identifiers, not aggregatable)
-    const idWords = ['id', 'zip', 'zipcode', 'postal', 'code', 'phone', 'index', 'row', 'sku']
-    if (words.some(w => idWords.includes(w))) return 'dimension'
-    
-    // Full column name patterns for IDs
-    const nameNorm = name.replace(/[\s\-]+/g, '_')
-    const idPatterns = ['row_id', 'rowid', 'order_id', 'orderid', 'transaction_id', 'invoice_id',
-      'ticket_id', 'customer_id', 'user_id', 'product_id', 'production_id', 'employee_id', 'student_id']
-    if (idPatterns.some(p => nameNorm === p || nameNorm.endsWith(p))) return 'dimension'
-    
-    // Attribute words — numeric but should be treated as dimensions (you don't SUM ages or ratings)
-    // These are individual-level attributes, not business metrics
-    const attrWords = ['age', 'year', 'month', 'day', 'rating', 'score', 'grade', 'rank', 'ranking',
-      'level', 'tier', 'floor', 'room', 'seat', 'group', 'class', 'category', 'size',
-      'region', 'zone', 'district', 'ward', 'block', 'batch', 'version', 'priority', 'number', 'no', 'num']
-    if (words.some(w => attrWords.includes(w))) return 'dimension'
-    
+    // If there are very few unique values relative to rows, it's likely a dimension (e.g., age groups, ratings 1-5)
     const uniqueValues = new Set(sample.map(v => String(v).trim()))
 
-    // High cardinality numeric = likely an ID, not a metric
+    // High cardinality numeric = likely an ID, not a metric (every value unique)
     if (uniqueValues.size > sample.length * 0.9) return 'dimension'
 
     if (uniqueValues.size <= Math.min(20, sample.length * 0.3)) return 'dimension'

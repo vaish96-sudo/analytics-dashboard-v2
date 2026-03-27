@@ -59,20 +59,13 @@ function detectColumnType(values, colName) {
   const numericCount = sample.filter(v => !isNaN(typeof v === 'number' ? v : parseFloat(String(v).replace(/[,$%]/g, '')))).length
   if (numericCount > sample.length * 0.8) {
     const name = (colName || '').toLowerCase()
+    const dimensionNames = ['id', 'age', 'year', 'month', 'day', 'zip', 'zipcode', 'zip_code', 'postal',
+      'code', 'phone', 'number', 'no', 'num', 'rank', 'ranking',
+      'region', 'zone', 'district', 'ward', 'block', 'batch', 'version']
+    if (dimensionNames.some(d => name === d || name.startsWith(d + '_') || name.endsWith('_' + d))) return 'dimension'
+    // Word-split for multi-word: "Row ID", "Postal Code", "Age"
     const words = name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_\-]+/g, ' ').split(/\s+/)
-    // ID words
-    if (words.some(w => ['id', 'zip', 'zipcode', 'postal', 'code', 'phone', 'index', 'row', 'sku'].includes(w))) return 'dimension'
-    // Full ID patterns
-    const nameNorm = name.replace(/[\s\-]+/g, '_')
-    if (['row_id', 'rowid', 'order_id', 'orderid', 'transaction_id', 'invoice_id', 'ticket_id',
-      'customer_id', 'user_id', 'product_id', 'production_id', 'employee_id', 'student_id'
-    ].some(p => nameNorm === p || nameNorm.endsWith(p))) return 'dimension'
-    // Attribute words — numeric but not aggregatable (don't SUM ages, ratings)
-    if (words.some(w => ['age', 'year', 'month', 'day', 'rating', 'score', 'grade', 'rank', 'ranking',
-      'level', 'tier', 'floor', 'room', 'seat', 'group', 'class', 'category', 'size',
-      'region', 'zone', 'district', 'ward', 'block', 'batch', 'version',
-      'priority', 'number', 'no', 'num'
-    ].includes(w))) return 'dimension'
+    if (words.some(w => ['id', 'age', 'zip', 'postal', 'code', 'phone'].includes(w))) return 'dimension'
     const uniqueValues = new Set(sample.map(v => String(v).trim()))
     if (uniqueValues.size > sample.length * 0.9) return 'dimension'
     if (uniqueValues.size <= Math.min(20, sample.length * 0.3)) return 'dimension'
@@ -298,19 +291,18 @@ export default function InstantDashboard() {
   const [askInput, setAskInput] = useState('')
   const fileRef = useRef(null)
 
-  // === FILE HANDLER — AI-powered column classification ===
+  // === FILE HANDLER — heuristic classification + template detection ===
   const handleFile = useCallback((file) => {
     if (!file) return
     setError(null)
     setBuilding(true)
-    setBuildingMsg('Reading your file...')
+    setBuildingMsg('Analyzing your data...')
     const reader = new FileReader()
-    reader.onload = async (e) => {
+    reader.onload = (e) => {
       try {
         const rows = parseCSV(e.target.result)
         if (rows.length === 0) { setError('No data found in file'); setBuilding(false); return }
 
-        setBuildingMsg('AI is classifying your columns...')
         let s = buildSchema(rows)
 
         // Template detection
@@ -320,48 +312,6 @@ export default function InstantDashboard() {
           setTemplate(detected.template)
           s = applyTemplateToSchema(detected.template, s)
         }
-
-        // AI column classification (the real deal — same as full product)
-        try {
-          const columns = Object.keys(rows[0])
-          const samples = {}
-          columns.forEach(col => { samples[col] = rows.map(r => r[col]).filter(v => v !== null && v !== undefined && v !== '').slice(0, 8) })
-          const colList = columns.map(col => `- "${col}": ${samples[col].slice(0, 5).map(v => JSON.stringify(v)).join(', ')}`).join('\n')
-
-          const aiText = await callPublicAI(
-            `You are a data classification expert. For each column, determine:
-1. type: "dimension" (categories/labels/IDs for grouping), "metric" (numeric values to SUM or AVERAGE — revenue, cost, quantity, profit), "date" (dates/timestamps), or "ignore" (row IDs, sequential indices, irrelevant)
-2. label: Clean human-readable name
-
-CRITICAL RULES — read carefully:
-- IDs (row, order, customer, product, transaction, invoice, user, employee, student) → "dimension" or "ignore"
-- Postal codes, zip codes, phone numbers → "dimension"
-- AGE is ALWAYS a "dimension" — you never SUM ages. Same for: experience, tenure, duration, rating, score, grade, rank, level, tier, priority, year
-- "Experience Years", "Tenure", "Age", "Rating", "Score" → DIMENSION (individual attributes, not business totals)
-- Only classify as "metric" if summing the column produces a meaningful BUSINESS TOTAL (e.g. total revenue, total units sold, total cost, total profit, total orders)
-- Ask: "Does SUM of this column mean anything?" If not → dimension
-- Every-row-unique numeric columns are IDs → "dimension" or "ignore"
-
-Respond with ONLY JSON (no markdown): {"col_name": {"type": "...", "label": "..."}, ...}`,
-            `Classify:\n${colList}`, 1500
-          )
-
-          if (aiText) {
-            const aiSchema = JSON.parse(aiText.replace(/```json|```/g, '').trim())
-            const validTypes = ['dimension', 'metric', 'date', 'ignore']
-            const columns2 = Object.keys(rows[0])
-            if (columns2.every(col => aiSchema[col] && validTypes.includes(aiSchema[col].type))) {
-              const updated = {}
-              columns2.forEach(col => {
-                updated[col] = { type: aiSchema[col]?.type || s[col]?.type || 'dimension', label: aiSchema[col]?.label || s[col]?.label || col }
-              })
-              s = updated
-              if (detected) s = applyTemplateToSchema(detected.template, s)
-            }
-          }
-        } catch (aiErr) { console.warn('AI tagging failed:', aiErr.message) }
-
-        setBuildingMsg('Building your charts...')
 
         // Compute columnsByType
         const cbt = { dimensions: [], metrics: [], dates: [], ignored: [] }
@@ -429,16 +379,39 @@ Respond with ONLY JSON (no markdown): {"col_name": {"type": "...", "label": "...
       if (tc?.length >= 2) return tc
     }
     const { dimensions, metrics, dates } = columnsByType; const c = []
-    const rankedDims = [...dimensions].sort((a, b) => {
+
+    // Filter out bad chart dimensions: too many unique values or ID-like names
+    const isGoodChartDim = (dim) => {
+      const card = dimCardinalities[dim] || 0
+      if (card < 2 || card > 50) return false
+      // Skip ID-like dimensions — terrible chart axes
+      const lower = dim.toLowerCase()
+      const words = lower.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_\-]+/g, ' ').split(/\s+/)
+      if (words.includes('id') || lower.endsWith('_id') || lower.endsWith('id')) return false
+      return true
+    }
+
+    // Rank: prefer 3-15 unique values (most insightful), allow up to 50
+    const rankedDims = [...dimensions].filter(isGoodChartDim).sort((a, b) => {
       const ca = dimCardinalities[a] || 0, cb = dimCardinalities[b] || 0
-      return (cb >= 2 && cb <= 15 ? 100 - Math.abs(cb - 6) : cb > 15 ? 20 : 0) - (ca >= 2 && ca <= 15 ? 100 - Math.abs(ca - 6) : ca > 15 ? 20 : 0)
-    }).filter(d => (dimCardinalities[d] || 0) >= 2)
+      const scoreA = ca >= 3 && ca <= 15 ? 100 - Math.abs(ca - 7) : ca > 15 ? 30 - ca : 0
+      const scoreB = cb >= 3 && cb <= 15 ? 100 - Math.abs(cb - 7) : cb > 15 ? 30 - cb : 0
+      return scoreB - scoreA
+    })
     const rankedDates = dates.filter(d => (dimCardinalities[d] || 0) >= 2)
+
+    // Build charts with best dimensions × metrics, each combo unique
     if (rankedDims[0] && metrics[0]) c.push({ type: 'bar', dim: rankedDims[0], met: metrics[0] })
     if (rankedDates[0] && metrics[0]) c.push({ type: 'line', dim: rankedDates[0], met: metrics[0] })
     if (rankedDims[0] && metrics[0] && (dimCardinalities[rankedDims[0]] || 0) <= 8) c.push({ type: 'pie', dim: rankedDims[0], met: metrics[0] })
     else if (rankedDims[1] && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[1], met: metrics[1] })
     if (rankedDims.length > 1 && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[1], met: metrics[1] })
+    else if (rankedDims[0] && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[0], met: metrics[1] })
+
+    // Fallback: if no good dims found, try dates or allow slightly higher cardinality
+    if (c.length === 0 && rankedDates[0] && metrics[0]) c.push({ type: 'line', dim: rankedDates[0], met: metrics[0] })
+    if (c.length === 0 && dimensions[0] && metrics[0]) c.push({ type: 'bar', dim: dimensions[0], met: metrics[0] })
+
     const seen = new Set()
     return c.filter(ch => { const k = `${ch.dim}-${ch.met}-${ch.type}`; if (seen.has(k)) return false; seen.add(k); return true }).slice(0, 4)
   }, [data, schema, columnsByType, dimCardinalities, template])

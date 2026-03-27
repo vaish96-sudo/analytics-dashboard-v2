@@ -149,19 +149,28 @@ export default function AutoCharts() {
     return resolveChartLayout(activeTemplate, columnsByType, dimCardinalities)
   }, [activeTemplate, columnsByType, dimCardinalities])
 
-  // Smarter basic heuristic (instant fallback) — avoids single-value dimensions
+  // Smarter basic heuristic (instant fallback) — avoids useless dimensions
   const basicCharts = useMemo(() => {
     if (!rawData || !schema) return []
     const { dimensions, metrics, dates } = columnsByType
     const c = []
 
-    // Sort dimensions by cardinality — prefer 3-15 unique values (most interesting)
-    const rankedDims = [...dimensions].sort((a, b) => {
+    // Filter out bad chart dimensions: too many unique values or ID-like names
+    const isGoodChartDim = (dim) => {
+      const card = dimCardinalities[dim] || 0
+      if (card < 2 || card > 50) return false
+      const lower = dim.toLowerCase()
+      const words = lower.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_\-]+/g, ' ').split(/\s+/)
+      if (words.includes('id') || lower.endsWith('_id') || lower.endsWith('id')) return false
+      return true
+    }
+
+    const rankedDims = [...dimensions].filter(isGoodChartDim).sort((a, b) => {
       const ca = dimCardinalities[a] || 0, cb = dimCardinalities[b] || 0
-      const scoreA = ca >= 2 && ca <= 15 ? 100 - Math.abs(ca - 6) : ca > 15 ? 20 : 0
-      const scoreB = cb >= 2 && cb <= 15 ? 100 - Math.abs(cb - 6) : cb > 15 ? 20 : 0
+      const scoreA = ca >= 3 && ca <= 15 ? 100 - Math.abs(ca - 7) : ca > 15 ? 30 - ca : 0
+      const scoreB = cb >= 3 && cb <= 15 ? 100 - Math.abs(cb - 7) : cb > 15 ? 30 - cb : 0
       return scoreB - scoreA
-    }).filter(d => (dimCardinalities[d] || 0) >= 2)
+    })
 
     const rankedDates = dates.filter(d => (dimCardinalities[d] || 0) >= 2)
 
@@ -171,6 +180,9 @@ export default function AutoCharts() {
     else if (rankedDims[1] && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[1], met: metrics[1] })
     if (rankedDims.length > 1 && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[1], met: metrics[1] })
     else if (rankedDims[0] && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[0], met: metrics[1] })
+
+    if (c.length === 0 && rankedDates[0] && metrics[0]) c.push({ type: 'line', dim: rankedDates[0], met: metrics[0] })
+    if (c.length === 0 && dimensions[0] && metrics[0]) c.push({ type: 'bar', dim: dimensions[0], met: metrics[0] })
 
     // Deduplicate
     const seen = new Set()
@@ -328,12 +340,20 @@ export function useAutoChartData() {
     if (!rawData || !schema) return []
     const { dimensions, metrics, dates } = columnsByType
     const c = []
-    const rankedDims = [...dimensions].sort((a, b) => {
+    const isGoodChartDim = (dim) => {
+      const card = dimCardinalities[dim] || 0
+      if (card < 2 || card > 50) return false
+      const lower = dim.toLowerCase()
+      const words = lower.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_\-]+/g, ' ').split(/\s+/)
+      if (words.includes('id') || lower.endsWith('_id') || lower.endsWith('id')) return false
+      return true
+    }
+    const rankedDims = [...dimensions].filter(isGoodChartDim).sort((a, b) => {
       const ca = dimCardinalities[a] || 0, cb = dimCardinalities[b] || 0
-      const scoreA = ca >= 2 && ca <= 15 ? 100 - Math.abs(ca - 6) : ca > 15 ? 20 : 0
-      const scoreB = cb >= 2 && cb <= 15 ? 100 - Math.abs(cb - 6) : cb > 15 ? 20 : 0
+      const scoreA = ca >= 3 && ca <= 15 ? 100 - Math.abs(ca - 7) : ca > 15 ? 30 - ca : 0
+      const scoreB = cb >= 3 && cb <= 15 ? 100 - Math.abs(cb - 7) : cb > 15 ? 30 - cb : 0
       return scoreB - scoreA
-    }).filter(d => (dimCardinalities[d] || 0) >= 2)
+    })
     const rankedDates = dates.filter(d => (dimCardinalities[d] || 0) >= 2)
     if (rankedDims[0] && metrics[0]) c.push({ type: 'bar', dim: rankedDims[0], met: metrics[0] })
     if (rankedDates[0] && metrics[0]) c.push({ type: 'line', dim: rankedDates[0], met: metrics[0] })
@@ -341,6 +361,8 @@ export function useAutoChartData() {
     else if (rankedDims[1] && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[1], met: metrics[1] })
     if (rankedDims.length > 1 && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[1], met: metrics[1] })
     else if (rankedDims[0] && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[0], met: metrics[1] })
+    if (c.length === 0 && rankedDates[0] && metrics[0]) c.push({ type: 'line', dim: rankedDates[0], met: metrics[0] })
+    if (c.length === 0 && dimensions[0] && metrics[0]) c.push({ type: 'bar', dim: dimensions[0], met: metrics[0] })
     const seen = new Set()
     return c.filter(ch => { const key = `${ch.dim}-${ch.met}-${ch.type}`; if (seen.has(key)) return false; seen.add(key); return true }).slice(0, 4)
   }, [rawData, schema, columnsByType, dimCardinalities])
