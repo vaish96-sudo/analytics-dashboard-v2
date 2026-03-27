@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useCallback, useMemo, useEf
 import { useProject } from './ProjectContext'
 import * as projectService from '../lib/projectService'
 import { callClaudeAPI } from '../utils/claudeClient.js'
-import { detectTemplate, applyTemplate, applyTemplateToSchema } from '../lib/templates'
 
 const DataContext = createContext(null)
 
@@ -95,7 +94,6 @@ export function DataProvider({ children }) {
   const [pendingSchema, setPendingSchema] = useState(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [autoConfirmReady, setAutoConfirmReady] = useState(false)
-  const [activeTemplate, setActiveTemplate] = useState(null)
   const [confirmError, setConfirmError] = useState(null)
 
   // Cache for full raw data — either uploaded this session or downloaded from Storage
@@ -370,12 +368,6 @@ export function DataProvider({ children }) {
     return result
   }, [schema])
 
-  // Compute template result (kpiOrder, insightFocus) from active template + current schema
-  const templateResult = useMemo(() => {
-    if (!activeTemplate || !schema || !columnsByType) return null
-    return applyTemplate(activeTemplate, schema, columnsByType)
-  }, [activeTemplate, schema, columnsByType])
-
   const rowCount = rawData ? rawData.length : 0
   const filteredRowCount = filteredRawData ? filteredRawData.length : 0
 
@@ -452,18 +444,6 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
     } finally {
       setSchemaLoading(false)
     }
-
-    // Auto-detect template from column names and use it to improve classification
-    try {
-      const colNames = Object.keys(data[0] || {})
-      const detected = detectTemplate(colNames)
-      if (detected) {
-        setActiveTemplate(detected.template)
-        // Use template's suggestedSchema to improve heuristic classification
-        // This runs AFTER AI tagging, so it only overrides where template has strong signal
-        finalSchema = applyTemplateToSchema(detected.template, finalSchema)
-      }
-    } catch {}
 
     // Auto-confirm: skip the tagger and go straight to building the dashboard
     setPendingSchema(finalSchema)
@@ -754,7 +734,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
   return <DataContext.Provider value={{
     rawData, filteredRawData, fileName, schema, step, setStep, activeTab, setActiveTab,
     globalFilters, setGlobalFilters, hasGlobalFilters,
-    loadData, cancelTagging, confirmTagging, editSchema, updateColumnSchema, removeColumn, columnsByType, schemaLoading, activeTemplate, templateResult,
+    loadData, cancelTagging, confirmTagging, editSchema, updateColumnSchema, removeColumn, columnsByType, schemaLoading,
     confirmLoading, confirmError, dataLoading,
     aggregate, aggregateUnfiltered, getUniqueValues, rowCount, filteredRowCount,
     datasets, activeDatasetId, activeDataset, switchDataset, removeDataset, updateDatasetState,

@@ -4,7 +4,6 @@ import { useData } from '../context/DataContext'
 import { CHART_COLORS, smartFormat, truncate } from '../utils/formatters'
 import { BarChart3, TrendingUp, PieChart as PieIcon, AreaChart as AreaIcon, Maximize2, Minimize2 } from 'lucide-react'
 import { callClaudeAPI } from '../utils/claudeClient.js'
-import { resolveChartLayout } from '../lib/templates'
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -120,7 +119,7 @@ export function ChartCard({ defaultType, defaultDim, defaultMet, index, schema, 
 }
 
 export default function AutoCharts() {
-  const { rawData, schema, columnsByType, aggregate, activeDatasetId, updateDatasetState, globalFilters, setGlobalFilters, chartsState, activeTemplate } = useData()
+  const { rawData, schema, columnsByType, aggregate, activeDatasetId, updateDatasetState, globalFilters, setGlobalFilters, chartsState } = useData()
   const [aiChartConfigs, setAiChartConfigs] = useState(null)
   const [aiLoading, setAiLoading] = useState(false)
   const aiRequestedRef = useRef(null)
@@ -142,12 +141,6 @@ export default function AutoCharts() {
     })
     return result
   }, [rawData, columnsByType])
-
-  // Template-based chart layout — resolved from hints to real column names
-  const templateCharts = useMemo(() => {
-    if (!activeTemplate || !columnsByType || !dimCardinalities) return null
-    return resolveChartLayout(activeTemplate, columnsByType, dimCardinalities)
-  }, [activeTemplate, columnsByType, dimCardinalities])
 
   // Smarter basic heuristic (instant fallback) — avoids useless dimensions
   const basicCharts = useMemo(() => {
@@ -200,8 +193,6 @@ export default function AutoCharts() {
     if (activeDatasetId === '__pending__') return
     if (aiRequestedRef.current === activeDatasetId) return
     if (userModifiedRef.current) return
-    // Skip AI chart selection if template already provides good charts
-    if (templateCharts && templateCharts.length >= 2) return
 
     aiRequestedRef.current = activeDatasetId
     setAiLoading(true)
@@ -275,10 +266,10 @@ Respond with ONLY a JSON array (no markdown, no backticks):
       })
       .catch(() => {})
       .finally(() => setAiLoading(false))
-  }, [activeDatasetId, rawData, schema, columnsByType, dimCardinalities, templateCharts])
+  }, [activeDatasetId, rawData, schema, columnsByType, dimCardinalities])
 
-  // Priority: template charts > AI configs > basic heuristic
-  const charts = templateCharts || aiChartConfigs || basicCharts
+  // Priority: AI configs > basic heuristic
+  const charts = aiChartConfigs || basicCharts
 
   const handleBarClick = useCallback((dimension, value) => {
     setGlobalFilters(prev => {
@@ -311,7 +302,7 @@ Respond with ONLY a JSON array (no markdown, no backticks):
 
 /** Hook: returns chart configs and all props needed to render individual ChartCards */
 export function useAutoChartData() {
-  const { rawData, schema, columnsByType, aggregate, activeDatasetId, updateDatasetState, globalFilters, setGlobalFilters, chartsState, activeTemplate } = useData()
+  const { rawData, schema, columnsByType, aggregate, activeDatasetId, updateDatasetState, globalFilters, setGlobalFilters, chartsState } = useData()
   const [aiChartConfigs, setAiChartConfigs] = useState(null)
   const [aiLoading, setAiLoading] = useState(false)
   const aiRequestedRef = useRef(null)
@@ -329,12 +320,6 @@ export function useAutoChartData() {
     allDims.forEach(dim => { result[dim] = new Set(rawData.map(r => r[dim])).size })
     return result
   }, [rawData, columnsByType])
-
-  // Template-based chart layout
-  const templateCharts = useMemo(() => {
-    if (!activeTemplate || !columnsByType || !dimCardinalities) return null
-    return resolveChartLayout(activeTemplate, columnsByType, dimCardinalities)
-  }, [activeTemplate, columnsByType, dimCardinalities])
 
   const basicCharts = useMemo(() => {
     if (!rawData || !schema) return []
@@ -382,8 +367,8 @@ export function useAutoChartData() {
     })
   }, [setGlobalFilters])
 
-  // Priority: template charts > AI configs > basic heuristic
-  const charts = templateCharts || aiChartConfigs || basicCharts
+  // Priority: AI configs > basic heuristic
+  const charts = aiChartConfigs || basicCharts
 
   return {
     charts,

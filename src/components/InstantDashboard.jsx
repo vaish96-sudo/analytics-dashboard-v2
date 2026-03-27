@@ -2,27 +2,16 @@ import React, { useState, useCallback, useRef, useMemo } from 'react'
 import {
   Upload, BarChart3, Sparkles, ArrowRight, Loader2, FileSpreadsheet,
   TrendingUp, Target, AlertTriangle, Lightbulb, PieChart as PieIcon,
-  AreaChart as AreaIcon, Download, Share2, Save, Lock, Maximize2, Minimize2,
+  AreaChart as AreaIcon, Lock, Maximize2, Minimize2,
   LayoutDashboard, Table2, Wand2, Settings, MessageSquare, Send,
-  Filter, X, ChevronDown, FileDown, Users, Crown
+  Filter, X, FileDown, Crown
 } from 'lucide-react'
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts'
 import LogoMark from './LogoMark'
-import { detectTemplate, applyTemplate, applyTemplateToSchema, resolveChartLayout } from '../lib/templates'
 import { smartFormat, truncate, CHART_COLORS } from '../utils/formatters'
-
-/**
- * Instant Dashboard — the conversion funnel.
- * 
- * Philosophy: Show the FULL product. Let them interact with everything.
- * Gate the ACTIONS (save, export, share, unlimited AI) behind signup.
- * 
- * Flow: Upload CSV → AI classifies columns → full interactive dashboard
- * with KPIs, Recharts, AI insights, data table preview, Ask AI teaser.
- */
 
 // === CSV PARSER ===
 function parseCSV(text) {
@@ -63,7 +52,6 @@ function detectColumnType(values, colName) {
       'code', 'phone', 'number', 'no', 'num', 'rank', 'ranking',
       'region', 'zone', 'district', 'ward', 'block', 'batch', 'version']
     if (dimensionNames.some(d => name === d || name.startsWith(d + '_') || name.endsWith('_' + d))) return 'dimension'
-    // Word-split for multi-word: "Row ID", "Postal Code", "Age"
     const words = name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_\-]+/g, ' ').split(/\s+/)
     if (words.some(w => ['id', 'age', 'zip', 'postal', 'code', 'phone'].includes(w))) return 'dimension'
     const uniqueValues = new Set(sample.map(v => String(v).trim()))
@@ -77,10 +65,21 @@ function detectColumnType(values, colName) {
 
 function toLabel(col) { return col.replace(/[_-]/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\b\w/g, c => c.toUpperCase()).trim() }
 
-function buildSchema(data) {
+function buildHeuristicSchema(data) {
   const cols = Object.keys(data[0]); const s = {}
   cols.forEach(col => { s[col] = { type: detectColumnType(data.map(r => r[col]), col), label: toLabel(col) } })
   return s
+}
+
+function computeColumnsByType(s) {
+  const cbt = { dimensions: [], metrics: [], dates: [], ignored: [] }
+  Object.entries(s).forEach(([col, def]) => {
+    if (def.type === 'dimension') cbt.dimensions.push(col)
+    else if (def.type === 'metric') cbt.metrics.push(col)
+    else if (def.type === 'date') cbt.dates.push(col)
+    else cbt.ignored.push(col)
+  })
+  return cbt
 }
 
 // === AGGREGATION ===
@@ -103,7 +102,7 @@ function aggregateData(data, dims, mets) {
   })
 }
 
-// === AI CALL HELPER ===
+// === AI CALL ===
 async function callPublicAI(system, userMessage, maxTokens = 500) {
   const res = await fetch('/api/claude-public', {
     method: 'POST',
@@ -132,7 +131,7 @@ const ChartTooltip = ({ active, payload, label }) => {
   )
 }
 
-// === INTERACTIVE CHART CARD ===
+// === CHART CARD ===
 function ChartCard({ defaultType, defaultDim, defaultMet, index, schema, columnsByType, data, globalFilters, onBarClick }) {
   const [expanded, setExpanded] = useState(false)
   const [dim, setDim] = useState(defaultDim)
@@ -242,7 +241,7 @@ function ChartCard({ defaultType, defaultDim, defaultMet, index, schema, columns
   )
 }
 
-// === INSIGHT STYLING ===
+// === STYLING ===
 const INSIGHT_ICONS = { opportunity: Target, trend: TrendingUp, alert: AlertTriangle, recommendation: Lightbulb }
 const INSIGHT_COLORS = {
   opportunity: { bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)', icon: '#10b981' },
@@ -252,7 +251,6 @@ const INSIGHT_COLORS = {
 }
 const KPI_COLORS = ['#3b82f6', '#0ea5e9', '#f97316', '#10b981', '#8b5cf6', '#ec4899']
 
-// === SIGNUP GATE OVERLAY ===
 function SignupGate({ title, description, icon: Icon }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
@@ -262,8 +260,7 @@ function SignupGate({ title, description, icon: Icon }) {
       </div>
       <h3 className="text-base font-display font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{title}</h3>
       <p className="text-sm mb-4 max-w-sm" style={{ color: 'var(--text-muted)' }}>{description}</p>
-      <a href="/" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
-        style={{ background: 'var(--accent)' }}>
+      <a href="/" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>
         Sign up free <ArrowRight className="w-4 h-4" />
       </a>
       <p className="text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>No credit card required</p>
@@ -279,7 +276,6 @@ export default function InstantDashboard() {
   const [schema, setSchema] = useState(null)
   const [columnsByType, setColumnsByType] = useState(null)
   const [fileName, setFileName] = useState(null)
-  const [template, setTemplate] = useState(null)
   const [dragging, setDragging] = useState(false)
   const [insights, setInsights] = useState([])
   const [insightLoading, setInsightLoading] = useState(false)
@@ -291,36 +287,64 @@ export default function InstantDashboard() {
   const [askInput, setAskInput] = useState('')
   const fileRef = useRef(null)
 
-  // === FILE HANDLER — heuristic classification + template detection ===
+  // === FILE HANDLER ===
   const handleFile = useCallback((file) => {
     if (!file) return
     setError(null)
     setBuilding(true)
-    setBuildingMsg('Analyzing your data...')
+    setBuildingMsg('Reading your file...')
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const rows = parseCSV(e.target.result)
         if (rows.length === 0) { setError('No data found in file'); setBuilding(false); return }
 
-        let s = buildSchema(rows)
+        // Start with heuristic
+        let s = buildHeuristicSchema(rows)
 
-        // Template detection
-        const colNames = Object.keys(rows[0])
-        const detected = detectTemplate(colNames)
-        if (detected) {
-          setTemplate(detected.template)
-          s = applyTemplateToSchema(detected.template, s)
-        }
+        // AI classification — same prompt as the main dashboard
+        setBuildingMsg('AI is classifying your columns...')
+        try {
+          const columns = Object.keys(rows[0])
+          const samples = {}
+          columns.forEach(col => { samples[col] = rows.map(r => r[col]).filter(v => v !== null && v !== undefined && v !== '').slice(0, 8) })
+          const colList = columns.map(col => `- "${col}": ${samples[col].slice(0, 5).map(v => JSON.stringify(v)).join(', ')}`).join('\n')
 
-        // Compute columnsByType
-        const cbt = { dimensions: [], metrics: [], dates: [], ignored: [] }
-        Object.entries(s).forEach(([col, def]) => {
-          if (def.type === 'dimension') cbt.dimensions.push(col)
-          else if (def.type === 'metric') cbt.metrics.push(col)
-          else if (def.type === 'date') cbt.dates.push(col)
-          else cbt.ignored.push(col)
-        })
+          const aiText = await callPublicAI(
+            `You are a data classification expert. The user uploaded a dataset. For each column, determine:
+1. type: "dimension" (text/categories for grouping — names, regions, ranges like "20-30%", IDs, labels), "metric" (numeric values you would SUM or AVERAGE — revenue, counts, amounts, rates as raw numbers), "date" (dates/timestamps), or "ignore" (irrelevant columns like row IDs, sequential indices)
+2. label: A clean, human-readable display name
+
+CRITICAL RULES:
+- Columns with ranges like "20-30%", "25-34", "100-200" are DIMENSIONS not metrics — they are categories
+- Columns with names/text that happen to contain numbers (IDs, codes, zip codes) are DIMENSIONS
+- AGE is ALWAYS a "dimension" — you never SUM ages
+- Only classify as "metric" if the values are actual numbers that make sense to sum or average
+- Column names like "amount", "total", "count", "revenue", "cost", "price", "sales", "profit", "quantity", "units", "spend" with raw numbers should be METRIC
+
+Respond with ONLY a JSON object (no markdown, no backticks) mapping column names to {type, label}:
+{"column_name": {"type": "dimension", "label": "Column Name"}, ...}`,
+            `Classify these columns:\n${colList}`, 1500
+          )
+
+          if (aiText) {
+            const aiSchema = JSON.parse(aiText.replace(/```json|```/g, '').trim())
+            const validTypes = ['dimension', 'metric', 'date', 'ignore']
+            if (columns.every(col => aiSchema[col] && validTypes.includes(aiSchema[col].type))) {
+              const updated = {}
+              columns.forEach(col => {
+                updated[col] = {
+                  type: aiSchema[col]?.type || s[col]?.type || 'dimension',
+                  label: aiSchema[col]?.label || s[col]?.label || col,
+                }
+              })
+              s = updated
+            }
+          }
+        } catch (aiErr) { console.warn('AI tagging failed, using heuristic:', aiErr.message) }
+
+        setBuildingMsg('Building your charts...')
+        const cbt = computeColumnsByType(s)
 
         setData(rows)
         setSchema(s)
@@ -328,15 +352,14 @@ export default function InstantDashboard() {
         setFileName(file.name)
         setBuilding(false)
 
-        // Generate insights in background
-        generateInsights(rows, s, cbt, detected?.template || null)
+        generateInsights(rows, s, cbt)
       } catch (err) { setError('Failed to parse: ' + err.message); setBuilding(false) }
     }
     reader.readAsText(file)
   }, [])
 
   // === AI INSIGHTS ===
-  const generateInsights = async (rows, s, cbt, tmpl) => {
+  const generateInsights = async (rows, s, cbt) => {
     setInsightLoading(true)
     try {
       const metrics = Object.entries(s).filter(([, d]) => d.type === 'metric').map(([col, d]) => ({ col, label: d.label }))
@@ -353,9 +376,8 @@ export default function InstantDashboard() {
         summaryParts.push(`\nTop ${dims[0].label} by ${metrics[0].label}:\n` + topData.map(r => `  ${r[dims[0].col]}: ${r[metrics[0].col]?.toLocaleString()}`).join('\n'))
       }
 
-      const focus = tmpl?.insightFocus ? `\n\nDOMAIN: ${tmpl.insightFocus}` : ''
       const text = await callPublicAI(
-        `You are a world-class strategic analyst. Respond with ONLY a JSON array of 4-5 insights:\n[{"type":"opportunity|trend|alert|recommendation","title":"Short title","description":"2-3 sentence actionable insight with specific numbers.","impact":"high|medium|low"}]\nBe specific. Think C-suite strategist.${focus}`,
+        `You are a world-class strategic analyst. Respond with ONLY a JSON array of 4-5 insights:\n[{"type":"opportunity|trend|alert|recommendation","title":"Short title","description":"2-3 sentence actionable insight with specific numbers.","impact":"high|medium|low"}]\nBe specific. Think C-suite strategist.`,
         `Dataset: ${rows.length} rows, ${Object.keys(s).length} columns.\n${summaryParts.join('\n')}\n\nProvide 4-5 strategic insights.`,
         800
       )
@@ -374,24 +396,18 @@ export default function InstantDashboard() {
 
   const charts = useMemo(() => {
     if (!data || !schema || !columnsByType) return []
-    if (template) {
-      const tc = resolveChartLayout(template, columnsByType, dimCardinalities)
-      if (tc?.length >= 2) return tc
-    }
     const { dimensions, metrics, dates } = columnsByType; const c = []
 
-    // Filter out bad chart dimensions: too many unique values or ID-like names
+    // Filter out bad chart dimensions
     const isGoodChartDim = (dim) => {
       const card = dimCardinalities[dim] || 0
       if (card < 2 || card > 50) return false
-      // Skip ID-like dimensions — terrible chart axes
       const lower = dim.toLowerCase()
       const words = lower.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_\-]+/g, ' ').split(/\s+/)
       if (words.includes('id') || lower.endsWith('_id') || lower.endsWith('id')) return false
       return true
     }
 
-    // Rank: prefer 3-15 unique values (most insightful), allow up to 50
     const rankedDims = [...dimensions].filter(isGoodChartDim).sort((a, b) => {
       const ca = dimCardinalities[a] || 0, cb = dimCardinalities[b] || 0
       const scoreA = ca >= 3 && ca <= 15 ? 100 - Math.abs(ca - 7) : ca > 15 ? 30 - ca : 0
@@ -400,7 +416,6 @@ export default function InstantDashboard() {
     })
     const rankedDates = dates.filter(d => (dimCardinalities[d] || 0) >= 2)
 
-    // Build charts with best dimensions × metrics, each combo unique
     if (rankedDims[0] && metrics[0]) c.push({ type: 'bar', dim: rankedDims[0], met: metrics[0] })
     if (rankedDates[0] && metrics[0]) c.push({ type: 'line', dim: rankedDates[0], met: metrics[0] })
     if (rankedDims[0] && metrics[0] && (dimCardinalities[rankedDims[0]] || 0) <= 8) c.push({ type: 'pie', dim: rankedDims[0], met: metrics[0] })
@@ -408,32 +423,23 @@ export default function InstantDashboard() {
     if (rankedDims.length > 1 && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[1], met: metrics[1] })
     else if (rankedDims[0] && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[0], met: metrics[1] })
 
-    // Fallback: if no good dims found, try dates or allow slightly higher cardinality
     if (c.length === 0 && rankedDates[0] && metrics[0]) c.push({ type: 'line', dim: rankedDates[0], met: metrics[0] })
     if (c.length === 0 && dimensions[0] && metrics[0]) c.push({ type: 'bar', dim: dimensions[0], met: metrics[0] })
 
     const seen = new Set()
     return c.filter(ch => { const k = `${ch.dim}-${ch.met}-${ch.type}`; if (seen.has(k)) return false; seen.add(k); return true }).slice(0, 4)
-  }, [data, schema, columnsByType, dimCardinalities, template])
+  }, [data, schema, columnsByType, dimCardinalities])
 
   // === KPIs ===
   const kpis = useMemo(() => {
     if (!data || !schema || !columnsByType) return []
-    let ordered = columnsByType.metrics
-    if (template) {
-      const r = applyTemplate(template, schema, columnsByType)
-      if (r?.kpiOrder?.length > 0) {
-        const valid = r.kpiOrder.filter(c => columnsByType.metrics.includes(c))
-        ordered = [...valid, ...columnsByType.metrics.filter(c => !valid.includes(c))]
-      }
-    }
-    return ordered.slice(0, 6).map(col => {
+    return columnsByType.metrics.slice(0, 6).map(col => {
       const vals = data.map(r => { const v = r[col]; return typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[,$%]/g, '')) }).filter(v => !isNaN(v))
       return { col, label: schema[col]?.label || col, total: vals.reduce((a, b) => a + b, 0) }
     })
-  }, [data, schema, columnsByType, template])
+  }, [data, schema, columnsByType])
 
-  // === GLOBAL FILTER (click bar to filter) ===
+  // === GLOBAL FILTER ===
   const handleBarClick = useCallback((dimension, value) => {
     setGlobalFilters(prev => {
       const current = prev[dimension] || []
@@ -443,10 +449,9 @@ export default function InstantDashboard() {
       } else { return { ...prev, [dimension]: [value] } }
     })
   }, [])
-
   const hasFilters = Object.values(globalFilters).some(v => v?.length > 0)
 
-  // === DATA TABLE PREVIEW ===
+  // === DATA TABLE ===
   const tablePreview = useMemo(() => {
     if (!data || !schema) return null
     const visibleCols = Object.entries(schema).filter(([, d]) => d.type !== 'ignore').map(([col]) => col).slice(0, 8)
@@ -455,7 +460,6 @@ export default function InstantDashboard() {
     return { cols: visibleCols, rows: rows.slice(0, 20), total: rows.length }
   }, [data, schema, globalFilters, hasFilters])
 
-  // === TABS ===
   const TABS = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'data', label: 'Data', icon: Table2 },
@@ -533,19 +537,12 @@ export default function InstantDashboard() {
             </div>
           </div>
         </div>
-
         <div className="p-3" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'var(--bg-overlay)' }}>
             <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--accent)' }} />
             <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{fileName}</span>
           </div>
-          {template && (
-            <div className="mt-2 px-3">
-              <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'var(--border-accent)', color: 'var(--accent)' }}>{template.icon} {template.name}</span>
-            </div>
-          )}
         </div>
-
         <nav className="flex-1 p-3 space-y-1">
           {TABS.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -562,11 +559,9 @@ export default function InstantDashboard() {
             </a>
           </div>
         </nav>
-
         <div className="p-4" style={{ borderTop: '1px solid var(--border)' }}>
           <div className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>{data.length.toLocaleString()} rows · {columnsByType.metrics.length}M {columnsByType.dimensions.length}D</div>
-          <a href="/" className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-display font-semibold text-white"
-            style={{ background: 'var(--accent)' }}>
+          <a href="/" className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-display font-semibold text-white" style={{ background: 'var(--accent)' }}>
             <Crown className="w-4 h-4" /> Sign up free
           </a>
         </div>
@@ -592,11 +587,10 @@ export default function InstantDashboard() {
         </div>
       </div>
 
-      {/* MAIN CONTENT */}
+      {/* MAIN */}
       <main className="flex-1 overflow-y-auto lg:ml-56 pb-20 lg:pb-0">
         <div className="p-4 lg:p-6 mx-auto max-w-[1400px]">
 
-          {/* FILTER BAR */}
           {hasFilters && activeTab === 'overview' && (
             <div className="flex items-center gap-2 mb-4 flex-wrap">
               <Filter className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
@@ -611,7 +605,7 @@ export default function InstantDashboard() {
             </div>
           )}
 
-          {/* === OVERVIEW TAB === */}
+          {/* OVERVIEW */}
           {activeTab === 'overview' && (
             <div className="space-y-4">
               {(insightLoading || insights.length > 0) && (
@@ -670,43 +664,46 @@ export default function InstantDashboard() {
                     schema={schema} columnsByType={columnsByType} data={data} globalFilters={globalFilters} onBarClick={handleBarClick} />
                 ))}
               </div>
-              <p className="text-center text-xs pt-2" style={{ color: 'var(--text-muted)' }}>Click any bar to filter · Switch chart types and metrics above</p>
+              {charts.length > 0 && <p className="text-center text-xs pt-2" style={{ color: 'var(--text-muted)' }}>Click any bar to filter · Switch chart types and metrics above</p>}
+
+              <div className="rounded-2xl p-8 text-center mt-2" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.06), rgba(37,99,235,0.06))', border: '1px solid rgba(139,92,246,0.15)' }}>
+                <Sparkles className="w-8 h-8 mx-auto mb-3" style={{ color: 'var(--accent)' }} />
+                <h2 className="text-lg font-display font-bold mb-2" style={{ color: 'var(--text-primary)' }}>This is just the beginning</h2>
+                <p className="text-sm mb-5 max-w-lg mx-auto" style={{ color: 'var(--text-muted)' }}>Sign up to save this dashboard, ask unlimited AI questions, build custom reports, export branded PDFs, share with your team, and connect Google Sheets for live data.</p>
+                <div className="flex items-center justify-center gap-3 flex-wrap mb-5">
+                  {['Save & revisit', 'Ask AI anything', 'Custom formulas', 'PDF export', 'Team sharing', 'Google Sheets', 'White-label', 'Scheduled reports'].map(f => (
+                    <span key={f} className="text-xs px-3 py-1.5 rounded-full" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>{f}</span>
+                  ))}
+                </div>
+                <a href="/" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-display font-semibold text-white" style={{ background: 'var(--accent)' }}>Sign up free <ArrowRight className="w-4 h-4" /></a>
+                <p className="text-[10px] mt-3" style={{ color: 'var(--text-muted)' }}>No credit card required · Free tier includes 1 project</p>
+              </div>
             </div>
           )}
 
-          {/* === DATA TAB === */}
+          {/* DATA */}
           {activeTab === 'data' && tablePreview && (
             <div className="rounded-xl overflow-hidden" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                      {tablePreview.cols.map(col => (
-                        <th key={col} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap" style={{ color: 'var(--text-secondary)', background: 'var(--bg-overlay)' }}>{schema[col]?.label || col}</th>
-                      ))}
+                  <thead><tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    {tablePreview.cols.map(col => (<th key={col} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap" style={{ color: 'var(--text-secondary)', background: 'var(--bg-overlay)' }}>{schema[col]?.label || col}</th>))}
+                  </tr></thead>
+                  <tbody>{tablePreview.rows.map((row, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                      {tablePreview.cols.map(col => (<td key={col} className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>{typeof row[col] === 'number' ? smartFormat(row[col], col) : truncate(String(row[col] ?? ''), 30)}</td>))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {tablePreview.rows.map((row, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                        {tablePreview.cols.map(col => (
-                          <td key={col} className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
-                            {typeof row[col] === 'number' ? smartFormat(row[col], col) : truncate(String(row[col] ?? ''), 30)}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
+                  ))}</tbody>
                 </table>
               </div>
               <div className="px-4 py-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-overlay)' }}>
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Showing 20 of {tablePreview.total.toLocaleString()} rows</span>
-                <span className="text-[10px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}><Lock style={{ width: 10, height: 10 }} /> Sign up for full data table with sort, search & filter</span>
+                <span className="text-[10px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}><Lock style={{ width: 10, height: 10 }} /> Sign up for full data table</span>
               </div>
             </div>
           )}
 
-          {/* === AI TAB === */}
+          {/* AI */}
           {activeTab === 'ai' && (
             <div className="space-y-4">
               {insights.length > 0 && (
@@ -732,30 +729,19 @@ export default function InstantDashboard() {
                   })}
                 </div>
               )}
-
               <div className="rounded-xl overflow-hidden" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
                 <div className="p-4" style={{ borderBottom: '1px solid var(--border)' }}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <MessageSquare className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-                    <h3 className="text-sm font-display font-semibold" style={{ color: 'var(--text-primary)' }}>Ask AI about your data</h3>
-                  </div>
+                  <div className="flex items-center gap-2 mb-1"><MessageSquare className="w-4 h-4" style={{ color: 'var(--accent)' }} /><h3 className="text-sm font-display font-semibold" style={{ color: 'var(--text-primary)' }}>Ask AI about your data</h3></div>
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Ask questions in plain English — "What's my top product?" "Show revenue by month"</p>
                 </div>
                 <div className="p-4">
                   <div className="flex gap-2">
-                    <input value={askInput} onChange={e => setAskInput(e.target.value)} placeholder="e.g. What are my top 5 products by revenue?"
-                      className="flex-1 text-sm px-4 py-2.5 rounded-xl focus:outline-none"
-                      style={{ background: 'var(--bg-overlay)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
-                    <a href="/" className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white shrink-0" style={{ background: 'var(--accent)' }}>
-                      <Send className="w-4 h-4" /> Ask
-                    </a>
+                    <input value={askInput} onChange={e => setAskInput(e.target.value)} placeholder="e.g. What are my top 5 products by revenue?" className="flex-1 text-sm px-4 py-2.5 rounded-xl focus:outline-none" style={{ background: 'var(--bg-overlay)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                    <a href="/" className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white shrink-0" style={{ background: 'var(--accent)' }}><Send className="w-4 h-4" /> Ask</a>
                   </div>
-                  <p className="text-[10px] mt-2 flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                    <Lock style={{ width: 10, height: 10 }} /> Sign up free to ask unlimited questions about your data
-                  </p>
+                  <p className="text-[10px] mt-2 flex items-center gap-1" style={{ color: 'var(--text-muted)' }}><Lock style={{ width: 10, height: 10 }} /> Sign up free to ask unlimited questions</p>
                 </div>
               </div>
-
               <div className="rounded-xl p-6 text-center" style={{ background: 'var(--bg-surface)', border: '1px dashed var(--border)' }}>
                 <Wand2 className="w-6 h-6 mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
                 <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>AI Recommendations</p>
@@ -765,29 +751,8 @@ export default function InstantDashboard() {
             </div>
           )}
 
-          {activeTab === 'builder' && (
-            <SignupGate icon={Wand2} title="Custom Report Builder" description="Build custom reports with drag-and-drop charts, custom formulas, calculated metrics, and scheduled PDF exports." />
-          )}
-
-          {activeTab === 'settings' && (
-            <SignupGate icon={Settings} title="Dashboard Settings" description="Customize your dashboard with white-label branding, team sharing, scheduled reports, and connected data sources." />
-          )}
-
-          {activeTab === 'overview' && (
-            <div className="rounded-2xl p-8 text-center mt-6" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.06), rgba(37,99,235,0.06))', border: '1px solid rgba(139,92,246,0.15)' }}>
-              <Sparkles className="w-8 h-8 mx-auto mb-3" style={{ color: 'var(--accent)' }} />
-              <h2 className="text-lg font-display font-bold mb-2" style={{ color: 'var(--text-primary)' }}>This is just the beginning</h2>
-              <p className="text-sm mb-5 max-w-lg mx-auto" style={{ color: 'var(--text-muted)' }}>Sign up to save this dashboard, ask unlimited AI questions, build custom reports, export branded PDFs, share with your team, and connect Google Sheets for live data.</p>
-              <div className="flex items-center justify-center gap-3 flex-wrap mb-5">
-                {['Save & revisit', 'Ask AI anything', 'Custom formulas', 'PDF export', 'Team sharing', 'Google Sheets', 'White-label', 'Scheduled reports'].map(f => (
-                  <span key={f} className="text-xs px-3 py-1.5 rounded-full" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>{f}</span>
-                ))}
-              </div>
-              <a href="/" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-display font-semibold text-white" style={{ background: 'var(--accent)' }}>Sign up free <ArrowRight className="w-4 h-4" /></a>
-              <p className="text-[10px] mt-3" style={{ color: 'var(--text-muted)' }}>No credit card required · Free tier includes 1 project</p>
-            </div>
-          )}
-
+          {activeTab === 'builder' && <SignupGate icon={Wand2} title="Custom Report Builder" description="Build custom reports with drag-and-drop charts, custom formulas, calculated metrics, and scheduled PDF exports." />}
+          {activeTab === 'settings' && <SignupGate icon={Settings} title="Dashboard Settings" description="Customize your dashboard with white-label branding, team sharing, scheduled reports, and connected data sources." />}
         </div>
       </main>
     </div>
