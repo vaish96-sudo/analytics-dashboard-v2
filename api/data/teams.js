@@ -1,6 +1,7 @@
 import { validateSession, checkOrigin } from '../lib/validateSession.js'
 import { auditLog } from '../lib/auditLog.js'
 import { applyRateLimit } from '../lib/rateLimit.js'
+import { sanitizeString } from '../lib/sanitize.js'
 
 export default async function handler(req, res) {
   const session = await validateSession(req)
@@ -32,11 +33,12 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const { name } = req.body || {}
-    if (!name?.trim()) return res.status(400).json({ error: 'Team name is required' })
+    const safeName = sanitizeString(name, 100)
+    if (!safeName) return res.status(400).json({ error: 'Team name is required (max 100 characters)' })
 
     const { data: newTeam, error: err } = await supabase
       .from('teams')
-      .insert({ name: name.trim(), owner_id: userId })
+      .insert({ name: safeName, owner_id: userId })
       .select()
       .single()
 
@@ -54,7 +56,7 @@ export default async function handler(req, res) {
       invited_email: (await supabase.from('users').select('email').eq('id', userId).single()).data?.email,
     })
 
-    await auditLog(supabase, userId, 'team.create', { teamId: newTeam.id, name: name.trim() })
+    await auditLog(supabase, userId, 'team.create', { teamId: newTeam.id, name: safeName })
     return res.status(201).json(newTeam)
   }
 

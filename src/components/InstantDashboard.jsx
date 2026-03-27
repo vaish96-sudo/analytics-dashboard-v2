@@ -60,9 +60,19 @@ function detectColumnType(values, colName) {
   if (numericCount > sample.length * 0.8) {
     const name = (colName || '').toLowerCase()
     const words = name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_\-]+/g, ' ').split(/\s+/)
-    if (words.some(w => ['id', 'zip', 'zipcode', 'postal', 'code', 'phone', 'index'].includes(w))) return 'dimension'
-    const nameNorm = name.replace(/[\s-]+/g, '_')
-    if (['row_id', 'rowid', 'order_id', 'orderid', 'transaction_id', 'invoice_id', 'ticket_id', 'customer_id', 'user_id', 'product_id', 'sku'].some(p => nameNorm === p || nameNorm.endsWith(p))) return 'dimension'
+    // ID words
+    if (words.some(w => ['id', 'zip', 'zipcode', 'postal', 'code', 'phone', 'index', 'row', 'sku'].includes(w))) return 'dimension'
+    // Full ID patterns
+    const nameNorm = name.replace(/[\s\-]+/g, '_')
+    if (['row_id', 'rowid', 'order_id', 'orderid', 'transaction_id', 'invoice_id', 'ticket_id',
+      'customer_id', 'user_id', 'product_id', 'production_id', 'employee_id', 'student_id'
+    ].some(p => nameNorm === p || nameNorm.endsWith(p))) return 'dimension'
+    // Attribute words — numeric but not aggregatable (don't SUM ages, ratings)
+    if (words.some(w => ['age', 'year', 'month', 'day', 'rating', 'score', 'grade', 'rank', 'ranking',
+      'level', 'tier', 'floor', 'room', 'seat', 'group', 'class', 'category', 'size',
+      'region', 'zone', 'district', 'ward', 'block', 'batch', 'version',
+      'priority', 'number', 'no', 'num'
+    ].includes(w))) return 'dimension'
     const uniqueValues = new Set(sample.map(v => String(v).trim()))
     if (uniqueValues.size > sample.length * 0.9) return 'dimension'
     if (uniqueValues.size <= Math.min(20, sample.length * 0.3)) return 'dimension'
@@ -323,11 +333,14 @@ export default function InstantDashboard() {
 1. type: "dimension" (categories/labels/IDs for grouping), "metric" (numeric values to SUM or AVERAGE — revenue, cost, quantity, profit), "date" (dates/timestamps), or "ignore" (row IDs, sequential indices, irrelevant)
 2. label: Clean human-readable name
 
-RULES:
-- IDs (row, order, customer, product, transaction, invoice) → "dimension" or "ignore"
+CRITICAL RULES — read carefully:
+- IDs (row, order, customer, product, transaction, invoice, user, employee, student) → "dimension" or "ignore"
 - Postal codes, zip codes, phone numbers → "dimension"
-- Only "metric" if values make business sense to SUM/AVERAGE
-- Every-row-unique numeric columns are IDs, not metrics
+- AGE is ALWAYS a "dimension" — you never SUM ages. Same for: experience, tenure, duration, rating, score, grade, rank, level, tier, priority, year
+- "Experience Years", "Tenure", "Age", "Rating", "Score" → DIMENSION (individual attributes, not business totals)
+- Only classify as "metric" if summing the column produces a meaningful BUSINESS TOTAL (e.g. total revenue, total units sold, total cost, total profit, total orders)
+- Ask: "Does SUM of this column mean anything?" If not → dimension
+- Every-row-unique numeric columns are IDs → "dimension" or "ignore"
 
 Respond with ONLY JSON (no markdown): {"col_name": {"type": "...", "label": "..."}, ...}`,
             `Classify:\n${colList}`, 1500

@@ -1,5 +1,6 @@
 import { validateSession, checkOrigin } from '../lib/validateSession.js'
 import { applyRateLimit } from '../lib/rateLimit.js'
+import { sanitizeUUID } from '../lib/sanitize.js'
 
 export default async function handler(req, res) {
   const session = await validateSession(req)
@@ -10,16 +11,10 @@ export default async function handler(req, res) {
   if (checkOrigin(req, res)) return
 
   if (req.method === 'GET') {
-    const projectId = req.query.project_id
-    if (!projectId) return res.status(400).json({ error: 'Missing project_id' })
+    const projectId = sanitizeUUID(req.query.project_id)
+    if (!projectId) return res.status(400).json({ error: 'Missing or invalid project_id' })
 
-    // Ownership check
-    const { data: project } = await supabase
-      .from('projects')
-      .select('user_id')
-      .eq('id', projectId)
-      .single()
-
+    const { data: project } = await supabase.from('projects').select('user_id').eq('id', projectId).single()
     if (!project || project.user_id !== userId) return res.status(403).json({ error: 'Access denied' })
 
     const { data, error } = await supabase
@@ -34,19 +29,16 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const { projectId, datasetId } = req.body || {}
-    if (!projectId) return res.status(400).json({ error: 'Missing projectId' })
+    const safeProjectId = sanitizeUUID(projectId)
+    const safeDatasetId = sanitizeUUID(datasetId)
+    if (!safeProjectId) return res.status(400).json({ error: 'Missing or invalid projectId' })
 
-    const { data: project } = await supabase
-      .from('projects')
-      .select('user_id')
-      .eq('id', projectId)
-      .single()
-
+    const { data: project } = await supabase.from('projects').select('user_id').eq('id', safeProjectId).single()
     if (!project || project.user_id !== userId) return res.status(403).json({ error: 'Access denied' })
 
     const { data, error } = await supabase
       .from('conversations')
-      .insert({ project_id: projectId, dataset_id: datasetId || null })
+      .insert({ project_id: safeProjectId, dataset_id: safeDatasetId || null })
       .select()
       .single()
 

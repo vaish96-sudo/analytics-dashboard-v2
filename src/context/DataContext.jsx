@@ -22,24 +22,29 @@ function detectColumnType(values, colName) {
   const isNumeric = numericCount > sample.length * 0.8
 
   if (isNumeric) {
-    // Smart check: even if values are numeric, some columns are dimensions
     const name = (colName || '').toLowerCase()
-    
-    // Split into words — handles "Row ID", "order_id", "postalCode", "Postal Code" etc.
     const words = name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_\-]+/g, ' ').split(/\s+/)
     
-    // Column names that are almost always dimensions even with numeric values
-    const dimensionWords = ['id', 'age', 'year', 'month', 'day', 'zip', 'zipcode', 'postal',
-      'code', 'phone', 'number', 'no', 'num', 'rank', 'ranking', 'rating', 'score', 'grade',
-      'level', 'tier', 'floor', 'room', 'seat', 'size', 'group', 'class', 'category',
-      'region', 'zone', 'district', 'ward', 'block', 'batch', 'version',
-      'row', 'index', 'order', 'transaction', 'invoice', 'ticket']
-    if (words.some(w => dimensionWords.includes(w))) return 'dimension'
+    // ID-like words — these make numeric columns into dimensions (identifiers, not aggregatable)
+    const idWords = ['id', 'zip', 'zipcode', 'postal', 'code', 'phone', 'index', 'row', 'sku']
+    if (words.some(w => idWords.includes(w))) return 'dimension'
     
-    // If there are very few unique values relative to rows, it's likely a dimension (e.g., age groups, ratings 1-5)
+    // Full column name patterns for IDs
+    const nameNorm = name.replace(/[\s\-]+/g, '_')
+    const idPatterns = ['row_id', 'rowid', 'order_id', 'orderid', 'transaction_id', 'invoice_id',
+      'ticket_id', 'customer_id', 'user_id', 'product_id', 'production_id', 'employee_id', 'student_id']
+    if (idPatterns.some(p => nameNorm === p || nameNorm.endsWith(p))) return 'dimension'
+    
+    // Attribute words — numeric but should be treated as dimensions (you don't SUM ages or ratings)
+    // These are individual-level attributes, not business metrics
+    const attrWords = ['age', 'year', 'month', 'day', 'rating', 'score', 'grade', 'rank', 'ranking',
+      'level', 'tier', 'floor', 'room', 'seat', 'group', 'class', 'category', 'size',
+      'region', 'zone', 'district', 'ward', 'block', 'batch', 'version', 'priority', 'number', 'no', 'num']
+    if (words.some(w => attrWords.includes(w))) return 'dimension'
+    
     const uniqueValues = new Set(sample.map(v => String(v).trim()))
 
-    // High cardinality numeric = likely an ID, not a metric (e.g., every row is unique)
+    // High cardinality numeric = likely an ID, not a metric
     if (uniqueValues.size > sample.length * 0.9) return 'dimension'
 
     if (uniqueValues.size <= Math.min(20, sample.length * 0.3)) return 'dimension'
@@ -406,15 +411,18 @@ export function DataProvider({ children }) {
       const colList = columns.map(col => `- "${col}": ${samples[col].slice(0, 5).map(v => JSON.stringify(v)).join(', ')}`).join('\n')
 
       const system = `You are a data classification expert. The user uploaded a dataset. For each column, determine:
-1. type: "dimension" (text/categories for grouping — names, regions, ranges like "20-30%", IDs, labels), "metric" (numeric values you would SUM or AVERAGE — revenue, counts, amounts, rates as raw numbers), "date" (dates/timestamps), or "ignore" (irrelevant columns like row IDs)
+1. type: "dimension" (text/categories for grouping — names, regions, ranges like "20-30%", IDs, labels), "metric" (numeric values you would SUM or AVERAGE — revenue, counts, amounts, rates as raw numbers), "date" (dates/timestamps), or "ignore" (irrelevant columns like row IDs, sequential indices)
 2. label: A clean, human-readable display name
 
-CRITICAL RULES:
+CRITICAL RULES — read carefully:
 - Columns with ranges like "20-30%", "25-34", "100-200" are DIMENSIONS not metrics — they are categories
 - Columns with names/text that happen to contain numbers (IDs, codes, zip codes) are DIMENSIONS
-- Only classify as "metric" if the values are actual numbers that make sense to sum or average
-- Column names like "age" with categorical values (age ranges) should be DIMENSION
-- Column names like "amount", "total", "count", "revenue", "cost", "price" with raw numbers should be METRIC
+- AGE is ALWAYS a "dimension" — you never SUM ages. Same for: experience, tenure, duration, rating, score, grade, rank, level, tier, priority
+- "Experience Years", "Tenure", "Age", "Rating", "Score" → DIMENSION (individual attributes, not business totals)
+- Only classify as "metric" if SUMMING the column produces a meaningful BUSINESS TOTAL (e.g. total revenue, total units sold, total cost, total profit, total orders, total quantity)
+- Ask yourself: "Does SUM of this column mean anything to a business?" If not → dimension
+- Column names like "amount", "total", "count", "revenue", "cost", "price", "sales", "profit", "quantity", "units", "spend" with raw numbers → METRIC
+- Every-row-unique numeric columns (IDs) → "dimension" or "ignore"
 
 Respond with ONLY a JSON object (no markdown, no backticks) mapping column names to {type, label}:
 {"column_name": {"type": "dimension", "label": "Column Name"}, ...}`

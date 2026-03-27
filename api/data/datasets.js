@@ -1,6 +1,7 @@
 import { validateSession, checkOrigin } from '../lib/validateSession.js'
 import { auditLog } from '../lib/auditLog.js'
 import { applyRateLimit } from '../lib/rateLimit.js'
+import { sanitizeString, sanitizeUUID, sanitizeJSON } from '../lib/sanitize.js'
 import { gzipSync } from 'zlib'
 
 export const config = { 
@@ -19,19 +20,21 @@ export default async function handler(req, res) {
   if (checkOrigin(req, res)) return
 
   const { projectId, fileName, schemaDef, rowCount, rawData } = req.body || {}
-  if (!projectId || !fileName) return res.status(400).json({ error: 'Missing required fields' })
+  const safeProjectId = sanitizeUUID(projectId)
+  const safeFileName = sanitizeString(fileName, 255)
+  if (!safeProjectId || !safeFileName) return res.status(400).json({ error: 'Missing or invalid required fields' })
 
   // Ownership check: project must belong to user
   const { data: project, error: projErr } = await supabase
     .from('projects')
     .select('id, user_id')
-    .eq('id', projectId)
+    .eq('id', safeProjectId)
     .single()
 
   if (projErr || !project) return res.status(404).json({ error: 'Project not found' })
   if (project.user_id !== userId) return res.status(403).json({ error: 'Access denied' })
 
-  const storagePath = `${projectId}/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}.json.gz`
+  const storagePath = `${safeProjectId}/${Date.now()}_${safeFileName.replace(/[^a-zA-Z0-9._-]/g, '_')}.json.gz`
 
   // Compress raw data server-side
   const jsonStr = JSON.stringify(rawData || [])
@@ -46,8 +49,8 @@ export default async function handler(req, res) {
   const { data, error } = await supabase
     .from('datasets')
     .insert({
-      project_id: projectId,
-      file_name: fileName,
+      project_id: safeProjectId,
+      file_name: safeFileName,
       schema_def: schemaDef,
       row_count: rowCount,
       raw_data: [],
@@ -64,6 +67,6 @@ export default async function handler(req, res) {
   // Auto-create dashboard state
   await supabase.from('dashboard_states').insert({ dataset_id: data.id })
 
-  await auditLog(supabase, userId, 'dataset.create', { datasetId: data.id, projectId, fileName })
+  await auditLog(supabase, userId, 'dataset.create', { datasetId: data.id, projectId: safeProjectId, fileName: safeFileName })
   return res.status(201).json(data)
 }

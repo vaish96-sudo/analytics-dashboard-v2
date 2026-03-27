@@ -1,5 +1,6 @@
 import { validateSession, checkOrigin } from '../lib/validateSession.js'
 import { applyRateLimit } from '../lib/rateLimit.js'
+import { sanitizeString, sanitizeUUID, sanitizeJSON } from '../lib/sanitize.js'
 
 export default async function handler(req, res) {
   const session = await validateSession(req)
@@ -10,8 +11,8 @@ export default async function handler(req, res) {
   if (checkOrigin(req, res)) return
 
   if (req.method === 'GET') {
-    const conversationId = req.query.conversation_id
-    if (!conversationId) return res.status(400).json({ error: 'Missing conversation_id' })
+    const conversationId = sanitizeUUID(req.query.conversation_id)
+    if (!conversationId) return res.status(400).json({ error: 'Missing or invalid conversation_id' })
 
     // Ownership via project
     const { data: convo } = await supabase
@@ -34,15 +35,18 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const { conversationId, role, content, sqlPlan, meta } = req.body || {}
-    if (!conversationId || !role || content === undefined) {
-      return res.status(400).json({ error: 'Missing required fields' })
+    const safeConvoId = sanitizeUUID(conversationId)
+    const safeRole = ['user', 'assistant'].includes(role) ? role : null
+    const safeContent = sanitizeString(content, 50000)
+    if (!safeConvoId || !safeRole || safeContent === null) {
+      return res.status(400).json({ error: 'Missing or invalid required fields' })
     }
 
     // Ownership via project
     const { data: convo } = await supabase
       .from('conversations')
       .select('id, projects!inner(user_id)')
-      .eq('id', conversationId)
+      .eq('id', safeConvoId)
       .single()
 
     if (!convo || convo.projects.user_id !== userId) return res.status(403).json({ error: 'Access denied' })
@@ -50,11 +54,11 @@ export default async function handler(req, res) {
     const { data, error } = await supabase
       .from('messages')
       .insert({
-        conversation_id: conversationId,
-        role,
-        content,
-        sql_plan: sqlPlan || null,
-        meta: meta || null,
+        conversation_id: safeConvoId,
+        role: safeRole,
+        content: safeContent,
+        sql_plan: sanitizeString(sqlPlan, 5000) || null,
+        meta: sanitizeJSON(meta, 50000) || null,
       })
       .select()
       .single()
