@@ -5,6 +5,7 @@ import { DataProvider, useData } from './context/DataContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { TierProvider, useTier } from './context/TierContext'
 import AuthScreen from './components/AuthScreen'
+import LandingPage from './components/LandingPage'
 import InstantDashboard from './components/InstantDashboard'
 import HomeScreen from './components/HomeScreen'
 import ProjectWizard from './components/ProjectWizard'
@@ -159,7 +160,12 @@ function AppContent() {
     )
   }
 
-  if (!user) return <AuthScreen />
+  if (!user) {
+    // Show auth screen if /#login hash, otherwise landing page
+    const hash = window.location.hash
+    if (hash === '#login' || hash === '#signup') return <AuthScreen />
+    return <LandingPage />
+  }
 
   // Onboarding overlay for new users
   const onboardingOverlay = showOnboarding ? <OnboardingOverlay onComplete={() => setShowOnboarding(false)} /> : null

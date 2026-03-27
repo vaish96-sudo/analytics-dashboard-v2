@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo } from 'react'
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import {
   Upload, BarChart3, Sparkles, ArrowRight, Loader2, FileSpreadsheet,
   TrendingUp, Target, AlertTriangle, Lightbulb, PieChart as PieIcon,
@@ -260,7 +260,7 @@ function SignupGate({ title, description, icon: Icon }) {
       </div>
       <h3 className="text-base font-display font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{title}</h3>
       <p className="text-sm mb-4 max-w-sm" style={{ color: 'var(--text-muted)' }}>{description}</p>
-      <a href="/" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>
+      <a href="/#login" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>
         Sign up free <ArrowRight className="w-4 h-4" />
       </a>
       <p className="text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>No credit card required</p>
@@ -286,6 +286,22 @@ export default function InstantDashboard() {
   const [globalFilters, setGlobalFilters] = useState({})
   const [askInput, setAskInput] = useState('')
   const fileRef = useRef(null)
+
+  // Auto-load file if passed from landing page via sessionStorage
+  useEffect(() => {
+    try {
+      const storedFile = sessionStorage.getItem('nb_instant_file')
+      const storedName = sessionStorage.getItem('nb_instant_filename')
+      if (storedFile && storedName) {
+        sessionStorage.removeItem('nb_instant_file')
+        sessionStorage.removeItem('nb_instant_filename')
+        // Create a fake File-like object and process it
+        const blob = new Blob([storedFile], { type: 'text/csv' })
+        const file = new File([blob], storedName, { type: 'text/csv' })
+        handleFile(file)
+      }
+    } catch {}
+  }, [])
 
   // === FILE HANDLER ===
   const handleFile = useCallback((file) => {
@@ -495,7 +511,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
               <span className="text-[9px] font-display font-semibold tracking-[0.25em] uppercase ml-1.5" style={{ color: 'var(--accent)' }}>Instant</span>
             </div>
           </div>
-          <a href="/" className="text-xs font-medium px-4 py-2 rounded-lg" style={{ background: 'var(--accent)', color: '#fff' }}>Sign up free</a>
+          <a href="/#login" className="text-xs font-medium px-4 py-2 rounded-lg" style={{ background: 'var(--accent)', color: '#fff' }}>Sign up free</a>
         </header>
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="max-w-lg w-full text-center">
@@ -553,7 +569,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
             </button>
           ))}
           <div className="pt-2 mt-2" style={{ borderTop: '1px solid var(--border)' }}>
-            <a href="/" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium"
+            <a href="/#login" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium"
               style={{ background: 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(139,92,246,0.08))', color: 'var(--accent)', border: '1px solid var(--border-accent)' }}>
               <FileDown className="w-4 h-4 shrink-0" /><span>Export report</span><Lock className="w-3 h-3 ml-auto" style={{ color: 'var(--text-muted)' }} />
             </a>
@@ -561,7 +577,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
         </nav>
         <div className="p-4" style={{ borderTop: '1px solid var(--border)' }}>
           <div className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>{data.length.toLocaleString()} rows · {columnsByType.metrics.length}M {columnsByType.dimensions.length}D</div>
-          <a href="/" className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-display font-semibold text-white" style={{ background: 'var(--accent)' }}>
+          <a href="/#login" className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-display font-semibold text-white" style={{ background: 'var(--accent)' }}>
             <Crown className="w-4 h-4" /> Sign up free
           </a>
         </div>
@@ -574,7 +590,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
             <LogoMark className="w-7 h-7 object-contain" />
             <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>NORTHERN BIRD</span>
           </div>
-          <a href="/" className="text-xs font-medium px-3 py-1.5 rounded-lg" style={{ background: 'var(--accent)', color: '#fff' }}>Sign up</a>
+          <a href="/#login" className="text-xs font-medium px-3 py-1.5 rounded-lg" style={{ background: 'var(--accent)', color: '#fff' }}>Sign up</a>
         </div>
         <div className="flex gap-1 overflow-x-auto pb-1">
           {TABS.map(tab => (
@@ -675,7 +691,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
                     <span key={f} className="text-xs px-3 py-1.5 rounded-full" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>{f}</span>
                   ))}
                 </div>
-                <a href="/" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-display font-semibold text-white" style={{ background: 'var(--accent)' }}>Sign up free <ArrowRight className="w-4 h-4" /></a>
+                <a href="/#login" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-display font-semibold text-white" style={{ background: 'var(--accent)' }}>Sign up free <ArrowRight className="w-4 h-4" /></a>
                 <p className="text-[10px] mt-3" style={{ color: 'var(--text-muted)' }}>No credit card required · Free tier includes 1 project</p>
               </div>
             </div>
@@ -737,7 +753,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
                 <div className="p-4">
                   <div className="flex gap-2">
                     <input value={askInput} onChange={e => setAskInput(e.target.value)} placeholder="e.g. What are my top 5 products by revenue?" className="flex-1 text-sm px-4 py-2.5 rounded-xl focus:outline-none" style={{ background: 'var(--bg-overlay)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
-                    <a href="/" className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white shrink-0" style={{ background: 'var(--accent)' }}><Send className="w-4 h-4" /> Ask</a>
+                    <a href="/#login" className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white shrink-0" style={{ background: 'var(--accent)' }}><Send className="w-4 h-4" /> Ask</a>
                   </div>
                   <p className="text-[10px] mt-2 flex items-center gap-1" style={{ color: 'var(--text-muted)' }}><Lock style={{ width: 10, height: 10 }} /> Sign up free to ask unlimited questions</p>
                 </div>
@@ -746,7 +762,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
                 <Wand2 className="w-6 h-6 mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
                 <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>AI Recommendations</p>
                 <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Get personalized action items, custom KPI formulas, and strategic recommendations</p>
-                <a href="/" className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: 'var(--accent)' }}>Unlock with free signup <ArrowRight className="w-3 h-3" /></a>
+                <a href="/#login" className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: 'var(--accent)' }}>Unlock with free signup <ArrowRight className="w-3 h-3" /></a>
               </div>
             </div>
           )}
