@@ -52,7 +52,7 @@ function GoogleAuthCallback({ onToken, onError }) {
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
       <div className="text-center">
         <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 animate-pulse" style={{ background: 'var(--border-accent)' }}>
-          <img src="/logo_mark.png" alt="NB" className="w-8 h-8 object-contain" />
+          <span style={{ fontSize: 28, fontWeight: 800, fontStyle: "italic", fontFamily: "Georgia,serif", background: "linear-gradient(135deg,#3b8bd4,#0a1f3d)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>µ</span>
         </div>
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Connecting to Google Sheets...</p>
       </div>
@@ -154,7 +154,7 @@ function AppContent() {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
         <div className="w-10 h-10 rounded-xl flex items-center justify-center animate-pulse" style={{ background: 'var(--border-accent)' }}>
-          <img src="/logo_mark.png" alt="NB" className="w-6 h-6 object-contain" />
+          <span style={{ fontSize: 22, fontWeight: 800, fontStyle: "italic", fontFamily: "Georgia,serif", background: "linear-gradient(135deg,#3b8bd4,#0a1f3d)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>µ</span>
         </div>
       </div>
     )

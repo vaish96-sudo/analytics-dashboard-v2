@@ -190,11 +190,11 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
       <aside className="hidden lg:flex w-60 shrink-0 flex-col fixed h-full z-40 nb-sidebar">
         <div className="p-5" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2.5">
-            <LogoMark className="w-9 h-9 object-contain" alt="Northern Bird" />
+            <LogoMark className="w-9 h-9 object-contain" alt="µBoard" />
             <div>
-              <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>NORTHERN BIRD</span>
+              <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>µBoard</span>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[9px] font-display font-semibold tracking-[0.25em] uppercase" style={{ color: 'var(--accent)' }}>Analytics</span>
+                <span className="text-[9px] font-display font-semibold tracking-[0.25em] uppercase" style={{ color: 'var(--accent-light)' }}>by Meuris</span>
                 <TierBadge />
               </div>
             </div>
@@ -283,7 +283,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <LogoMark className="w-7 h-7 object-contain" />
-            <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>NORTHERN BIRD</span>
+            <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>µBoard</span>
             <TierBadge />
           </div>
           <div className="flex items-center gap-1">

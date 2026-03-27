@@ -507,7 +507,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
           <div className="flex items-center gap-2.5">
             <LogoMark className="w-8 h-8 object-contain" />
             <div>
-              <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>NORTHERN BIRD</span>
+              <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>µBoard</span>
               <span className="text-[9px] font-display font-semibold tracking-[0.25em] uppercase ml-1.5" style={{ color: 'var(--accent)' }}>Instant</span>
             </div>
           </div>
@@ -548,7 +548,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
           <div className="flex items-center gap-2.5">
             <LogoMark className="w-8 h-8 object-contain" />
             <div>
-              <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>NORTHERN BIRD</span>
+              <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>µBoard</span>
               <span className="text-[9px] font-display font-semibold tracking-[0.25em] uppercase" style={{ color: 'var(--accent)' }}>Instant</span>
             </div>
           </div>
@@ -588,7 +588,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <LogoMark className="w-7 h-7 object-contain" />
-            <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>NORTHERN BIRD</span>
+            <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>µBoard</span>
           </div>
           <a href="/#login" className="text-xs font-medium px-3 py-1.5 rounded-lg" style={{ background: 'var(--accent)', color: '#fff' }}>Sign up</a>
         </div>

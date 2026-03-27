@@ -45,7 +45,7 @@ export default function FileUpload() {
               <LogoMark className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
             </div>
             <div className="text-left">
-              <h1 className="text-xl sm:text-2xl font-display font-bold tracking-tight text-slate-900">NORTHERN BIRD</h1>
+              <h1 className="text-xl sm:text-2xl font-display font-bold tracking-tight text-slate-900">µBoard</h1>
               <p className="text-[9px] sm:text-[10px] font-display font-semibold tracking-[0.3em] text-accent uppercase -mt-0.5">Analytics</p>
             </div>
           </div>

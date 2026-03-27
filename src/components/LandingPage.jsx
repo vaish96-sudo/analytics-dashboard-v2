@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 
 /**
- * LandingPage — the front door to Northern Bird Analytics.
+ * LandingPage — the front door to µBoard by Meuris.
  * 
  * Scroll sections: Hero → Logos → Features → How it works → 
  * Try it now (CSV drop) → Pricing → Final CTA → Footer
@@ -48,11 +48,11 @@ function Navbar() {
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
-      style={{ background: scrolled ? 'rgba(245,245,240,0.92)' : 'transparent', backdropFilter: scrolled ? 'blur(16px)' : 'none', borderBottom: scrolled ? '1px solid var(--border)' : '1px solid transparent' }}>
+      style={{ background: scrolled ? 'rgba(244,246,248,0.92)' : 'transparent', backdropFilter: scrolled ? 'blur(16px)' : 'none', borderBottom: scrolled ? '1px solid var(--border)' : '1px solid transparent' }}>
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <img src="/logo_mark.png" alt="NB" className="w-8 h-8 object-contain" />
-          <span className="text-sm font-bold tracking-tight" style={{ color: 'var(--text-primary)', fontFamily: 'Lora, serif' }}>NORTHERN BIRD</span>
+          <svg width="32" height="32" viewBox="0 0 56 56"><defs><linearGradient id="nav-mu" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#3b8bd4"/><stop offset="100%" stopColor="#0a1f3d"/></linearGradient></defs><text x="28" y="46" textAnchor="middle" fontSize="58" fontWeight="800" fontStyle="italic" fontFamily="Georgia,serif" fill="url(#nav-mu)">µ</text></svg>
+          <span className="text-sm font-bold tracking-tight" style={{ color: 'var(--text-primary)', fontFamily: 'Lora, serif' }}>µBoard</span>
         </div>
         <div className="hidden md:flex items-center gap-8">
           <a href="#features" className="text-sm" style={{ color: 'var(--text-secondary)' }}>Features</a>
@@ -74,13 +74,13 @@ function Hero() {
     <section className="pt-32 pb-20 px-6 relative overflow-hidden">
       {/* Subtle background texture */}
       <div className="absolute inset-0 pointer-events-none" style={{
-        background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(176,141,87,0.06), transparent)',
+        background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(59,139,212,0.06), transparent)',
       }} />
 
       <div className="max-w-5xl mx-auto text-center relative">
         <FadeIn>
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-6 text-xs font-medium"
-            style={{ background: 'var(--border-accent)', color: 'var(--accent)', border: '1px solid rgba(176,141,87,0.2)' }}>
+            style={{ background: 'var(--border-accent)', color: 'var(--accent)', border: '1px solid rgba(59,139,212,0.2)' }}>
             <Sparkles className="w-3.5 h-3.5" /> AI-powered analytics for any dataset
           </div>
         </FadeIn>
@@ -96,7 +96,7 @@ function Hero() {
         <FadeIn delay={0.2}>
           <p className="text-lg sm:text-xl max-w-2xl mx-auto mb-10 leading-relaxed"
             style={{ color: 'var(--text-secondary)' }}>
-            Northern Bird turns your spreadsheets into interactive dashboards with AI insights, 
+            µBoard turns your spreadsheets into interactive dashboards with AI insights, 
             beautiful charts, and shareable reports — no setup, no code, no data team needed.
           </p>
         </FadeIn>
@@ -121,7 +121,7 @@ function Hero() {
               {/* Window chrome */}
               <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
                 <div className="flex gap-1.5"><div className="w-3 h-3 rounded-full" style={{ background: '#ef4444' }} /><div className="w-3 h-3 rounded-full" style={{ background: '#f59e0b' }} /><div className="w-3 h-3 rounded-full" style={{ background: '#22c55e' }} /></div>
-                <div className="flex-1 flex justify-center"><div className="px-12 py-1 rounded-md text-xs" style={{ background: 'var(--bg-overlay)', color: 'var(--text-muted)' }}>analytics.northernbird.io</div></div>
+                <div className="flex-1 flex justify-center"><div className="px-12 py-1 rounded-md text-xs" style={{ background: 'var(--bg-overlay)', color: 'var(--text-muted)' }}>app.meuris.io</div></div>
               </div>
               {/* Stylized dashboard */}
               <div className="p-6 grid grid-cols-12 gap-4">
@@ -138,7 +138,7 @@ function Hero() {
                 {/* Main content */}
                 <div className="col-span-12 lg:col-span-10 space-y-4">
                   {/* Insight bar */}
-                  <div className="rounded-xl p-3 flex items-center gap-3" style={{ background: 'rgba(176,141,87,0.06)', border: '1px solid rgba(176,141,87,0.12)' }}>
+                  <div className="rounded-xl p-3 flex items-center gap-3" style={{ background: 'rgba(59,139,212,0.06)', border: '1px solid rgba(59,139,212,0.12)' }}>
                     <Sparkles className="w-4 h-4" style={{ color: 'var(--accent)' }} />
                     <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>AI found 5 insights in your data</span>
                     <div className="flex-1" />
@@ -159,7 +159,7 @@ function Hero() {
                       <div className="text-xs font-medium mb-3" style={{ color: 'var(--text-secondary)' }}>Revenue by Channel</div>
                       <div className="flex items-end gap-2 h-16">
                         {[85, 62, 74, 45, 55, 90, 68].map((h, i) => (
-                          <div key={i} className="flex-1 rounded-t" style={{ height: `${h}%`, background: i === 5 ? 'var(--accent)' : 'rgba(176,141,87,0.2)' }} />
+                          <div key={i} className="flex-1 rounded-t" style={{ height: `${h}%`, background: i === 5 ? 'var(--accent)' : 'rgba(59,139,212,0.2)' }} />
                         ))}
                       </div>
                     </div>
@@ -167,7 +167,7 @@ function Hero() {
                       <div className="text-xs font-medium mb-3" style={{ color: 'var(--text-secondary)' }}>Monthly Trend</div>
                       <svg viewBox="0 0 200 60" className="w-full h-16">
                         <path d="M0,50 Q25,45 50,35 T100,20 T150,25 T200,10" fill="none" stroke="var(--accent)" strokeWidth="2" />
-                        <path d="M0,50 Q25,45 50,35 T100,20 T150,25 T200,10 L200,60 L0,60 Z" fill="rgba(176,141,87,0.08)" />
+                        <path d="M0,50 Q25,45 50,35 T100,20 T150,25 T200,10 L200,60 L0,60 Z" fill="rgba(59,139,212,0.08)" />
                       </svg>
                     </div>
                   </div>
@@ -175,7 +175,7 @@ function Hero() {
               </div>
             </div>
             {/* Glow effect */}
-            <div className="absolute -inset-4 -z-10 rounded-3xl" style={{ background: 'radial-gradient(ellipse at center, rgba(176,141,87,0.08), transparent 70%)' }} />
+            <div className="absolute -inset-4 -z-10 rounded-3xl" style={{ background: 'radial-gradient(ellipse at center, rgba(59,139,212,0.08), transparent 70%)' }} />
           </div>
         </FadeIn>
       </div>
@@ -320,7 +320,7 @@ function TryItNow() {
 
         <FadeIn delay={0.15}>
           <div className="border-2 border-dashed rounded-2xl p-14 transition-all cursor-pointer"
-            style={{ borderColor: dragging ? 'var(--accent)' : 'var(--border)', background: dragging ? 'rgba(176,141,87,0.04)' : 'var(--bg-surface)' }}
+            style={{ borderColor: dragging ? 'var(--accent)' : 'var(--border)', background: dragging ? 'rgba(59,139,212,0.04)' : 'var(--bg-surface)' }}
             onDragOver={e => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)}
             onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]) }}
             onClick={() => fileRef.current?.click()}>
@@ -355,7 +355,7 @@ function Pricing() {
     {
       name: 'Enterprise', price: 'Custom', period: '', accent: false,
       features: ['Everything in Pro', 'Unlimited team members', 'SSO / SAML', 'Custom integrations', 'Dedicated support', 'SLA guarantee', 'Custom data connectors', 'On-premise option'],
-      cta: 'Contact us', href: 'mailto:hello@northernbird.io',
+      cta: 'Contact us', href: 'mailto:hello@meuris.io',
     },
   ]
 
@@ -455,8 +455,8 @@ function Footer() {
         <div className="flex flex-col md:flex-row items-start justify-between gap-8 mb-10">
           <div>
             <div className="flex items-center gap-2.5 mb-3">
-              <img src="/logo_mark.png" alt="NB" className="w-7 h-7 object-contain" />
-              <span className="text-sm font-bold tracking-tight" style={{ color: 'var(--text-primary)', fontFamily: 'Lora, serif' }}>NORTHERN BIRD</span>
+              <svg width="28" height="28" viewBox="0 0 56 56"><defs><linearGradient id="ftr-mu" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#3b8bd4"/><stop offset="100%" stopColor="#0a1f3d"/></linearGradient></defs><text x="28" y="46" textAnchor="middle" fontSize="58" fontWeight="800" fontStyle="italic" fontFamily="Georgia,serif" fill="url(#ftr-mu)">µ</text></svg>
+              <span className="text-sm font-bold tracking-tight" style={{ color: 'var(--text-primary)', fontFamily: 'Lora, serif' }}>µBoard</span>
             </div>
             <p className="text-sm max-w-xs" style={{ color: 'var(--text-muted)' }}>AI-powered analytics dashboards from any spreadsheet. Built for teams who need answers, not another tool to learn.</p>
           </div>
@@ -480,7 +480,7 @@ function Footer() {
           </div>
         </div>
         <div className="flex items-center justify-between pt-6" style={{ borderTop: '1px solid var(--border)' }}>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>&copy; {new Date().getFullYear()} Northern Bird Analytics. All rights reserved.</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>&copy; {new Date().getFullYear()} µBoard by Meuris. All rights reserved.</p>
         </div>
       </div>
     </footer>

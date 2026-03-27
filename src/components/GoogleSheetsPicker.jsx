@@ -76,7 +76,7 @@ export default function GoogleSheetsPicker({ accessToken, onBack, onDone }) {
               <LogoMark className="w-10 h-10 object-contain" alt="NB" />
             </div>
             <div className="text-left">
-              <h1 className="text-2xl font-display font-bold tracking-tight text-slate-900">NORTHERN BIRD</h1>
+              <h1 className="text-2xl font-display font-bold tracking-tight text-slate-900">µBoard</h1>
               <p className="text-[10px] font-display font-semibold tracking-[0.3em] text-accent uppercase -mt-0.5">Analytics</p>
             </div>
           </div>
