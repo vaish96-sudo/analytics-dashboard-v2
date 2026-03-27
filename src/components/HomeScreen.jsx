@@ -258,14 +258,15 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
   return (
     <div className="min-h-screen flex" style={{ background: 'var(--bg-primary)' }}>
       {/* ===== DESKTOP SIDEBAR ===== */}
-      <aside className="hidden lg:flex w-60 shrink-0 flex-col fixed h-full z-40 nb-sidebar">
+      <aside className="hidden lg:flex w-60 shrink-0 flex-col fixed h-full z-40"
+        style={{ background: 'linear-gradient(180deg, var(--sidebar-bg) 0%, color-mix(in srgb, var(--sidebar-bg), var(--accent) 3%) 100%)', borderRight: '1px solid var(--border)' }}>
         <div className="p-5" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2.5">
-            <LogoMark className="w-9 h-9 object-contain" alt="µBoard" />
+            <LogoMark size={34} />
             <div className="flex-1">
-              <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>µBoard</span>
+              <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>Meuris</span>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[9px] font-display font-semibold tracking-[0.25em] uppercase" style={{ color: 'var(--accent)' }}>by Meuris</span>
+                <span className="text-[9px] font-display font-semibold tracking-[0.15em] uppercase" style={{ color: 'var(--accent-light)' }}>Analytics</span>
                 <TierBadge />
               </div>
             </div>
@@ -571,7 +572,7 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <LogoMark className="w-7 h-7 object-contain" />
-            <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>µBoard</span>
+            <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>Meuris</span>
             <TierBadge />
           </div>
           <div className="flex items-center gap-1">

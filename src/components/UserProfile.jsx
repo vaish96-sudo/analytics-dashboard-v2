@@ -235,7 +235,7 @@ export default function UserProfile() {
             <label className="text-sm font-medium flex items-center gap-1.5 mb-1.5" style={{ color: 'var(--text-secondary)' }}>
               <Building2 className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} /> Brand name on reports
             </label>
-            <input type="text" value={customCompany} onChange={(e) => setCustomCompany(e.target.value)} placeholder="Your Company Name (replaces µBoard on exports)"
+            <input type="text" value={customCompany} onChange={(e) => setCustomCompany(e.target.value)} placeholder="Your Company Name (replaces Meuris on exports)"
               className="w-full px-3 py-2.5 text-sm rounded-xl nb-input" />
           </div>
           <div className="flex justify-end">

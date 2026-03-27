@@ -187,14 +187,15 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
   return (
     <div className="min-h-screen flex flex-col lg:flex-row" style={{ background: 'var(--bg-primary)' }}>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-60 shrink-0 flex-col fixed h-full z-40 nb-sidebar">
+      <aside className="hidden lg:flex w-60 shrink-0 flex-col fixed h-full z-40"
+        style={{ background: 'linear-gradient(180deg, var(--sidebar-bg) 0%, color-mix(in srgb, var(--sidebar-bg), var(--accent) 3%) 100%)', borderRight: '1px solid var(--border)' }}>
         <div className="p-5" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2.5">
-            <LogoMark className="w-9 h-9 object-contain" alt="µBoard" />
+            <LogoMark size={34} />
             <div>
-              <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>µBoard</span>
+              <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>Meuris</span>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[9px] font-display font-semibold tracking-[0.25em] uppercase" style={{ color: 'var(--accent-light)' }}>by Meuris</span>
+                <span className="text-[9px] font-display font-semibold tracking-[0.15em] uppercase" style={{ color: 'var(--accent-light)' }}>Analytics</span>
                 <TierBadge />
               </div>
             </div>
@@ -220,12 +221,12 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {TABS.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all relative"
               style={{
                 color: activeTab === tab.id ? 'var(--accent)' : 'var(--text-secondary)',
                 background: activeTab === tab.id ? 'var(--border-accent)' : 'transparent',
-                border: activeTab === tab.id ? '1px solid var(--border-accent)' : '1px solid transparent',
               }}>
+              {activeTab === tab.id && <div style={{ position: 'absolute', left: 0, top: '20%', bottom: '20%', width: 3, borderRadius: 2, background: 'var(--accent-light)' }} />}
               <tab.icon className="w-4 h-4 shrink-0" /><span>{tab.label}</span>
             </button>
           ))}
@@ -283,7 +284,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <LogoMark className="w-7 h-7 object-contain" />
-            <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>µBoard</span>
+            <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>Meuris</span>
             <TierBadge />
           </div>
           <div className="flex items-center gap-1">

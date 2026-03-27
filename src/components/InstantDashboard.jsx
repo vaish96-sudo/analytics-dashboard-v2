@@ -507,7 +507,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
           <div className="flex items-center gap-2.5">
             <LogoMark className="w-8 h-8 object-contain" />
             <div>
-              <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>µBoard</span>
+              <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>Meuris</span>
               <span className="text-[9px] font-display font-semibold tracking-[0.25em] uppercase ml-1.5" style={{ color: 'var(--accent)' }}>Instant</span>
             </div>
           </div>
@@ -543,34 +543,36 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
   return (
     <div className="min-h-screen flex flex-col lg:flex-row" style={{ background: 'var(--bg-primary)' }}>
       {/* SIDEBAR */}
-      <aside className="hidden lg:flex w-56 shrink-0 flex-col fixed h-full z-40" style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)' }}>
+      <aside className="hidden lg:flex w-56 shrink-0 flex-col fixed h-full z-40"
+        style={{ background: 'linear-gradient(180deg, var(--sidebar-bg) 0%, color-mix(in srgb, var(--sidebar-bg), var(--accent) 3%) 100%)', borderRight: '1px solid var(--border)' }}>
         <div className="p-5" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2.5">
-            <LogoMark className="w-8 h-8 object-contain" />
+            <LogoMark size={30} />
             <div>
-              <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>µBoard</span>
-              <span className="text-[9px] font-display font-semibold tracking-[0.25em] uppercase" style={{ color: 'var(--accent)' }}>Instant</span>
+              <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>Meuris</span>
+              <span className="text-[9px] font-display font-semibold tracking-[0.15em] uppercase" style={{ color: 'var(--accent-light)' }}>Analytics · Instant</span>
             </div>
           </div>
         </div>
         <div className="p-3" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'var(--bg-overlay)' }}>
-            <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--accent)' }} />
+            <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--accent-light)' }} />
             <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{fileName}</span>
           </div>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {TABS.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all relative"
               style={{ color: activeTab === tab.id ? 'var(--accent)' : 'var(--text-secondary)', background: activeTab === tab.id ? 'var(--border-accent)' : 'transparent' }}>
+              {activeTab === tab.id && <div style={{ position: 'absolute', left: 0, top: '20%', bottom: '20%', width: 3, borderRadius: 2, background: 'var(--accent-light)' }} />}
               <tab.icon className="w-4 h-4 shrink-0" /><span>{tab.label}</span>
               {(tab.id === 'builder' || tab.id === 'settings') && <Lock className="w-3 h-3 ml-auto" style={{ color: 'var(--text-muted)' }} />}
             </button>
           ))}
           <div className="pt-2 mt-2" style={{ borderTop: '1px solid var(--border)' }}>
-            <a href="/#login" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium"
-              style={{ background: 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(139,92,246,0.08))', color: 'var(--accent)', border: '1px solid var(--border-accent)' }}>
+            <a href="/#login" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium"
+              style={{ background: 'rgba(59,139,212,0.06)', color: 'var(--accent)', border: '1px solid var(--border-accent)' }}>
               <FileDown className="w-4 h-4 shrink-0" /><span>Export report</span><Lock className="w-3 h-3 ml-auto" style={{ color: 'var(--text-muted)' }} />
             </a>
           </div>
@@ -588,7 +590,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <LogoMark className="w-7 h-7 object-contain" />
-            <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>µBoard</span>
+            <span className="text-sm font-display font-bold" style={{ color: 'var(--text-primary)' }}>Meuris</span>
           </div>
           <a href="/#login" className="text-xs font-medium px-3 py-1.5 rounded-lg" style={{ background: 'var(--accent)', color: '#fff' }}>Sign up</a>
         </div>

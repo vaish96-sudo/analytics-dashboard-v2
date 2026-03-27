@@ -1,4 +1,4 @@
-// µBoard by Meuris — Executive PDF Export
+// Meuris Analytics — Executive PDF Export
 // Consulting-grade report: KPIs, Insights, Builder Table, Dimension Analysis
 
 const GOLD = [176, 141, 87]
@@ -12,8 +12,8 @@ const RED = [200, 50, 50]
 const AMBER = [190, 120, 30]
 const SLATE = [100, 116, 139]
 
-export async function exportToPDF(content, title = 'µBoard Report', branding = {}) {
-  const brandName = branding.companyName || 'µBoard'
+export async function exportToPDF(content, title = 'Meuris Analytics Report', branding = {}) {
+  const brandName = branding.companyName || 'Meuris'
   const brandSuffix = branding.companyName ? '' : 'ANALYTICS'
   const { default: jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -407,7 +407,7 @@ export async function exportToPDF(content, title = 'µBoard Report', branding = 
     // Gold accent dot
     doc.setFillColor(...GOLD)
     doc.circle(m + 1.5, ph - 5, 0.8, 'F')
-    text(`${branding.companyName || 'µBoard by Meuris'}  |  Confidential`, m + 5, ph - 3.5, 6.5, 'normal', MUTED)
+    text(`${branding.companyName || 'Meuris Analytics'}  |  Confidential`, m + 5, ph - 3.5, 6.5, 'normal', MUTED)
     text(`Page ${i} of ${pages}`, pw - m, ph - 3.5, 6.5, 'normal', MUTED, { align: 'right' })
   }
 
@@ -517,10 +517,10 @@ export async function exportDashboardReport({ projectName, fileName, rowCount, s
 
 
 // === WORD EXPORT ===
-export async function exportToWord(content, title = 'µBoard Report', branding = {}) {
+export async function exportToWord(content, title = 'Meuris Analytics Report', branding = {}) {
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle } = await import('docx')
   const children = []
-  const brandName = branding.companyName || 'µBoard ANALYTICS'
+  const brandName = branding.companyName || 'MEURIS ANALYTICS'
 
   children.push(new Paragraph({ text: brandName.toUpperCase(), heading: HeadingLevel.HEADING_1, spacing: { after: 100 } }))
   children.push(new Paragraph({ text: title, heading: HeadingLevel.HEADING_2, spacing: { after: 100 } }))
