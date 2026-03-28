@@ -46,20 +46,20 @@ function ParticleChartHero() {
     const container = containerRef.current
     let W, H, mx = -999, my = -999, SZ, N
     let particles = [], shapeIdx = 0
-    const SHAPES = ['bar', 'line', 'kpi']
+    const SHAPES = ['bar', 'line']
 
     function computeSize() {
       W = container.offsetWidth; H = container.offsetHeight
-      // Scale particle size with screen — bigger screen = bigger particles to keep count reasonable
-      SZ = W > 1200 ? 7 : W > 800 ? 6 : 5
-      // Estimate max particles needed for the bar chart (largest shape)
-      const cL = W * 0.18, cR = W * 0.85, cB = H * 0.88, cT = H * 0.5
+      // Larger particles = fewer needed = cleaner scatter
+      SZ = W > 1200 ? 8 : W > 800 ? 7 : 6
+      // Estimate particles for bar chart
+      const cL = W * 0.15, cR = W * 0.78, cB = H * 0.84, cT = H * 0.48
       const cW = cR - cL, cH = cB - cT
-      const bW = (cW - cW * 0.025 * 8) / 7
+      const bW = (cW * 0.88) / 6
       let est = 0
-      ;[0.62, 0.45, 0.72, 0.32, 0.55, 0.88, 0.4].forEach(h => { est += Math.ceil(bW / SZ) * Math.ceil(h * cH / SZ) })
-      est += Math.ceil(cW / SZ) * 2 + Math.ceil(cH / SZ) + 100 // axes + grid + spare
-      N = Math.min(est, 4000) // cap for performance
+      ;[0.6, 0.42, 0.7, 0.35, 0.55, 0.82].forEach(h => { est += Math.ceil(bW / SZ) * Math.ceil(h * cH / SZ) })
+      est += Math.ceil(cW / SZ) + Math.ceil(cH / SZ) + 50
+      N = Math.min(est, 2500)
     }
 
     function resize() {
@@ -77,54 +77,46 @@ function ParticleChartHero() {
     }
 
     function genTargets(shape) {
-      const cL = W * 0.15, cR = W * 0.82, cB = H * 0.86, cT = H * 0.48
+      const cL = W * 0.15, cR = W * 0.78, cB = H * 0.84, cT = H * 0.48
       const cW = cR - cL, cH = cB - cT
       let idx = 0
 
       if (shape === 'bar') {
-        const heights = [0.62, 0.45, 0.72, 0.32, 0.55, 0.88, 0.4]
-        const bCnt = 7, gap = cW * 0.025, tGap = gap * (bCnt + 1), bW = (cW - tGap) / bCnt
-        const colors = ['#38bdf8', '#0ea5e9', '#0284c7', '#0369a1', '#0ea5e9', '#0c1425', '#38bdf8']
+        const heights = [0.6, 0.42, 0.7, 0.35, 0.55, 0.82]
+        const bCnt = 6, totalBarW = cW * 0.88, gap = (cW - totalBarW) / (bCnt + 1), bW = totalBarW / bCnt
+        const colors = ['#38bdf8', '#0ea5e9', '#0284c7', '#0ea5e9', '#38bdf8', '#0284c7']
         for (let b = 0; b < bCnt; b++) {
           const bx = cL + gap + b * (bW + gap), bh = heights[b] * cH, by = cB - bh
           for (let py = by; py < cB; py += SZ) for (let px = bx; px < bx + bW; px += SZ) {
             if (idx < N) { particles[idx].tx = px; particles[idx].ty = py; particles[idx].tc = colors[b]; particles[idx].sq = true; idx++ }
           }
         }
+        // X axis
         for (let px = cL; px <= cR && idx < N; px += SZ) { particles[idx].tx = px; particles[idx].ty = cB; particles[idx].tc = '#cbd5e1'; particles[idx].sq = true; idx++ }
+        // Y axis
         for (let py = cT; py <= cB && idx < N; py += SZ) { particles[idx].tx = cL - 2; particles[idx].ty = py; particles[idx].tc = '#cbd5e1'; particles[idx].sq = true; idx++ }
-        for (let g = 0; g < 4; g++) { const gy = cT + g * (cH / 4); for (let px = cL; px <= cR && idx < N; px += SZ * 4) { particles[idx].tx = px; particles[idx].ty = gy; particles[idx].tc = '#e2e8f0'; particles[idx].sq = true; idx++ } }
       } else if (shape === 'line') {
-        const dY = [0.55, 0.42, 0.58, 0.35, 0.48, 0.22, 0.3, 0.14, 0.24, 0.1, 0.18, 0.06]
+        const dY = [0.52, 0.4, 0.55, 0.32, 0.45, 0.2, 0.28, 0.12, 0.22, 0.08]
         for (let i = 0; i < dY.length - 1; i++) {
           const x1 = cL + i / (dY.length - 1) * cW, x2 = cL + (i + 1) / (dY.length - 1) * cW
           const y1 = cT + dY[i] * cH, y2 = cT + dY[i + 1] * cH
           for (let x = x1; x < x2 && idx < N; x += SZ) {
             const t = (x - x1) / (x2 - x1), lY = y1 + (y2 - y1) * t
+            // Stroke line (2 pixels thick)
             if (idx < N) { particles[idx].tx = x; particles[idx].ty = lY; particles[idx].tc = '#0ea5e9'; particles[idx].sq = true; idx++ }
-            for (let y = lY + SZ * 2; y < cB && idx < N; y += SZ * 1.5) { particles[idx].tx = x; particles[idx].ty = y; particles[idx].tc = 'rgba(14,165,233,0.12)'; particles[idx].sq = true; idx++ }
+            if (idx < N) { particles[idx].tx = x; particles[idx].ty = lY + SZ; particles[idx].tc = '#0ea5e9'; particles[idx].sq = true; idx++ }
+            // Area fill below
+            for (let y = lY + SZ * 2; y < cB && idx < N; y += SZ * 2) { particles[idx].tx = x; particles[idx].ty = y; particles[idx].tc = '#bae6fd'; particles[idx].sq = true; idx++ }
           }
         }
-        dY.forEach((v, i) => { const dx = cL + i / (dY.length - 1) * cW, dy = cT + v * cH; for (let a = 0; a < Math.PI * 2 && idx < N; a += 0.5) { particles[idx].tx = dx + Math.cos(a) * 5; particles[idx].ty = dy + Math.sin(a) * 5; particles[idx].tc = '#0ea5e9'; particles[idx].sq = true; idx++ } })
+        // Data point dots
+        dY.forEach((v, i) => { const dx = cL + i / (dY.length - 1) * cW, dy = cT + v * cH; for (let a = 0; a < Math.PI * 2 && idx < N; a += 0.4) for (let r = 0; r < 6 && idx < N; r += SZ) { particles[idx].tx = dx + Math.cos(a) * r; particles[idx].ty = dy + Math.sin(a) * r; particles[idx].tc = '#0284c7'; particles[idx].sq = true; idx++ } })
+        // Axes
         for (let px = cL; px <= cR && idx < N; px += SZ) { particles[idx].tx = px; particles[idx].ty = cB; particles[idx].tc = '#cbd5e1'; particles[idx].sq = true; idx++ }
         for (let py = cT; py <= cB && idx < N; py += SZ) { particles[idx].tx = cL - 2; particles[idx].ty = py; particles[idx].tc = '#cbd5e1'; particles[idx].sq = true; idx++ }
-      } else if (shape === 'kpi') {
-        const cards = [
-          { label: 'REVENUE', value: '$142K', color: '#3b82f6' },
-          { label: 'ORDERS', value: '2,847', color: '#10b981' },
-          { label: 'GROWTH', value: '+23%', color: '#8b5cf6' },
-          { label: 'AVG ORDER', value: '$49.80', color: '#f97316' },
-        ]
-        const cardW = cW * 0.22, cardH = cH * 0.55, gap2 = (cW - cardW * 4) / 5
-        const cardY = cT + (cH - cardH) * 0.4
-        cards.forEach((card, ci) => {
-          const cx0 = cL + gap2 + ci * (cardW + gap2)
-          for (let py = cardY; py < cardY + cardH && idx < N; py += SZ) for (let px = cx0; px < cx0 + cardW && idx < N; px += SZ) { particles[idx].tx = px; particles[idx].ty = py; particles[idx].tc = `${card.color}15`; particles[idx].sq = true; idx++ }
-          for (let px = cx0; px < cx0 + cardW && idx < N; px += SZ) { particles[idx].tx = px; particles[idx].ty = cardY; particles[idx].tc = card.color; particles[idx].sq = true; idx++ }
-          for (let px = cx0; px < cx0 + cardW && idx < N; px += SZ) { particles[idx].tx = px; particles[idx].ty = cardY + SZ; particles[idx].tc = card.color; particles[idx].sq = true; idx++ }
-        })
       }
-      while (idx < N) { particles[idx].tx = W * 0.1 + Math.random() * W * 0.8; particles[idx].ty = cB + 15 + Math.random() * 30; particles[idx].tc = '#e2e8f0'; particles[idx].sq = false; idx++ }
+      // Remaining particles — hide them below the chart, scattered lightly
+      while (idx < N) { particles[idx].tx = cL + Math.random() * cW; particles[idx].ty = cB + 10 + Math.random() * 20; particles[idx].tc = '#e2e8f0'; particles[idx].sq = false; idx++ }
       particles._m = { shape, cL, cR, cB, cT, cW, cH }
     }
 
@@ -235,22 +227,16 @@ function ParticleChartHero() {
           ctx.font = '600 13px system-ui,sans-serif'; ctx.fillStyle = '#0c1425'; ctx.textAlign = 'center'
           ctx.fillText('Revenue by channel', W * 0.5, m.cT - 10)
           ctx.font = '400 10px system-ui,sans-serif'; ctx.fillStyle = '#94a3b8'
-          ;['Direct', 'Email', 'Social', 'Referral', 'Organic', 'Paid', 'Other'].forEach((l, i) => ctx.fillText(l, m.cL + (i + 0.5) * (m.cW / 7), m.cB + 16))
+          ;['Direct', 'Email', 'Social', 'Referral', 'Organic', 'Paid'].forEach((l, i) => ctx.fillText(l, m.cL + (i + 0.5) * (m.cW / 6), m.cB + 16))
           ctx.textAlign = 'right'
-          ;['$0', '$25K', '$50K', '$75K', '$100K'].forEach((l, i) => ctx.fillText(l, m.cL - 8, m.cB - i * (m.cH / 4) + 3))
+          ;['$0', '$25K', '$50K', '$75K'].forEach((l, i) => ctx.fillText(l, m.cL - 8, m.cB - i * (m.cH / 3) + 3))
         } else if (m.shape === 'line') {
           ctx.font = '600 13px system-ui,sans-serif'; ctx.fillStyle = '#0c1425'; ctx.textAlign = 'center'
           ctx.fillText('Monthly revenue trend', W * 0.5, m.cT - 10)
           ctx.font = '400 10px system-ui,sans-serif'; ctx.fillStyle = '#94a3b8'
-          ;['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].forEach((l, i) => ctx.fillText(l, m.cL + (i + 0.5) * (m.cW / 12), m.cB + 16))
+          ;['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov'].forEach((l, i) => ctx.fillText(l, m.cL + (i + 0.5) * (m.cW / 6), m.cB + 16))
           ctx.textAlign = 'right'
-          ;['$0', '$25K', '$50K', '$75K', '$100K'].forEach((l, i) => ctx.fillText(l, m.cL - 8, m.cB - i * (m.cH / 4) + 3))
-        } else if (m.shape === 'kpi') {
-          const cards = [{ label: 'REVENUE', value: '$142K', color: '#3b82f6' }, { label: 'ORDERS', value: '2,847', color: '#10b981' }, { label: 'GROWTH', value: '+23%', color: '#8b5cf6' }, { label: 'AVG ORDER', value: '$49.80', color: '#f97316' }]
-          const cardW = m.cW * 0.22, gap2 = (m.cW - cardW * 4) / 5, cardH = m.cH * 0.55, cardY = m.cT + (m.cH - cardH) * 0.4
-          ctx.font = '600 13px system-ui,sans-serif'; ctx.fillStyle = '#0c1425'; ctx.textAlign = 'center'
-          ctx.fillText('Key performance indicators', W * 0.5, m.cT - 10)
-          cards.forEach((c, ci) => { const cx0 = m.cL + gap2 + ci * (cardW + gap2), midX = cx0 + cardW / 2; ctx.font = '700 8px system-ui,sans-serif'; ctx.fillStyle = c.color; ctx.textAlign = 'center'; ctx.fillText(c.label, midX, cardY + cardH * 0.35); ctx.font = '700 20px Georgia,serif'; ctx.fillStyle = '#0c1425'; ctx.fillText(c.value, midX, cardY + cardH * 0.65) })
+          ;['$0', '$25K', '$50K', '$75K'].forEach((l, i) => ctx.fillText(l, m.cL - 8, m.cB - i * (m.cH / 3) + 3))
         }
         ctx.globalAlpha = 1
       }
