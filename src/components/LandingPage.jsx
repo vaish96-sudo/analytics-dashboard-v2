@@ -44,21 +44,36 @@ function ParticleChartHero() {
   useEffect(() => {
     const cv = canvasRef.current, ctx = cv.getContext('2d')
     const container = containerRef.current
-    let W, H, mx = -999, my = -999
-    const SZ = 4, N = 900
-    let particles = [], shapeIdx = 0, holdTimer = 0
-    const HOLD = 180, SHAPES = ['bar', 'line', 'kpi']
+    let W, H, mx = -999, my = -999, SZ, N
+    let particles = [], shapeIdx = 0
+    const SHAPES = ['bar', 'line', 'kpi']
+
+    function computeSize() {
+      W = container.offsetWidth; H = container.offsetHeight
+      // Scale particle size with screen — bigger screen = bigger particles to keep count reasonable
+      SZ = W > 1200 ? 7 : W > 800 ? 6 : 5
+      // Estimate max particles needed for the bar chart (largest shape)
+      const cL = W * 0.18, cR = W * 0.85, cB = H * 0.88, cT = H * 0.5
+      const cW = cR - cL, cH = cB - cT
+      const bW = (cW - cW * 0.025 * 8) / 7
+      let est = 0
+      ;[0.62, 0.45, 0.72, 0.32, 0.55, 0.88, 0.4].forEach(h => { est += Math.ceil(bW / SZ) * Math.ceil(h * cH / SZ) })
+      est += Math.ceil(cW / SZ) * 2 + Math.ceil(cH / SZ) + 100 // axes + grid + spare
+      N = Math.min(est, 4000) // cap for performance
+    }
 
     function resize() {
-      W = container.offsetWidth; H = container.offsetHeight
+      const oldN = N
+      computeSize()
       cv.width = W * 2; cv.height = H * 2
       ctx.setTransform(2, 0, 0, 2, 0, 0)
+      if (N !== oldN) init()
       genTargets(SHAPES[shapeIdx])
     }
 
     function init() {
       particles = []
-      for (let i = 0; i < N; i++) particles.push({ x: Math.random() * 800, y: 300 + Math.random() * 300, vx: 0, vy: 0, tx: 0, ty: 0, c: '#0ea5e9', tc: '#0ea5e9', sq: true })
+      for (let i = 0; i < N; i++) particles.push({ x: W * 0.1 + Math.random() * W * 0.8, y: H * 0.4 + Math.random() * H * 0.5, vx: 0, vy: 0, tx: 0, ty: 0, c: '#0ea5e9', tc: '#0ea5e9', sq: true })
     }
 
     function genTargets(shape) {
@@ -90,7 +105,7 @@ function ParticleChartHero() {
             for (let y = lY + SZ * 2; y < cB && idx < N; y += SZ * 1.5) { particles[idx].tx = x; particles[idx].ty = y; particles[idx].tc = 'rgba(14,165,233,0.12)'; particles[idx].sq = true; idx++ }
           }
         }
-        dY.forEach((v, i) => { const dx = cL + i / (dY.length - 1) * cW, dy = cT + v * cH; for (let a = 0; a < Math.PI * 2 && idx < N; a += 0.6) { particles[idx].tx = dx + Math.cos(a) * 4; particles[idx].ty = dy + Math.sin(a) * 4; particles[idx].tc = '#0ea5e9'; particles[idx].sq = true; idx++ } })
+        dY.forEach((v, i) => { const dx = cL + i / (dY.length - 1) * cW, dy = cT + v * cH; for (let a = 0; a < Math.PI * 2 && idx < N; a += 0.5) { particles[idx].tx = dx + Math.cos(a) * 5; particles[idx].ty = dy + Math.sin(a) * 5; particles[idx].tc = '#0ea5e9'; particles[idx].sq = true; idx++ } })
         for (let px = cL; px <= cR && idx < N; px += SZ) { particles[idx].tx = px; particles[idx].ty = cB; particles[idx].tc = '#cbd5e1'; particles[idx].sq = true; idx++ }
         for (let py = cT; py <= cB && idx < N; py += SZ) { particles[idx].tx = cL - 2; particles[idx].ty = py; particles[idx].tc = '#cbd5e1'; particles[idx].sq = true; idx++ }
       } else if (shape === 'kpi') {
@@ -113,49 +128,104 @@ function ParticleChartHero() {
       particles._m = { shape, cL, cR, cB, cT, cW, cH }
     }
 
-    init(); resize()
+    computeSize(); init(); resize()
     window.addEventListener('resize', resize)
     container.addEventListener('mousemove', e => { const r = container.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top })
     container.addEventListener('touchmove', e => { const t = e.touches[0]; const r = container.getBoundingClientRect(); mx = t.clientX - r.left; my = t.clientY - r.top }, { passive: true })
     container.addEventListener('mouseleave', () => { mx = -999; my = -999 })
 
+    // Phase machine: 'forming' → 'holding' → 'drifting' → 'forming' ...
+    let phase = 'forming', phaseTimer = 0
+    const FORM_TIME = 90, HOLD_TIME = 180, DRIFT_TIME = 180 // frames (~1.5s, 3s, 3s at 60fps)
+
+    // Set drift targets — random positions in the chart area
+    function setDriftTargets() {
+      const cL = W * 0.1, cR = W * 0.9, cT = H * 0.45, cB = H * 0.9
+      particles.forEach(p => {
+        p.tx = cL + Math.random() * (cR - cL)
+        p.ty = cT + Math.random() * (cB - cT)
+        p.tc = '#0ea5e9'
+        p.sq = false
+      })
+      particles._m = null
+    }
+
     let raf
     function draw() {
       ctx.clearRect(0, 0, W, H)
-      holdTimer++
-      if (holdTimer > HOLD) { holdTimer = 0; shapeIdx = (shapeIdx + 1) % SHAPES.length; genTargets(SHAPES[shapeIdx]) }
+      phaseTimer++
+
+      // Phase transitions
+      if (phase === 'forming' && phaseTimer > FORM_TIME) {
+        phase = 'holding'; phaseTimer = 0
+      } else if (phase === 'holding' && phaseTimer > HOLD_TIME) {
+        phase = 'drifting'; phaseTimer = 0
+        setDriftTargets()
+      } else if (phase === 'drifting' && phaseTimer > DRIFT_TIME) {
+        phase = 'forming'; phaseTimer = 0
+        shapeIdx = (shapeIdx + 1) % SHAPES.length
+        genTargets(SHAPES[shapeIdx])
+      }
+
+      // Physics — always spring toward target, varying speed by phase
+      const springStrength = phase === 'forming' ? 0.06 : phase === 'holding' ? 0.12 : 0.03
+      const friction = phase === 'holding' ? 0.78 : 0.84
 
       let settled = 0
       particles.forEach(p => {
         const dx = p.tx - p.x, dy = p.ty - p.y
-        p.vx += dx * 0.07; p.vy += dy * 0.07
-        p.vx *= 0.82; p.vy *= 0.82
+        p.vx += dx * springStrength
+        p.vy += dy * springStrength
+        // Add gentle noise during drift for organic float feel
+        if (phase === 'drifting') {
+          p.vx += (Math.random() - 0.5) * 0.3
+          p.vy += (Math.random() - 0.5) * 0.3
+        }
+        p.vx *= friction; p.vy *= friction
         p.x += p.vx; p.y += p.vy
         p.c = p.tc
-        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) settled++
+        if (Math.abs(dx) < 2 && Math.abs(dy) < 2) settled++
       })
       const sPct = settled / N
 
-      if (mx > 0) particles.forEach(p => { const dx = mx - p.x, dy = my - p.y, dist = Math.sqrt(dx * dx + dy * dy); if (dist < 80 && dist > 1) { p.vx -= dx * 0.5 / dist; p.vy -= dy * 0.5 / dist } })
+      // Mouse repel
+      if (mx > 0) {
+        particles.forEach(p => {
+          const dx = mx - p.x, dy = my - p.y, dist = Math.sqrt(dx * dx + dy * dy)
+          if (dist < 80 && dist > 1) { p.vx -= dx * 0.4 / dist; p.vy -= dy * 0.4 / dist }
+        })
+      }
 
-      const isSettled = sPct > 0.85
+      // Draw particles — squares when formed, circles when transitioning
+      const showSquare = phase === 'holding' || (phase === 'forming' && sPct > 0.7)
       particles.forEach(p => {
-        ctx.globalAlpha = p.tc.includes('rgba') ? 0.35 : (p.tc === '#e2e8f0' || p.tc === '#cbd5e1') ? 0.4 : 0.85
+        const isLight = typeof p.tc === 'string' && (p.tc.includes('rgba') || p.tc === '#e2e8f0' || p.tc === '#cbd5e1')
+        ctx.globalAlpha = phase === 'drifting' ? 0.5 : isLight ? 0.4 : 0.85
         ctx.fillStyle = p.c
-        if (isSettled && p.sq) ctx.fillRect(p.x, p.y, SZ, SZ)
-        else { ctx.beginPath(); ctx.arc(p.x, p.y, p.sq ? 2 : 1.5, 0, Math.PI * 2); ctx.fill() }
+        if (showSquare && p.sq) {
+          ctx.fillRect(p.x, p.y, SZ, SZ)
+        } else {
+          ctx.beginPath(); ctx.arc(p.x, p.y, phase === 'drifting' ? 2.5 : 2, 0, Math.PI * 2); ctx.fill()
+        }
       })
       ctx.globalAlpha = 1
 
-      if (!isSettled) {
-        for (let i = 0; i < N; i += 8) for (let j = i + 8; j < N; j += 8) {
-          const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y, dist = Math.sqrt(dx * dx + dy * dy)
-          if (dist < 30) { ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y); ctx.strokeStyle = `rgba(14,165,233,${0.025 * (1 - dist / 30)})`; ctx.lineWidth = 0.3; ctx.stroke() }
+      // Connection lines during drift/forming
+      if (phase === 'drifting' || (phase === 'forming' && sPct < 0.5)) {
+        const step = Math.max(4, Math.floor(N / 400))
+        for (let i = 0; i < N; i += step) {
+          for (let j = i + step; j < N; j += step) {
+            const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y, dist = Math.sqrt(dx * dx + dy * dy)
+            if (dist < 35) { ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y); ctx.strokeStyle = `rgba(14,165,233,${0.04 * (1 - dist / 35)})`; ctx.lineWidth = 0.4; ctx.stroke() }
+          }
         }
       }
 
-      if (isSettled && particles._m) {
-        const m = particles._m, fade = Math.min((sPct - 0.85) / 0.1, 1) * 0.75
+      // Labels when holding or mostly formed
+      const showLabels = phase === 'holding' || (phase === 'forming' && sPct > 0.8)
+      if (showLabels && particles._m) {
+        const m = particles._m
+        const fade = phase === 'holding' ? Math.min(phaseTimer / 20, 1) * 0.75 : Math.min((sPct - 0.8) / 0.15, 1) * 0.5
         ctx.globalAlpha = fade
         if (m.shape === 'bar') {
           ctx.font = '600 13px system-ui,sans-serif'; ctx.fillStyle = '#0c1425'; ctx.textAlign = 'center'
