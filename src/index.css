@@ -5,50 +5,50 @@
 @tailwind utilities;
 
 /* ============================================================
-   LIGHT MODE — Navy + blue accent (Meuris brand)
+   LIGHT MODE — Deep dark text + electric cyan accent (Meuris)
    ============================================================ */
 :root {
-  --bg-primary: #f4f6f8;
+  --bg-primary: #f8fafc;
   --bg-surface: #ffffff;
   --bg-raised: #ffffff;
-  --bg-overlay: #ebeef2;
-  --accent: #1a3f6b;
-  --accent-light: #3b8bd4;
-  --accent-dark: #0a1f3d;
-  --text-primary: #0a1f3d;
-  --text-secondary: #4a5568;
+  --bg-overlay: #f1f5f9;
+  --accent: #0c1425;
+  --accent-light: #0ea5e9;
+  --accent-dark: #0c1425;
+  --text-primary: #0c1425;
+  --text-secondary: #475569;
   --text-muted: #94a3b8;
-  --border: #e2e6ec;
-  --border-light: #ebeef2;
-  --border-accent: rgba(59, 139, 212, 0.12);
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --border-accent: rgba(14, 165, 233, 0.10);
   --sidebar-bg: #ffffff;
-  --sidebar-border: #e2e6ec;
+  --sidebar-border: #e2e8f0;
   --card-bg: #ffffff;
-  --card-border: #e2e6ec;
+  --card-border: #e2e8f0;
   --card-shadow: 0 1px 3px rgba(0,0,0,0.04);
-  --input-bg: #f4f6f8;
-  --input-border: #e2e6ec;
-  --scrollbar-thumb: #cbd5e0;
+  --input-bg: #f8fafc;
+  --input-border: #e2e8f0;
+  --scrollbar-thumb: #cbd5e1;
   --scrollbar-hover: #94a3b8;
 }
 
 /* ============================================================
-   DARK MODE — Deep navy + blue accent (Meuris brand)
+   DARK MODE — Deep navy + electric cyan accent (Meuris)
    ============================================================ */
 .dark {
-  --bg-primary: #0c1420;
+  --bg-primary: #0c1425;
   --bg-surface: #111b2a;
   --bg-raised: #162236;
   --bg-overlay: #162236;
-  --accent: #3b8bd4;
-  --accent-light: #5ba3e0;
-  --accent-dark: #1a3f6b;
+  --accent: #0ea5e9;
+  --accent-light: #38bdf8;
+  --accent-dark: #0369a1;
   --text-primary: #e2e8f0;
   --text-secondary: #94a3b8;
   --text-muted: #475569;
   --border: #1e2d42;
   --border-light: #1a2738;
-  --border-accent: rgba(59, 139, 212, 0.15);
+  --border-accent: rgba(14, 165, 233, 0.15);
   --sidebar-bg: #0f1926;
   --sidebar-border: #1e2d42;
   --card-bg: #111b2a;

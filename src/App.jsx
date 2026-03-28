@@ -52,7 +52,7 @@ function GoogleAuthCallback({ onToken, onError }) {
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
       <div className="text-center">
         <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 animate-pulse" style={{ background: 'var(--border-accent)' }}>
-          <span style={{ fontSize: 28, fontWeight: 800, fontStyle: "italic", fontFamily: "Georgia,serif", background: "linear-gradient(135deg,#3b8bd4,#0a1f3d)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>µ</span>
+          <span style={{ fontSize: 28, fontWeight: 800, fontStyle: "italic", fontFamily: "Georgia,serif", background: "linear-gradient(135deg,#38bdf8,#0c1425)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>µ</span>
         </div>
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Connecting to Google Sheets...</p>
       </div>
@@ -148,21 +148,27 @@ function AppContent() {
 
   const handleNewProject = () => { setShowProjectWizard(true) }
 
+  // Listen for hash changes (login/signup links from landing page) — must be above early returns
+  const [hash, setHash] = useState(window.location.hash)
+  useEffect(() => {
+    const onHash = () => setHash(window.location.hash)
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+
   if (isGoogleCallback) return <GoogleAuthCallback onToken={handleGoogleToken} onError={e => console.error('Google auth error:', e)} />
 
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
         <div className="w-10 h-10 rounded-xl flex items-center justify-center animate-pulse" style={{ background: 'var(--border-accent)' }}>
-          <span style={{ fontSize: 22, fontWeight: 800, fontStyle: "italic", fontFamily: "Georgia,serif", background: "linear-gradient(135deg,#3b8bd4,#0a1f3d)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>µ</span>
+          <span style={{ fontSize: 22, fontWeight: 800, fontStyle: "italic", fontFamily: "Georgia,serif", background: "linear-gradient(135deg,#38bdf8,#0c1425)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>µ</span>
         </div>
       </div>
     )
   }
 
   if (!user) {
-    // Show auth screen if /#login hash, otherwise landing page
-    const hash = window.location.hash
     if (hash === '#login' || hash === '#signup') return <AuthScreen />
     return <LandingPage />
   }
