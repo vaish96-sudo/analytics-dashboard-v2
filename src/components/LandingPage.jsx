@@ -173,10 +173,12 @@ function AmbientCanvas() {
     const clusters = []
     const chartTypes = ['bar', 'line', 'donut', 'bar', 'line', 'scatter', 'bar', 'line']
     for (let ci = 0; ci < 8; ci++) {
-      const cw = 60 + Math.random() * 80
-      const ch = 50 + Math.random() * 60
-      const cx = Math.random() * 0.9 + 0.05 // 5%-95% of width
-      const cy = Math.random() * 0.85 + 0.05
+      const cw = 50 + Math.random() * 60
+      const ch = 40 + Math.random() * 50
+      // Place clusters in edges only — avoid center 60% where text lives
+      let cx, cy
+      if (ci < 4) { cx = Math.random() * 0.15 + 0.02; cy = Math.random() * 0.8 + 0.05 }
+      else { cx = Math.random() * 0.15 + 0.83; cy = Math.random() * 0.8 + 0.05 }
       const particles = []
       const type = chartTypes[ci]
       const SZ = 3
@@ -228,7 +230,7 @@ function AmbientCanvas() {
         p.dtx = Math.random() * W; p.dty = Math.random() * H
       })
 
-      clusters.push({ particles, cx, cy, phase: 'forming', timer: Math.floor(Math.random() * 100), opacity: 0.25 + Math.random() * 0.35 })
+      clusters.push({ particles, cx, cy, phase: 'forming', timer: Math.floor(Math.random() * 100), opacity: 0.15 + Math.random() * 0.2 })
     }
 
     let raf
@@ -352,7 +354,7 @@ function DashboardMockup() {
   const show = (s) => stage >= s
 
   return (
-    <div ref={ref} className="relative max-w-4xl mx-auto">
+    <div ref={ref} className="relative max-w-3xl mx-auto">
       <div className="rounded-2xl overflow-hidden transition-all duration-700"
         style={{ background: '#fff', border: '1px solid #e2e8f0',
           boxShadow: show(1) ? '0 25px 80px rgba(12,20,37,0.08), 0 1px 3px rgba(0,0,0,0.03)' : 'none',
@@ -406,7 +408,7 @@ function DashboardMockup() {
                 {bars.map((h, i) => (
                   <div key={i} className="flex-1 rounded-t transition-all"
                     style={{ height: show(3) ? `${h}%` : '0%',
-                      background: i === 5 ? C.dark : `rgba(14,165,233,${0.25 + i * 0.08})`,
+                      background: `rgba(14,165,233,${0.3 + i * 0.09})`,
                       transitionDuration: `${600 + i * 80}ms`,
                       transitionTimingFunction: 'cubic-bezier(.34,1.56,.64,1)',
                       transitionDelay: `${show(3) ? 200 + i * 60 : 0}ms` }} />
