@@ -550,7 +550,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
             <LogoMark size={30} />
             <div>
               <span className="text-sm font-display font-bold block leading-none" style={{ color: 'var(--text-primary)' }}>Meuris</span>
-              <span className="text-[9px] font-display font-semibold tracking-[0.15em] uppercase" style={{ color: 'var(--accent-light)' }}>Analytics · Instant</span>
+              <span className="text-[9px] font-display font-semibold tracking-[0.15em] uppercase" style={{ color: 'var(--accent-light)' }}>Instant</span>
             </div>
           </div>
         </div>
