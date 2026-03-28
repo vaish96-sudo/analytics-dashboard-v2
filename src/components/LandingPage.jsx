@@ -150,20 +150,142 @@ function MiniParticleChart({ type, width, height, style, className = '' }) {
 }
 
 /* ============================================================
-   HERO
+   HERO — full-page ambient particles + centered content + mockup
    ============================================================ */
+function AmbientCanvas() {
+  const canvasRef = useRef(null)
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    const cv = canvasRef.current, ctx = cv.getContext('2d')
+    const container = containerRef.current
+    let W, H
+    const blues = ['#38bdf8', '#0ea5e9', '#7dd3fc', '#0284c7', '#bae6fd']
+
+    function resize() {
+      W = container.offsetWidth; H = container.offsetHeight
+      cv.width = W * 2; cv.height = H * 2; ctx.setTransform(2, 0, 0, 2, 0, 0)
+    }
+    resize()
+    window.addEventListener('resize', resize)
+
+    // Create small chart clusters scattered across the page
+    const clusters = []
+    const chartTypes = ['bar', 'line', 'donut', 'bar', 'line', 'scatter', 'bar', 'line']
+    for (let ci = 0; ci < 8; ci++) {
+      const cw = 60 + Math.random() * 80
+      const ch = 50 + Math.random() * 60
+      const cx = Math.random() * 0.9 + 0.05 // 5%-95% of width
+      const cy = Math.random() * 0.85 + 0.05
+      const particles = []
+      const type = chartTypes[ci]
+      const SZ = 3
+
+      // Generate chart particles relative to cluster center
+      if (type === 'bar') {
+        const heights = [0.5, 0.35, 0.65, 0.3, 0.55]
+        const bW = cw * 0.16, gap = (cw - bW * 5) / 6
+        heights.forEach((h, i) => {
+          const bx = gap + i * (bW + gap); const by = ch * (1 - h) * 0.8; const bh = h * ch * 0.7
+          for (let py = by; py < by + bh; py += SZ) for (let px = bx; px < bx + bW; px += SZ)
+            particles.push({ ox: px, oy: py, c: blues[i % blues.length] })
+        })
+      } else if (type === 'line') {
+        const pts = [0.55, 0.4, 0.5, 0.25, 0.35, 0.15, 0.2]
+        for (let i = 0; i < pts.length - 1; i++) {
+          const x1 = i / (pts.length - 1) * cw * 0.9 + cw * 0.05
+          const x2 = (i + 1) / (pts.length - 1) * cw * 0.9 + cw * 0.05
+          const y1 = pts[i] * ch * 0.7 + ch * 0.1, y2 = pts[i + 1] * ch * 0.7 + ch * 0.1
+          for (let x = x1; x < x2; x += SZ) {
+            const t = (x - x1) / (x2 - x1), ly = y1 + (y2 - y1) * t
+            particles.push({ ox: x, oy: ly, c: '#0ea5e9' })
+            if (Math.random() < 0.4) particles.push({ ox: x, oy: ly + SZ * 2 + Math.random() * (ch * 0.8 - ly), c: '#bae6fd' })
+          }
+        }
+      } else if (type === 'donut') {
+        const R = Math.min(cw, ch) * 0.4, iR = R * 0.55
+        const slices = [0.35, 0.25, 0.2, 0.2]; let sA = -Math.PI / 2
+        slices.forEach((s, si) => {
+          const eA = sA + s * Math.PI * 2
+          for (let a = sA; a < eA; a += 0.06) for (let r = iR; r < R; r += SZ)
+            particles.push({ ox: cw / 2 + Math.cos(a) * r, oy: ch / 2 + Math.sin(a) * r, c: blues[si] })
+          sA = eA
+        })
+      } else {
+        for (let i = 0; i < 25; i++) {
+          const px = Math.random() * cw * 0.8 + cw * 0.1
+          const py = ch * 0.8 - (px / cw) * ch * 0.5 + (Math.random() - 0.5) * ch * 0.2
+          particles.push({ ox: px, oy: py, c: blues[i % blues.length] })
+        }
+      }
+
+      // Initialize with positions
+      particles.forEach(p => {
+        p.x = cx * W + p.ox + (Math.random() - 0.5) * W * 0.3
+        p.y = cy * H + p.oy + (Math.random() - 0.5) * H * 0.3
+        p.vx = 0; p.vy = 0
+        p.tx = cx * W + p.ox; p.ty = cy * H + p.oy
+        p.dtx = Math.random() * W; p.dty = Math.random() * H
+      })
+
+      clusters.push({ particles, cx, cy, phase: 'forming', timer: Math.floor(Math.random() * 100), opacity: 0.25 + Math.random() * 0.35 })
+    }
+
+    let raf
+    function draw() {
+      ctx.clearRect(0, 0, W, H)
+
+      clusters.forEach(cl => {
+        cl.timer++
+        if (cl.phase === 'forming' && cl.timer > 120) { cl.phase = 'holding'; cl.timer = 0 }
+        else if (cl.phase === 'holding' && cl.timer > 200) {
+          cl.phase = 'drifting'; cl.timer = 0
+          cl.particles.forEach(p => { p.dtx = cl.cx * W + (Math.random() - 0.5) * W * 0.4; p.dty = cl.cy * H + (Math.random() - 0.5) * H * 0.4 })
+        }
+        else if (cl.phase === 'drifting' && cl.timer > 250) { cl.phase = 'forming'; cl.timer = 0 }
+
+        const spring = cl.phase === 'forming' ? 0.025 : cl.phase === 'holding' ? 0.08 : 0.012
+        const fric = cl.phase === 'holding' ? 0.82 : 0.92
+        const useDrift = cl.phase === 'drifting'
+
+        let settled = 0
+        cl.particles.forEach(p => {
+          const targetX = useDrift ? p.dtx : p.tx
+          const targetY = useDrift ? p.dty : p.ty
+          p.vx += (targetX - p.x) * spring; p.vy += (targetY - p.y) * spring
+          if (useDrift) { p.vx += (Math.random() - 0.5) * 0.06; p.vy += (Math.random() - 0.5) * 0.06 }
+          p.vx *= fric; p.vy *= fric; p.x += p.vx; p.y += p.vy
+          if (Math.abs(targetX - p.x) < 2 && Math.abs(targetY - p.y) < 2) settled++
+        })
+
+        const isSolid = cl.phase === 'holding' || (cl.phase === 'forming' && settled / cl.particles.length > 0.7)
+        ctx.globalAlpha = cl.opacity * (useDrift ? 0.5 : 1)
+
+        cl.particles.forEach(p => {
+          ctx.fillStyle = p.c
+          if (isSolid) ctx.fillRect(p.x, p.y, 3, 3)
+          else { ctx.beginPath(); ctx.arc(p.x, p.y, 1.2, 0, Math.PI * 2); ctx.fill() }
+        })
+      })
+
+      ctx.globalAlpha = 1
+      raf = requestAnimationFrame(draw)
+    }
+    draw()
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) }
+  }, [])
+
+  return (
+    <div ref={containerRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
+      <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />
+    </div>
+  )
+}
+
 function Hero() {
   return (
     <section className="relative pt-28 sm:pt-36 pb-24 px-6" style={{ overflow: 'hidden', minHeight: '100vh' }}>
-      {/* Ambient mini charts in whitespace */}
-      <div className="absolute inset-0 pointer-events-none hidden lg:block" style={{ zIndex: 0 }}>
-        <MiniParticleChart type="bar" width={140} height={100} style={{ position: 'absolute', top: '15%', left: '4%', opacity: 0.6 }} />
-        <MiniParticleChart type="line" width={160} height={90} style={{ position: 'absolute', top: '12%', right: '5%', opacity: 0.5 }} />
-        <MiniParticleChart type="donut" width={90} height={90} style={{ position: 'absolute', bottom: '20%', left: '6%', opacity: 0.5 }} />
-        <MiniParticleChart type="scatter" width={130} height={100} style={{ position: 'absolute', bottom: '15%', right: '4%', opacity: 0.45 }} />
-        <MiniParticleChart type="bar" width={100} height={70} style={{ position: 'absolute', top: '55%', left: '12%', opacity: 0.35 }} />
-        <MiniParticleChart type="line" width={120} height={70} style={{ position: 'absolute', top: '50%', right: '10%', opacity: 0.35 }} />
-      </div>
+      <AmbientCanvas />
 
       {/* Main content */}
       <div className="max-w-5xl mx-auto text-center relative" style={{ zIndex: 2 }}>
