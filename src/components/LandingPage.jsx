@@ -35,7 +35,7 @@ function MuLogo({ size = 32 }) {
 }
 
 /* ============================================================
-   PARTICLE CHART HERO
+   PARTICLE CHART HERO — smooth morphing between chart types
    ============================================================ */
 function ParticleChartHero() {
   const canvasRef = useRef(null)
@@ -45,132 +45,140 @@ function ParticleChartHero() {
     const cv = canvasRef.current, ctx = cv.getContext('2d')
     const container = containerRef.current
     let W, H, mx = -999, my = -999
-    let particles = [], phase = 'forming', formT = 0, solidT = 0, shape = 'bar', autoC = 0
-    const SZ = 4
+    const SZ = 4, N = 900
+    let particles = [], shapeIdx = 0, holdTimer = 0
+    const HOLD = 180, SHAPES = ['bar', 'line', 'kpi']
 
     function resize() {
       W = container.offsetWidth; H = container.offsetHeight
-      cv.width = W * 2; cv.height = H * 2; ctx.scale(2, 2)
+      cv.width = W * 2; cv.height = H * 2
+      ctx.setTransform(2, 0, 0, 2, 0, 0)
+      genTargets(SHAPES[shapeIdx])
     }
-    resize()
-    window.addEventListener('resize', resize)
 
-    // --- Chart Generators ---
-    function makeBar() {
-      const ps = []
-      const heights = [0.62, 0.45, 0.7, 0.32, 0.52, 0.85, 0.4]
-      const labels = ['Direct', 'Email', 'Social', 'Referral', 'Organic', 'Paid', 'Other']
-      const cL = W * 0.18, cR = W * 0.85, cB = H * 0.88, cT = H * 0.52
-      const cW = cR - cL, cH = cB - cT, bCnt = 7, gap = cW * 0.025, tGap = gap * (bCnt + 1), bW = (cW - tGap) / bCnt
-      for (let b = 0; b < bCnt; b++) {
-        const bx = cL + gap + b * (bW + gap), bh = heights[b] * cH, by = cB - bh
-        for (let py = by; py < cB; py += SZ) for (let px = bx; px < bx + bW; px += SZ) ps.push({ tx: px, ty: py, c: BAR_C[b] })
-      }
-      for (let px = cL - 2; px <= cR; px += SZ) ps.push({ tx: px, ty: cB, c: '#cbd5e1', ax: 1 })
-      for (let py = cT; py <= cB; py += SZ) ps.push({ tx: cL - 2, ty: py, c: '#cbd5e1', ax: 1 })
-      for (let g = 0; g < 5; g++) { const gy = cT + g * (cH / 4); for (let px = cL; px <= cR; px += SZ * 3) ps.push({ tx: px, ty: gy, c: '#e2e8f0', ax: 1 }) }
-      ps._m = { cL, cR, cB, cT, bW, gap, labels, title: 'Revenue by channel', yL: ['$0', '$25K', '$50K', '$75K', '$100K'] }
-      return ps
+    function init() {
+      particles = []
+      for (let i = 0; i < N; i++) particles.push({ x: Math.random() * 800, y: 300 + Math.random() * 300, vx: 0, vy: 0, tx: 0, ty: 0, c: '#0ea5e9', tc: '#0ea5e9', sq: true })
     }
-    function makeLine() {
-      const ps = []
-      const cL = W * 0.18, cR = W * 0.85, cB = H * 0.88, cT = H * 0.52
+
+    function genTargets(shape) {
+      const cL = W * 0.18, cR = W * 0.85, cB = H * 0.88, cT = H * 0.5
       const cW = cR - cL, cH = cB - cT
-      const dY = [0.52, 0.4, 0.55, 0.32, 0.45, 0.2, 0.28, 0.13, 0.22, 0.1, 0.16, 0.06]
-      for (let i = 0; i < dY.length - 1; i++) {
-        const x1 = cL + i / (dY.length - 1) * cW, x2 = cL + (i + 1) / (dY.length - 1) * cW
-        const y1 = cT + dY[i] * cH, y2 = cT + dY[i + 1] * cH
-        for (let x = x1; x < x2; x += SZ) {
-          const t = (x - x1) / (x2 - x1), lY = y1 + (y2 - y1) * t
-          for (let dy = -2; dy <= 2; dy += SZ) ps.push({ tx: x, ty: lY + dy, c: '#0ea5e9' })
-          for (let y = lY + SZ; y < cB; y += SZ) ps.push({ tx: x, ty: y, c: 'rgba(14,165,233,0.1)', ar: 1 })
+      let idx = 0
+
+      if (shape === 'bar') {
+        const heights = [0.62, 0.45, 0.72, 0.32, 0.55, 0.88, 0.4]
+        const bCnt = 7, gap = cW * 0.025, tGap = gap * (bCnt + 1), bW = (cW - tGap) / bCnt
+        const colors = ['#38bdf8', '#0ea5e9', '#0284c7', '#0369a1', '#0ea5e9', '#0c1425', '#38bdf8']
+        for (let b = 0; b < bCnt; b++) {
+          const bx = cL + gap + b * (bW + gap), bh = heights[b] * cH, by = cB - bh
+          for (let py = by; py < cB; py += SZ) for (let px = bx; px < bx + bW; px += SZ) {
+            if (idx < N) { particles[idx].tx = px; particles[idx].ty = py; particles[idx].tc = colors[b]; particles[idx].sq = true; idx++ }
+          }
         }
+        for (let px = cL; px <= cR && idx < N; px += SZ) { particles[idx].tx = px; particles[idx].ty = cB; particles[idx].tc = '#cbd5e1'; particles[idx].sq = true; idx++ }
+        for (let py = cT; py <= cB && idx < N; py += SZ) { particles[idx].tx = cL - 2; particles[idx].ty = py; particles[idx].tc = '#cbd5e1'; particles[idx].sq = true; idx++ }
+        for (let g = 0; g < 4; g++) { const gy = cT + g * (cH / 4); for (let px = cL; px <= cR && idx < N; px += SZ * 4) { particles[idx].tx = px; particles[idx].ty = gy; particles[idx].tc = '#e2e8f0'; particles[idx].sq = true; idx++ } }
+      } else if (shape === 'line') {
+        const dY = [0.55, 0.42, 0.58, 0.35, 0.48, 0.22, 0.3, 0.14, 0.24, 0.1, 0.18, 0.06]
+        for (let i = 0; i < dY.length - 1; i++) {
+          const x1 = cL + i / (dY.length - 1) * cW, x2 = cL + (i + 1) / (dY.length - 1) * cW
+          const y1 = cT + dY[i] * cH, y2 = cT + dY[i + 1] * cH
+          for (let x = x1; x < x2 && idx < N; x += SZ) {
+            const t = (x - x1) / (x2 - x1), lY = y1 + (y2 - y1) * t
+            if (idx < N) { particles[idx].tx = x; particles[idx].ty = lY; particles[idx].tc = '#0ea5e9'; particles[idx].sq = true; idx++ }
+            for (let y = lY + SZ * 2; y < cB && idx < N; y += SZ * 1.5) { particles[idx].tx = x; particles[idx].ty = y; particles[idx].tc = 'rgba(14,165,233,0.12)'; particles[idx].sq = true; idx++ }
+          }
+        }
+        dY.forEach((v, i) => { const dx = cL + i / (dY.length - 1) * cW, dy = cT + v * cH; for (let a = 0; a < Math.PI * 2 && idx < N; a += 0.6) { particles[idx].tx = dx + Math.cos(a) * 4; particles[idx].ty = dy + Math.sin(a) * 4; particles[idx].tc = '#0ea5e9'; particles[idx].sq = true; idx++ } })
+        for (let px = cL; px <= cR && idx < N; px += SZ) { particles[idx].tx = px; particles[idx].ty = cB; particles[idx].tc = '#cbd5e1'; particles[idx].sq = true; idx++ }
+        for (let py = cT; py <= cB && idx < N; py += SZ) { particles[idx].tx = cL - 2; particles[idx].ty = py; particles[idx].tc = '#cbd5e1'; particles[idx].sq = true; idx++ }
+      } else if (shape === 'kpi') {
+        const cards = [
+          { label: 'REVENUE', value: '$142K', color: '#3b82f6' },
+          { label: 'ORDERS', value: '2,847', color: '#10b981' },
+          { label: 'GROWTH', value: '+23%', color: '#8b5cf6' },
+          { label: 'AVG ORDER', value: '$49.80', color: '#f97316' },
+        ]
+        const cardW = cW * 0.22, cardH = cH * 0.55, gap2 = (cW - cardW * 4) / 5
+        const cardY = cT + (cH - cardH) * 0.4
+        cards.forEach((card, ci) => {
+          const cx0 = cL + gap2 + ci * (cardW + gap2)
+          for (let py = cardY; py < cardY + cardH && idx < N; py += SZ) for (let px = cx0; px < cx0 + cardW && idx < N; px += SZ) { particles[idx].tx = px; particles[idx].ty = py; particles[idx].tc = `${card.color}15`; particles[idx].sq = true; idx++ }
+          for (let px = cx0; px < cx0 + cardW && idx < N; px += SZ) { particles[idx].tx = px; particles[idx].ty = cardY; particles[idx].tc = card.color; particles[idx].sq = true; idx++ }
+          for (let px = cx0; px < cx0 + cardW && idx < N; px += SZ) { particles[idx].tx = px; particles[idx].ty = cardY + SZ; particles[idx].tc = card.color; particles[idx].sq = true; idx++ }
+        })
       }
-      dY.forEach((v, i) => { const dx = cL + i / (dY.length - 1) * cW, dy = cT + v * cH; for (let a = 0; a < Math.PI * 2; a += 0.5) for (let r = 0; r < 5; r += SZ) ps.push({ tx: dx + Math.cos(a) * r, ty: dy + Math.sin(a) * r, c: '#0ea5e9' }) })
-      for (let px = cL - 2; px <= cR; px += SZ) ps.push({ tx: px, ty: cB, c: '#cbd5e1', ax: 1 })
-      for (let py = cT; py <= cB; py += SZ) ps.push({ tx: cL - 2, ty: py, c: '#cbd5e1', ax: 1 })
-      for (let g = 0; g < 5; g++) { const gy = cT + g * (cH / 4); for (let px = cL; px <= cR; px += SZ * 3) ps.push({ tx: px, ty: gy, c: '#e2e8f0', ax: 1 }) }
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-      ps._m = { cL, cR, cB, cT, labels: months, title: 'Monthly revenue trend', yL: ['$0', '$25K', '$50K', '$75K', '$100K'] }
-      return ps
-    }
-    function makePie() {
-      const ps = []
-      const cx0 = W * 0.5, cy0 = H * 0.7, R = Math.min(W, H) * 0.2, iR = R * 0.48
-      const slices = [{ p: 0.32, c: PIE_C[0], l: 'Direct' }, { p: 0.24, c: PIE_C[1], l: 'Social' }, { p: 0.18, c: PIE_C[2], l: 'Email' }, { p: 0.14, c: PIE_C[3], l: 'Referral' }, { p: 0.12, c: PIE_C[4], l: 'Other' }]
-      let sA = -Math.PI / 2
-      slices.forEach(s => { const eA = sA + s.p * Math.PI * 2; for (let a = sA; a < eA; a += 0.02) for (let r = iR; r < R; r += SZ) ps.push({ tx: cx0 + Math.cos(a) * r, ty: cy0 + Math.sin(a) * r, c: s.c }); sA = eA })
-      ps._m = { cx: cx0, cy: cy0, R, title: 'Revenue by source', slices }
-      return ps
+      while (idx < N) { particles[idx].tx = W * 0.1 + Math.random() * W * 0.8; particles[idx].ty = cB + 15 + Math.random() * 30; particles[idx].tc = '#e2e8f0'; particles[idx].sq = false; idx++ }
+      particles._m = { shape, cL, cR, cB, cT, cW, cH }
     }
 
-    function initP(target) {
-      const old = particles
-      particles = target.map((t, i) => {
-        const src = old[i] || { x: W * 0.5 + (Math.random() - 0.5) * W, y: H * 0.7 + (Math.random() - 0.5) * H * 0.4 }
-        return { x: src.x, y: src.y, vx: src.vx || 0, vy: src.vy || 0, tx: t.tx, ty: t.ty, c: t.c, ax: t.ax, ar: t.ar, a: t.ar ? 0.35 : t.ax ? 0.45 : 0.85 }
-      })
-      particles._m = target._m
-    }
-    function doShatter() {
-      phase = 'shattering'; formT = 0
-      particles.forEach(p => { const ang = Math.atan2(p.y - H * 0.7, p.x - W * 0.5) + (Math.random() - 0.5) * 1; const spd = 3 + Math.random() * 5; p.vx = Math.cos(ang) * spd; p.vy = Math.sin(ang) * spd })
-    }
-    function setS(s) {
-      shape = s; doShatter()
-      setTimeout(() => { let t; if (s === 'bar') t = makeBar(); else if (s === 'line') t = makeLine(); else t = makePie(); initP(t); phase = 'forming'; formT = 0 }, 650)
-    }
-
+    init(); resize()
+    window.addEventListener('resize', resize)
     container.addEventListener('mousemove', e => { const r = container.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top })
     container.addEventListener('touchmove', e => { const t = e.touches[0]; const r = container.getBoundingClientRect(); mx = t.clientX - r.left; my = t.clientY - r.top }, { passive: true })
     container.addEventListener('mouseleave', () => { mx = -999; my = -999 })
 
-    initP(makeBar()); phase = 'forming'; formT = 0
-
     let raf
     function draw() {
-      ctx.clearRect(0, 0, W, H); formT++
+      ctx.clearRect(0, 0, W, H)
+      holdTimer++
+      if (holdTimer > HOLD) { holdTimer = 0; shapeIdx = (shapeIdx + 1) % SHAPES.length; genTargets(SHAPES[shapeIdx]) }
 
-      if (phase === 'forming') {
-        const p = Math.min(formT / 55, 1), ease = 1 - Math.pow(1 - p, 3)
-        particles.forEach(d => { d.x += (d.tx - d.x) * 0.1 * ease; d.y += (d.ty - d.y) * 0.1 * ease; d.vx *= 0.8; d.vy *= 0.8; d.x += d.vx; d.y += d.vy })
-        if (p >= 1) { phase = 'solid'; solidT = 0 }
-      } else if (phase === 'solid') {
-        solidT++; particles.forEach(d => { d.x += (d.tx - d.x) * 0.2; d.y += (d.ty - d.y) * 0.2 })
-        if (solidT > 200) { autoC++; const shapes = ['bar', 'line', 'pie']; setS(shapes[autoC % 3]) }
-      } else if (phase === 'shattering') {
-        particles.forEach(d => { d.x += d.vx; d.y += d.vy; d.vx *= 0.96; d.vy *= 0.96; d.vy += 0.02; if (d.x < 0 || d.x > W) d.vx *= -0.5; if (d.y < 0 || d.y > H) d.vy *= -0.5 })
-      } else {
-        particles.forEach(d => { d.vx += (Math.random() - 0.5) * 0.04; d.vy += (Math.random() - 0.5) * 0.04; d.vx *= 0.995; d.vy *= 0.995; d.x += d.vx; d.y += d.vy; if (d.x < 0 || d.x > W) d.vx *= -0.5; if (d.y < 0 || d.y > H) d.vy *= -0.5 })
-      }
-      // Mouse
-      if (mx > 0) {
-        const repel = phase === 'solid' || phase === 'forming'
-        particles.forEach(d => { const dx = mx - d.x, dy = my - d.y, dist = Math.sqrt(dx * dx + dy * dy); if (dist < 80 && dist > 1) { if (repel) { d.vx -= dx * 0.35 / dist; d.vy -= dy * 0.35 / dist } else { d.vx += dx * 0.06 / dist; d.vy += dy * 0.06 / dist } } })
-      }
+      let settled = 0
+      particles.forEach(p => {
+        const dx = p.tx - p.x, dy = p.ty - p.y
+        p.vx += dx * 0.07; p.vy += dy * 0.07
+        p.vx *= 0.82; p.vy *= 0.82
+        p.x += p.vx; p.y += p.vy
+        p.c = p.tc
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) settled++
+      })
+      const sPct = settled / N
 
-      const solid = phase === 'solid' || (phase === 'forming' && formT > 25)
-      particles.forEach(d => {
-        ctx.globalAlpha = d.a; ctx.fillStyle = d.c
-        if (solid) { ctx.fillRect(d.x, d.y, SZ, SZ) } else { ctx.beginPath(); ctx.arc(d.x, d.y, d.ax ? 1 : 1.8, 0, Math.PI * 2); ctx.fill() }
+      if (mx > 0) particles.forEach(p => { const dx = mx - p.x, dy = my - p.y, dist = Math.sqrt(dx * dx + dy * dy); if (dist < 80 && dist > 1) { p.vx -= dx * 0.5 / dist; p.vy -= dy * 0.5 / dist } })
+
+      const isSettled = sPct > 0.85
+      particles.forEach(p => {
+        ctx.globalAlpha = p.tc.includes('rgba') ? 0.35 : (p.tc === '#e2e8f0' || p.tc === '#cbd5e1') ? 0.4 : 0.85
+        ctx.fillStyle = p.c
+        if (isSettled && p.sq) ctx.fillRect(p.x, p.y, SZ, SZ)
+        else { ctx.beginPath(); ctx.arc(p.x, p.y, p.sq ? 2 : 1.5, 0, Math.PI * 2); ctx.fill() }
       })
       ctx.globalAlpha = 1
 
-      // Labels
-      if ((phase === 'solid' || phase === 'forming') && particles._m) {
-        const fade = phase === 'solid' ? 0.75 : Math.min(formT / 55, 1) * 0.4
-        ctx.globalAlpha = fade; const m = particles._m
-        ctx.font = '600 13px system-ui,sans-serif'; ctx.fillStyle = C.dark; ctx.textAlign = 'center'
-        if (m.title) ctx.fillText(m.title, W * 0.5, (m.cT || H * 0.5) - 10)
-        ctx.font = '400 10px system-ui,sans-serif'; ctx.fillStyle = '#94a3b8'
-        if (m.labels && m.cB) m.labels.forEach((l, i) => { ctx.fillText(l, m.cL + (i + 0.5) * ((m.cR - m.cL) / m.labels.length), m.cB + 16) })
-        if (m.yL && m.cT) { ctx.textAlign = 'right'; m.yL.forEach((l, i) => { ctx.fillText(l, m.cL - 8, m.cB - i * ((m.cB - m.cT) / 4) + 3) }) }
-        if (m.slices) { ctx.font = '500 11px system-ui,sans-serif'; ctx.textAlign = 'left'; m.slices.forEach((s, i) => { const lx = W * 0.72, ly = H * 0.56 + i * 20; ctx.fillStyle = s.c; ctx.fillRect(lx, ly - 4, 10, 10); ctx.fillStyle = '#475569'; ctx.fillText(`${s.l} (${Math.round(s.p * 100)}%)`, lx + 16, ly + 4) }) }
-        ctx.globalAlpha = 1
+      if (!isSettled) {
+        for (let i = 0; i < N; i += 8) for (let j = i + 8; j < N; j += 8) {
+          const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y, dist = Math.sqrt(dx * dx + dy * dy)
+          if (dist < 30) { ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y); ctx.strokeStyle = `rgba(14,165,233,${0.025 * (1 - dist / 30)})`; ctx.lineWidth = 0.3; ctx.stroke() }
+        }
       }
-      // Connection lines when scattered
-      if (phase !== 'solid' && phase !== 'forming') {
-        for (let i = 0; i < particles.length; i += 6) { for (let j = i + 6; j < particles.length; j += 6) { const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y, dist = Math.sqrt(dx * dx + dy * dy); if (dist < 35) { ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y); ctx.strokeStyle = `rgba(14,165,233,${0.03 * (1 - dist / 35)})`; ctx.lineWidth = 0.3; ctx.stroke() } } }
+
+      if (isSettled && particles._m) {
+        const m = particles._m, fade = Math.min((sPct - 0.85) / 0.1, 1) * 0.75
+        ctx.globalAlpha = fade
+        if (m.shape === 'bar') {
+          ctx.font = '600 13px system-ui,sans-serif'; ctx.fillStyle = '#0c1425'; ctx.textAlign = 'center'
+          ctx.fillText('Revenue by channel', W * 0.5, m.cT - 10)
+          ctx.font = '400 10px system-ui,sans-serif'; ctx.fillStyle = '#94a3b8'
+          ;['Direct', 'Email', 'Social', 'Referral', 'Organic', 'Paid', 'Other'].forEach((l, i) => ctx.fillText(l, m.cL + (i + 0.5) * (m.cW / 7), m.cB + 16))
+          ctx.textAlign = 'right'
+          ;['$0', '$25K', '$50K', '$75K', '$100K'].forEach((l, i) => ctx.fillText(l, m.cL - 8, m.cB - i * (m.cH / 4) + 3))
+        } else if (m.shape === 'line') {
+          ctx.font = '600 13px system-ui,sans-serif'; ctx.fillStyle = '#0c1425'; ctx.textAlign = 'center'
+          ctx.fillText('Monthly revenue trend', W * 0.5, m.cT - 10)
+          ctx.font = '400 10px system-ui,sans-serif'; ctx.fillStyle = '#94a3b8'
+          ;['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].forEach((l, i) => ctx.fillText(l, m.cL + (i + 0.5) * (m.cW / 12), m.cB + 16))
+          ctx.textAlign = 'right'
+          ;['$0', '$25K', '$50K', '$75K', '$100K'].forEach((l, i) => ctx.fillText(l, m.cL - 8, m.cB - i * (m.cH / 4) + 3))
+        } else if (m.shape === 'kpi') {
+          const cards = [{ label: 'REVENUE', value: '$142K', color: '#3b82f6' }, { label: 'ORDERS', value: '2,847', color: '#10b981' }, { label: 'GROWTH', value: '+23%', color: '#8b5cf6' }, { label: 'AVG ORDER', value: '$49.80', color: '#f97316' }]
+          const cardW = m.cW * 0.22, gap2 = (m.cW - cardW * 4) / 5, cardH = m.cH * 0.55, cardY = m.cT + (m.cH - cardH) * 0.4
+          ctx.font = '600 13px system-ui,sans-serif'; ctx.fillStyle = '#0c1425'; ctx.textAlign = 'center'
+          ctx.fillText('Key performance indicators', W * 0.5, m.cT - 10)
+          cards.forEach((c, ci) => { const cx0 = m.cL + gap2 + ci * (cardW + gap2), midX = cx0 + cardW / 2; ctx.font = '700 8px system-ui,sans-serif'; ctx.fillStyle = c.color; ctx.textAlign = 'center'; ctx.fillText(c.label, midX, cardY + cardH * 0.35); ctx.font = '700 20px Georgia,serif'; ctx.fillStyle = '#0c1425'; ctx.fillText(c.value, midX, cardY + cardH * 0.65) })
+        }
+        ctx.globalAlpha = 1
       }
       raf = requestAnimationFrame(draw)
     }
@@ -193,7 +201,7 @@ function ParticleChartHero() {
           Drop any CSV or connect Google Sheets. AI builds your dashboard with charts, KPIs, and insights — no code, no setup.
         </p>
         <div style={{ display: 'flex', gap: 12, pointerEvents: 'auto', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <a href="/#login" className="group" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 28px', borderRadius: 12, background: C.dark, color: '#fff', fontSize: 14, fontWeight: 600, textDecoration: 'none', boxShadow: '0 4px 20px rgba(12,20,37,0.25)', transition: 'transform 0.15s' }}
+          <a href="/#login" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 28px', borderRadius: 12, background: C.dark, color: '#fff', fontSize: 14, fontWeight: 600, textDecoration: 'none', boxShadow: '0 4px 20px rgba(12,20,37,0.25)', transition: 'transform 0.15s' }}
             onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
             Start free — no credit card <ArrowRight style={{ width: 16, height: 16 }} />
           </a>
