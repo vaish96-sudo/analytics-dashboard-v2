@@ -77,7 +77,7 @@ function ParticleChartHero() {
     }
 
     function genTargets(shape) {
-      const cL = W * 0.18, cR = W * 0.85, cB = H * 0.88, cT = H * 0.5
+      const cL = W * 0.15, cR = W * 0.82, cB = H * 0.86, cT = H * 0.48
       const cW = cR - cL, cH = cB - cT
       let idx = 0
 
@@ -136,14 +136,13 @@ function ParticleChartHero() {
 
     // Phase machine: 'forming' → 'holding' → 'drifting' → 'forming' ...
     let phase = 'forming', phaseTimer = 0
-    const FORM_TIME = 90, HOLD_TIME = 180, DRIFT_TIME = 180 // frames (~1.5s, 3s, 3s at 60fps)
+    const FORM_TIME = 180, HOLD_TIME = 180, DRIFT_TIME = 300 // ~3s form, 3s hold, 5s drift
 
-    // Set drift targets — random positions in the chart area
+    // Set drift targets — scatter across entire viewport
     function setDriftTargets() {
-      const cL = W * 0.1, cR = W * 0.9, cT = H * 0.45, cB = H * 0.9
       particles.forEach(p => {
-        p.tx = cL + Math.random() * (cR - cL)
-        p.ty = cT + Math.random() * (cB - cT)
+        p.tx = Math.random() * W
+        p.ty = Math.random() * H
         p.tc = '#0ea5e9'
         p.sq = false
       })
@@ -167,23 +166,28 @@ function ParticleChartHero() {
         genTargets(SHAPES[shapeIdx])
       }
 
-      // Physics — always spring toward target, varying speed by phase
-      const springStrength = phase === 'forming' ? 0.06 : phase === 'holding' ? 0.12 : 0.03
-      const friction = phase === 'holding' ? 0.78 : 0.84
+      // Physics — gentle springs, slow and smooth
+      const springStrength = phase === 'forming' ? 0.025 : phase === 'holding' ? 0.1 : 0.012
+      const friction = phase === 'holding' ? 0.8 : 0.92
 
       let settled = 0
       particles.forEach(p => {
         const dx = p.tx - p.x, dy = p.ty - p.y
         p.vx += dx * springStrength
         p.vy += dy * springStrength
-        // Add gentle noise during drift for organic float feel
+        // Gentle noise during drift for organic floating
         if (phase === 'drifting') {
-          p.vx += (Math.random() - 0.5) * 0.3
-          p.vy += (Math.random() - 0.5) * 0.3
+          p.vx += (Math.random() - 0.5) * 0.15
+          p.vy += (Math.random() - 0.5) * 0.15
         }
         p.vx *= friction; p.vy *= friction
         p.x += p.vx; p.y += p.vy
         p.c = p.tc
+        // Keep particles on screen
+        if (p.x < -20) p.x = -20
+        if (p.x > W + 20) p.x = W + 20
+        if (p.y < -20) p.y = -20
+        if (p.y > H + 20) p.y = H + 20
         if (Math.abs(dx) < 2 && Math.abs(dy) < 2) settled++
       })
       const sPct = settled / N
