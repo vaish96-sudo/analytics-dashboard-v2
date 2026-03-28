@@ -1,14 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react'
 import {
-  BarChart3, Sparkles, ArrowRight, Upload, FileSpreadsheet, Share2,
+  BarChart3, Sparkles, ArrowRight, Upload, Share2,
   Zap, Users, Check, MessageSquare, FileDown, Shield, Globe, ArrowUpRight
 } from 'lucide-react'
 
 const C = { dark: '#0c1425', mid: '#162236', cyan: '#0ea5e9', cyanLight: '#38bdf8', cyanGlow: 'rgba(14,165,233,0.12)' }
-const BAR_C = ['#38bdf8','#0ea5e9','#0284c7','#0369a1','#0ea5e9','#0c1425','#38bdf8']
-const PIE_C = ['#0ea5e9','#0369a1','#38bdf8','#06b6d4','#0c4a6e']
 
-/* === HOOKS === */
+/* === HOOKS & UTILS === */
 function useInView(ref, threshold = 0.15) {
   const [v, setV] = useState(false)
   useEffect(() => { if (!ref.current) return; const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) setV(true) }, { threshold }); o.observe(ref.current); return () => o.disconnect() }, [ref, threshold]); return v
@@ -16,11 +14,6 @@ function useInView(ref, threshold = 0.15) {
 function FadeIn({ children, className = '', delay = 0 }) {
   const ref = useRef(null); const vis = useInView(ref)
   return <div ref={ref} className={className} style={{ opacity: vis ? 1 : 0, transform: vis ? 'translateY(0)' : 'translateY(28px)', transition: `opacity 0.7s cubic-bezier(.16,1,.3,1) ${delay}s, transform 0.7s cubic-bezier(.16,1,.3,1) ${delay}s` }}>{children}</div>
-}
-function CountUp({ target, prefix = '', suffix = '', duration = 1800 }) {
-  const [val, setVal] = useState(0); const ref = useRef(null); const started = useRef(false); const vis = useInView(ref, 0.5)
-  useEffect(() => { if (!vis || started.current) return; started.current = true; const s = performance.now(); const t = (n) => { const p = Math.min((n - s) / duration, 1); setVal(Math.round(target * (1 - Math.pow(1 - p, 3)))); if (p < 1) requestAnimationFrame(t) }; requestAnimationFrame(t) }, [vis, target, duration])
-  return <span ref={ref}>{prefix}{val.toLocaleString()}{suffix}</span>
 }
 function MuLogo({ size = 32 }) {
   const r = Math.round(size * 0.22)
@@ -35,244 +28,287 @@ function MuLogo({ size = 32 }) {
 }
 
 /* ============================================================
-   PARTICLE CHART HERO — smooth morphing between chart types
+   MINI PARTICLE CHART — small, decorative, floats in whitespace
    ============================================================ */
-function ParticleChartHero() {
+function MiniParticleChart({ type, width, height, style, className = '' }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
 
   useEffect(() => {
     const cv = canvasRef.current, ctx = cv.getContext('2d')
-    const container = containerRef.current
-    let W, H, mx = -999, my = -999, SZ, N
-    let particles = [], shapeIdx = 0
-    const SHAPES = ['bar', 'line']
+    const W = width, H = height
+    cv.width = W * 2; cv.height = H * 2; ctx.scale(2, 2)
+    const SZ = 3
+    const particles = []
+    const blues = ['#38bdf8', '#0ea5e9', '#0284c7', '#7dd3fc', '#0369a1']
 
-    function computeSize() {
-      W = container.offsetWidth; H = container.offsetHeight
-      // Larger particles = fewer needed = cleaner scatter
-      SZ = W > 1200 ? 8 : W > 800 ? 7 : 6
-      // Estimate particles for bar chart
-      const cL = W * 0.15, cR = W * 0.78, cB = H * 0.84, cT = H * 0.48
-      const cW = cR - cL, cH = cB - cT
-      const bW = (cW * 0.88) / 6
-      let est = 0
-      ;[0.6, 0.42, 0.7, 0.35, 0.55, 0.82].forEach(h => { est += Math.ceil(bW / SZ) * Math.ceil(h * cH / SZ) })
-      est += Math.ceil(cW / SZ) + Math.ceil(cH / SZ) + 50
-      N = Math.min(est, 2500)
-    }
-
-    function resize() {
-      const oldN = N
-      computeSize()
-      cv.width = W * 2; cv.height = H * 2
-      ctx.setTransform(2, 0, 0, 2, 0, 0)
-      if (N !== oldN) init()
-      genTargets(SHAPES[shapeIdx])
-    }
-
-    function init() {
-      particles = []
-      for (let i = 0; i < N; i++) particles.push({ x: W * 0.1 + Math.random() * W * 0.8, y: H * 0.4 + Math.random() * H * 0.5, vx: 0, vy: 0, tx: 0, ty: 0, c: '#0ea5e9', tc: '#0ea5e9', sq: true })
-    }
-
-    function genTargets(shape) {
-      const cL = W * 0.15, cR = W * 0.78, cB = H * 0.84, cT = H * 0.48
-      const cW = cR - cL, cH = cB - cT
-      let idx = 0
-
-      if (shape === 'bar') {
-        const heights = [0.6, 0.42, 0.7, 0.35, 0.55, 0.82]
-        const bCnt = 6, totalBarW = cW * 0.88, gap = (cW - totalBarW) / (bCnt + 1), bW = totalBarW / bCnt
-        const colors = ['#38bdf8', '#0ea5e9', '#0284c7', '#0ea5e9', '#38bdf8', '#0284c7']
-        for (let b = 0; b < bCnt; b++) {
-          const bx = cL + gap + b * (bW + gap), bh = heights[b] * cH, by = cB - bh
-          for (let py = by; py < cB; py += SZ) for (let px = bx; px < bx + bW; px += SZ) {
-            if (idx < N) { particles[idx].tx = px; particles[idx].ty = py; particles[idx].tc = colors[b]; particles[idx].sq = true; idx++ }
+    // Generate chart shape targets
+    function genChart() {
+      if (type === 'bar') {
+        const heights = [0.55, 0.4, 0.7, 0.3, 0.6]
+        const bW = W * 0.15, gap = (W - bW * 5) / 6
+        heights.forEach((h, i) => {
+          const bx = gap + i * (bW + gap), by = H * (1 - h) * 0.85, bh = h * H * 0.75
+          for (let py = by; py < by + bh; py += SZ) for (let px = bx; px < bx + bW; px += SZ) {
+            particles.push({ x: Math.random() * W, y: Math.random() * H, vx: 0, vy: 0, tx: px, ty: py, c: blues[i], dtx: 0, dty: 0 })
           }
-        }
-        // X axis
-        for (let px = cL; px <= cR && idx < N; px += SZ) { particles[idx].tx = px; particles[idx].ty = cB; particles[idx].tc = '#cbd5e1'; particles[idx].sq = true; idx++ }
-        // Y axis
-        for (let py = cT; py <= cB && idx < N; py += SZ) { particles[idx].tx = cL - 2; particles[idx].ty = py; particles[idx].tc = '#cbd5e1'; particles[idx].sq = true; idx++ }
-      } else if (shape === 'line') {
-        const dY = [0.52, 0.4, 0.55, 0.32, 0.45, 0.2, 0.28, 0.12, 0.22, 0.08]
-        for (let i = 0; i < dY.length - 1; i++) {
-          const x1 = cL + i / (dY.length - 1) * cW, x2 = cL + (i + 1) / (dY.length - 1) * cW
-          const y1 = cT + dY[i] * cH, y2 = cT + dY[i + 1] * cH
-          for (let x = x1; x < x2 && idx < N; x += SZ) {
+        })
+      } else if (type === 'line') {
+        const pts = [0.6, 0.45, 0.55, 0.3, 0.4, 0.15, 0.25, 0.1]
+        for (let i = 0; i < pts.length - 1; i++) {
+          const x1 = i / (pts.length - 1) * W * 0.9 + W * 0.05
+          const x2 = (i + 1) / (pts.length - 1) * W * 0.9 + W * 0.05
+          const y1 = pts[i] * H * 0.7 + H * 0.1, y2 = pts[i + 1] * H * 0.7 + H * 0.1
+          for (let x = x1; x < x2; x += SZ) {
             const t = (x - x1) / (x2 - x1), lY = y1 + (y2 - y1) * t
-            // Stroke line (2 pixels thick)
-            if (idx < N) { particles[idx].tx = x; particles[idx].ty = lY; particles[idx].tc = '#0ea5e9'; particles[idx].sq = true; idx++ }
-            if (idx < N) { particles[idx].tx = x; particles[idx].ty = lY + SZ; particles[idx].tc = '#0ea5e9'; particles[idx].sq = true; idx++ }
-            // Area fill below
-            for (let y = lY + SZ * 2; y < cB && idx < N; y += SZ * 2) { particles[idx].tx = x; particles[idx].ty = y; particles[idx].tc = '#bae6fd'; particles[idx].sq = true; idx++ }
+            particles.push({ x: Math.random() * W, y: Math.random() * H, vx: 0, vy: 0, tx: x, ty: lY, c: '#0ea5e9', dtx: 0, dty: 0 })
+            for (let y = lY + SZ; y < H * 0.85; y += SZ * 2) {
+              particles.push({ x: Math.random() * W, y: Math.random() * H, vx: 0, vy: 0, tx: x, ty: y, c: '#bae6fd', dtx: 0, dty: 0 })
+            }
           }
         }
-        // Data point dots
-        dY.forEach((v, i) => { const dx = cL + i / (dY.length - 1) * cW, dy = cT + v * cH; for (let a = 0; a < Math.PI * 2 && idx < N; a += 0.4) for (let r = 0; r < 6 && idx < N; r += SZ) { particles[idx].tx = dx + Math.cos(a) * r; particles[idx].ty = dy + Math.sin(a) * r; particles[idx].tc = '#0284c7'; particles[idx].sq = true; idx++ } })
-        // Axes
-        for (let px = cL; px <= cR && idx < N; px += SZ) { particles[idx].tx = px; particles[idx].ty = cB; particles[idx].tc = '#cbd5e1'; particles[idx].sq = true; idx++ }
-        for (let py = cT; py <= cB && idx < N; py += SZ) { particles[idx].tx = cL - 2; particles[idx].ty = py; particles[idx].tc = '#cbd5e1'; particles[idx].sq = true; idx++ }
+      } else if (type === 'donut') {
+        const cx0 = W / 2, cy0 = H / 2, R = Math.min(W, H) * 0.4, iR = R * 0.55
+        const slices = [0.35, 0.25, 0.2, 0.2]
+        let sA = -Math.PI / 2
+        slices.forEach((s, si) => {
+          const eA = sA + s * Math.PI * 2
+          for (let a = sA; a < eA; a += 0.04) for (let r = iR; r < R; r += SZ) {
+            particles.push({ x: Math.random() * W, y: Math.random() * H, vx: 0, vy: 0, tx: cx0 + Math.cos(a) * r, ty: cy0 + Math.sin(a) * r, c: blues[si], dtx: 0, dty: 0 })
+          }
+          sA = eA
+        })
+      } else if (type === 'scatter') {
+        for (let i = 0; i < 40; i++) {
+          const px = W * 0.1 + Math.random() * W * 0.8
+          const py = H * 0.8 - (px / W) * H * 0.6 + (Math.random() - 0.5) * H * 0.2
+          for (let a = 0; a < Math.PI * 2; a += 0.8) {
+            particles.push({ x: Math.random() * W, y: Math.random() * H, vx: 0, vy: 0, tx: px + Math.cos(a) * 3, ty: py + Math.sin(a) * 3, c: blues[i % blues.length], dtx: 0, dty: 0 })
+          }
+        }
       }
-      // Remaining particles — hide them below the chart, scattered lightly
-      while (idx < N) { particles[idx].tx = cL + Math.random() * cW; particles[idx].ty = cB + 10 + Math.random() * 20; particles[idx].tc = '#e2e8f0'; particles[idx].sq = false; idx++ }
-      particles._m = { shape, cL, cR, cB, cT, cW, cH }
+      // Set drift targets
+      particles.forEach(p => { p.dtx = Math.random() * W; p.dty = Math.random() * H })
     }
+    genChart()
 
-    computeSize(); init(); resize()
-    window.addEventListener('resize', resize)
-    container.addEventListener('mousemove', e => { const r = container.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top })
-    container.addEventListener('touchmove', e => { const t = e.touches[0]; const r = container.getBoundingClientRect(); mx = t.clientX - r.left; my = t.clientY - r.top }, { passive: true })
-    container.addEventListener('mouseleave', () => { mx = -999; my = -999 })
-
-    // Phase machine: 'forming' → 'holding' → 'drifting' → 'forming' ...
-    let phase = 'forming', phaseTimer = 0
-    const FORM_TIME = 180, HOLD_TIME = 180, DRIFT_TIME = 300 // ~3s form, 3s hold, 5s drift
-
-    // Set drift targets — scatter across entire viewport
-    function setDriftTargets() {
-      particles.forEach(p => {
-        p.tx = Math.random() * W
-        p.ty = Math.random() * H
-        p.tc = '#0ea5e9'
-        p.sq = false
-      })
-      particles._m = null
-    }
-
+    let phase = 'forming', timer = 0
+    const FORM = 150, HOLD = 200, DRIFT = 250
     let raf
+
     function draw() {
       ctx.clearRect(0, 0, W, H)
-      phaseTimer++
+      timer++
+      if (phase === 'forming' && timer > FORM) { phase = 'holding'; timer = 0 }
+      else if (phase === 'holding' && timer > HOLD) { phase = 'drifting'; timer = 0; particles.forEach(p => { p.dtx = Math.random() * W; p.dty = Math.random() * H }) }
+      else if (phase === 'drifting' && timer > DRIFT) { phase = 'forming'; timer = 0 }
 
-      // Phase transitions
-      if (phase === 'forming' && phaseTimer > FORM_TIME) {
-        phase = 'holding'; phaseTimer = 0
-      } else if (phase === 'holding' && phaseTimer > HOLD_TIME) {
-        phase = 'drifting'; phaseTimer = 0
-        setDriftTargets()
-      } else if (phase === 'drifting' && phaseTimer > DRIFT_TIME) {
-        phase = 'forming'; phaseTimer = 0
-        shapeIdx = (shapeIdx + 1) % SHAPES.length
-        genTargets(SHAPES[shapeIdx])
-      }
-
-      // Physics — gentle springs, slow and smooth
-      const springStrength = phase === 'forming' ? 0.025 : phase === 'holding' ? 0.1 : 0.012
-      const friction = phase === 'holding' ? 0.8 : 0.92
+      const spring = phase === 'forming' ? 0.03 : phase === 'holding' ? 0.1 : 0.015
+      const fric = phase === 'holding' ? 0.8 : 0.91
+      const tx = phase === 'drifting' ? 'dtx' : 'tx'
+      const ty = phase === 'drifting' ? 'dty' : 'ty'
 
       let settled = 0
       particles.forEach(p => {
-        const dx = p.tx - p.x, dy = p.ty - p.y
-        p.vx += dx * springStrength
-        p.vy += dy * springStrength
-        // Gentle noise during drift for organic floating
-        if (phase === 'drifting') {
-          p.vx += (Math.random() - 0.5) * 0.15
-          p.vy += (Math.random() - 0.5) * 0.15
-        }
-        p.vx *= friction; p.vy *= friction
+        const dx = p[tx] - p.x, dy = p[ty] - p.y
+        p.vx += dx * spring; p.vy += dy * spring
+        if (phase === 'drifting') { p.vx += (Math.random() - 0.5) * 0.08; p.vy += (Math.random() - 0.5) * 0.08 }
+        p.vx *= fric; p.vy *= fric
         p.x += p.vx; p.y += p.vy
-        p.c = p.tc
-        // Keep particles on screen
-        if (p.x < -20) p.x = -20
-        if (p.x > W + 20) p.x = W + 20
-        if (p.y < -20) p.y = -20
-        if (p.y > H + 20) p.y = H + 20
-        if (Math.abs(dx) < 2 && Math.abs(dy) < 2) settled++
+        if (Math.abs(dx) < 1.5 && Math.abs(dy) < 1.5) settled++
       })
-      const sPct = settled / N
 
-      // Mouse repel
-      if (mx > 0) {
-        particles.forEach(p => {
-          const dx = mx - p.x, dy = my - p.y, dist = Math.sqrt(dx * dx + dy * dy)
-          if (dist < 80 && dist > 1) { p.vx -= dx * 0.4 / dist; p.vy -= dy * 0.4 / dist }
-        })
-      }
-
-      // Draw particles — squares when formed, circles when transitioning
-      const showSquare = phase === 'holding' || (phase === 'forming' && sPct > 0.7)
+      const isSolid = phase === 'holding' || (phase === 'forming' && settled / particles.length > 0.75)
       particles.forEach(p => {
-        const isLight = typeof p.tc === 'string' && (p.tc.includes('rgba') || p.tc === '#e2e8f0' || p.tc === '#cbd5e1')
-        ctx.globalAlpha = phase === 'drifting' ? 0.5 : isLight ? 0.4 : 0.85
+        ctx.globalAlpha = phase === 'drifting' ? 0.35 : p.c === '#bae6fd' ? 0.3 : 0.7
         ctx.fillStyle = p.c
-        if (showSquare && p.sq) {
-          ctx.fillRect(p.x, p.y, SZ, SZ)
-        } else {
-          ctx.beginPath(); ctx.arc(p.x, p.y, phase === 'drifting' ? 2.5 : 2, 0, Math.PI * 2); ctx.fill()
-        }
+        if (isSolid) ctx.fillRect(p.x, p.y, SZ, SZ)
+        else { ctx.beginPath(); ctx.arc(p.x, p.y, 1.5, 0, Math.PI * 2); ctx.fill() }
       })
-      ctx.globalAlpha = 1
 
-      // Connection lines during drift/forming
-      if (phase === 'drifting' || (phase === 'forming' && sPct < 0.5)) {
-        const step = Math.max(4, Math.floor(N / 400))
-        for (let i = 0; i < N; i += step) {
-          for (let j = i + step; j < N; j += step) {
-            const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y, dist = Math.sqrt(dx * dx + dy * dy)
-            if (dist < 35) { ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y); ctx.strokeStyle = `rgba(14,165,233,${0.04 * (1 - dist / 35)})`; ctx.lineWidth = 0.4; ctx.stroke() }
+      if (phase === 'drifting') {
+        ctx.globalAlpha = 1
+        for (let i = 0; i < particles.length; i += 6) {
+          for (let j = i + 6; j < particles.length; j += 6) {
+            const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y, d = Math.sqrt(dx * dx + dy * dy)
+            if (d < 20) { ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y); ctx.strokeStyle = `rgba(14,165,233,${0.04 * (1 - d / 20)})`; ctx.lineWidth = 0.3; ctx.stroke() }
           }
         }
       }
-
-      // Labels when holding or mostly formed
-      const showLabels = phase === 'holding' || (phase === 'forming' && sPct > 0.8)
-      if (showLabels && particles._m) {
-        const m = particles._m
-        const fade = phase === 'holding' ? Math.min(phaseTimer / 20, 1) * 0.75 : Math.min((sPct - 0.8) / 0.15, 1) * 0.5
-        ctx.globalAlpha = fade
-        if (m.shape === 'bar') {
-          ctx.font = '600 13px system-ui,sans-serif'; ctx.fillStyle = '#0c1425'; ctx.textAlign = 'center'
-          ctx.fillText('Revenue by channel', W * 0.5, m.cT - 10)
-          ctx.font = '400 10px system-ui,sans-serif'; ctx.fillStyle = '#94a3b8'
-          ;['Direct', 'Email', 'Social', 'Referral', 'Organic', 'Paid'].forEach((l, i) => ctx.fillText(l, m.cL + (i + 0.5) * (m.cW / 6), m.cB + 16))
-          ctx.textAlign = 'right'
-          ;['$0', '$25K', '$50K', '$75K'].forEach((l, i) => ctx.fillText(l, m.cL - 8, m.cB - i * (m.cH / 3) + 3))
-        } else if (m.shape === 'line') {
-          ctx.font = '600 13px system-ui,sans-serif'; ctx.fillStyle = '#0c1425'; ctx.textAlign = 'center'
-          ctx.fillText('Monthly revenue trend', W * 0.5, m.cT - 10)
-          ctx.font = '400 10px system-ui,sans-serif'; ctx.fillStyle = '#94a3b8'
-          ;['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov'].forEach((l, i) => ctx.fillText(l, m.cL + (i + 0.5) * (m.cW / 6), m.cB + 16))
-          ctx.textAlign = 'right'
-          ;['$0', '$25K', '$50K', '$75K'].forEach((l, i) => ctx.fillText(l, m.cL - 8, m.cB - i * (m.cH / 3) + 3))
-        }
-        ctx.globalAlpha = 1
-      }
+      ctx.globalAlpha = 1
       raf = requestAnimationFrame(draw)
     }
     draw()
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) }
-  }, [])
+    return () => cancelAnimationFrame(raf)
+  }, [type, width, height])
 
   return (
-    <section ref={containerRef} className="relative" style={{ height: '100vh', minHeight: 640, maxHeight: 960, overflow: 'hidden' }}>
-      <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', zIndex: 2, pointerEvents: 'none', paddingTop: 'max(80px, 12vh)' }}>
-        <div style={{ fontSize: 11, fontWeight: 500, padding: '5px 16px', borderRadius: 20, background: C.cyanGlow, color: C.dark, border: '1px solid rgba(14,165,233,0.15)', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Sparkles style={{ width: 14, height: 14, color: C.cyan }} /> Intelligence, simplified
-        </div>
-        <h1 style={{ fontSize: 'clamp(30px, 5vw, 56px)', fontWeight: 700, color: C.dark, fontFamily: 'Lora, Georgia, serif', textAlign: 'center', lineHeight: 1.1, margin: '0 0 16px' }}>
-          Upload a spreadsheet.<br />
-          <span style={{ background: `linear-gradient(135deg, ${C.cyan}, ${C.dark})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Get answers in seconds.</span>
-        </h1>
-        <p style={{ fontSize: 'clamp(14px, 1.8vw, 18px)', color: '#475569', textAlign: 'center', maxWidth: 520, lineHeight: 1.6, margin: '0 0 28px', padding: '0 20px' }}>
-          Drop any CSV or connect Google Sheets. AI builds your dashboard with charts, KPIs, and insights — no code, no setup.
-        </p>
-        <div style={{ display: 'flex', gap: 12, pointerEvents: 'auto', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <a href="/#login" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 28px', borderRadius: 12, background: C.dark, color: '#fff', fontSize: 14, fontWeight: 600, textDecoration: 'none', boxShadow: '0 4px 20px rgba(12,20,37,0.25)', transition: 'transform 0.15s' }}
-            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
-            Start free — no credit card <ArrowRight style={{ width: 16, height: 16 }} />
-          </a>
-          <a href="/instant" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 28px', borderRadius: 12, background: 'rgba(255,255,255,0.9)', color: C.dark, fontSize: 14, fontWeight: 500, textDecoration: 'none', border: '1px solid #e2e8f0', transition: 'all 0.15s', backdropFilter: 'blur(8px)' }}
-            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)'; e.currentTarget.style.borderColor = 'rgba(14,165,233,0.3)' }}
-            onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#e2e8f0' }}>
-            <Upload style={{ width: 16, height: 16, color: C.cyan }} /> Try with your CSV
-          </a>
-        </div>
+    <div ref={containerRef} className={className} style={{ width, height, ...style }}>
+      <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />
+    </div>
+  )
+}
+
+/* ============================================================
+   HERO
+   ============================================================ */
+function Hero() {
+  return (
+    <section className="relative pt-28 sm:pt-36 pb-24 px-6" style={{ overflow: 'hidden', minHeight: '100vh' }}>
+      {/* Ambient mini charts in whitespace */}
+      <div className="absolute inset-0 pointer-events-none hidden lg:block" style={{ zIndex: 0 }}>
+        <MiniParticleChart type="bar" width={140} height={100} style={{ position: 'absolute', top: '15%', left: '4%', opacity: 0.6 }} />
+        <MiniParticleChart type="line" width={160} height={90} style={{ position: 'absolute', top: '12%', right: '5%', opacity: 0.5 }} />
+        <MiniParticleChart type="donut" width={90} height={90} style={{ position: 'absolute', bottom: '20%', left: '6%', opacity: 0.5 }} />
+        <MiniParticleChart type="scatter" width={130} height={100} style={{ position: 'absolute', bottom: '15%', right: '4%', opacity: 0.45 }} />
+        <MiniParticleChart type="bar" width={100} height={70} style={{ position: 'absolute', top: '55%', left: '12%', opacity: 0.35 }} />
+        <MiniParticleChart type="line" width={120} height={70} style={{ position: 'absolute', top: '50%', right: '10%', opacity: 0.35 }} />
+      </div>
+
+      {/* Main content */}
+      <div className="max-w-5xl mx-auto text-center relative" style={{ zIndex: 2 }}>
+        <FadeIn>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-6 text-xs font-medium"
+            style={{ background: C.cyanGlow, color: C.dark, border: '1px solid rgba(14,165,233,0.15)' }}>
+            <Sparkles style={{ width: 14, height: 14, color: C.cyan }} /> Intelligence, simplified
+          </div>
+        </FadeIn>
+
+        <FadeIn delay={0.06}>
+          <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold leading-[1.08] mb-6 tracking-tight" style={{ color: C.dark, fontFamily: 'Lora, Georgia, serif' }}>
+            Upload a spreadsheet.<br />
+            <span style={{ background: `linear-gradient(135deg, ${C.cyan}, ${C.dark})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Get answers in seconds.</span>
+          </h1>
+        </FadeIn>
+
+        <FadeIn delay={0.12}>
+          <p className="text-lg sm:text-xl max-w-2xl mx-auto mb-10 leading-relaxed" style={{ color: '#475569' }}>
+            Drop any CSV or connect Google Sheets. AI builds your dashboard with charts, KPIs, and strategic insights — no code, no setup, no data team needed.
+          </p>
+        </FadeIn>
+
+        <FadeIn delay={0.18}>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20">
+            <a href="/#login" className="flex items-center gap-2 px-7 py-3.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.03]"
+              style={{ background: C.dark, textDecoration: 'none', boxShadow: '0 4px 20px rgba(12,20,37,0.25)' }}>
+              Start free — no credit card <ArrowRight style={{ width: 16, height: 16 }} />
+            </a>
+            <a href="/instant" className="flex items-center gap-2 px-7 py-3.5 rounded-xl text-sm font-medium transition-all hover:shadow-md"
+              style={{ background: '#fff', color: C.dark, textDecoration: 'none', border: '1px solid #e2e8f0' }}>
+              <Upload style={{ width: 16, height: 16, color: C.cyan }} /> Try with your CSV
+            </a>
+          </div>
+        </FadeIn>
+
+        {/* Animated dashboard mockup */}
+        <FadeIn delay={0.25}>
+          <DashboardMockup />
+        </FadeIn>
       </div>
     </section>
+  )
+}
+
+/* ============================================================
+   ANIMATED DASHBOARD MOCKUP — self-building, professional
+   ============================================================ */
+function DashboardMockup() {
+  const ref = useRef(null)
+  const vis = useInView(ref, 0.2)
+  const [stage, setStage] = useState(0) // 0=hidden, 1=frame, 2=kpis, 3=charts, 4=insight
+
+  useEffect(() => {
+    if (!vis) return
+    const t1 = setTimeout(() => setStage(1), 100)
+    const t2 = setTimeout(() => setStage(2), 500)
+    const t3 = setTimeout(() => setStage(3), 1000)
+    const t4 = setTimeout(() => setStage(4), 1600)
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4) }
+  }, [vis])
+
+  const bars = [65, 48, 72, 35, 58, 88, 42]
+  const show = (s) => stage >= s
+
+  return (
+    <div ref={ref} className="relative max-w-4xl mx-auto">
+      <div className="rounded-2xl overflow-hidden transition-all duration-700"
+        style={{ background: '#fff', border: '1px solid #e2e8f0',
+          boxShadow: show(1) ? '0 25px 80px rgba(12,20,37,0.08), 0 1px 3px rgba(0,0,0,0.03)' : 'none',
+          opacity: show(1) ? 1 : 0, transform: show(1) ? 'translateY(0)' : 'translateY(20px)' }}>
+
+        {/* Chrome */}
+        <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderBottom: '1px solid #f1f5f9' }}>
+          <div className="flex gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#fca5a5' }} />
+            <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#fcd34d' }} />
+            <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#86efac' }} />
+          </div>
+          <div className="flex-1 text-center"><span className="text-[10px] px-8 py-0.5 rounded" style={{ background: '#f8fafc', color: '#94a3b8' }}>app.meuris.io</span></div>
+        </div>
+
+        <div className="p-4 sm:p-5">
+          {/* Insight bar */}
+          <div className="rounded-lg p-2.5 flex items-center gap-2 mb-4 transition-all duration-500"
+            style={{ background: C.cyanGlow, border: '1px solid rgba(14,165,233,0.08)',
+              opacity: show(4) ? 1 : 0, transform: show(4) ? 'translateY(0)' : 'translateY(-8px)' }}>
+            <Sparkles style={{ width: 12, height: 12, color: C.cyan }} />
+            <span className="text-[10px] font-medium" style={{ color: C.dark }}>AI found 5 insights — revenue up 23%, West region outperforming by 17%</span>
+            <span className="ml-auto text-[9px] font-medium hidden sm:inline" style={{ color: C.cyan }}>View all →</span>
+          </div>
+
+          {/* KPIs */}
+          <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-4">
+            {[
+              { l: 'Revenue', v: '$142K', c: '#3b82f6' },
+              { l: 'Orders', v: '2,847', c: '#10b981' },
+              { l: 'Avg Order', v: '$49.80', c: '#f97316' },
+              { l: 'Growth', v: '+23%', c: '#8b5cf6' },
+            ].map((k, i) => (
+              <div key={k.l} className="p-2 sm:p-3 rounded-lg transition-all duration-500"
+                style={{ background: '#fff', border: `1.5px solid ${k.c}15`,
+                  opacity: show(2) ? 1 : 0, transform: show(2) ? 'translateY(0)' : 'translateY(12px)',
+                  transitionDelay: `${i * 100}ms` }}>
+                <span className="text-[7px] sm:text-[8px] font-bold uppercase tracking-wider block" style={{ color: k.c }}>{k.l}</span>
+                <div className="text-sm sm:text-lg font-bold mt-0.5" style={{ color: C.dark, fontFamily: 'Lora, Georgia, serif' }}>{k.v}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Charts */}
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <div className="rounded-lg p-3 sm:p-4 transition-all duration-500"
+              style={{ background: '#fff', border: '1px solid #f1f5f9', height: 140,
+                opacity: show(3) ? 1 : 0, transform: show(3) ? 'translateY(0)' : 'translateY(12px)' }}>
+              <div className="text-[9px] sm:text-[10px] font-medium mb-3" style={{ color: '#475569' }}>Revenue by channel</div>
+              <div className="flex items-end gap-[4px] sm:gap-[5px]" style={{ height: 80 }}>
+                {bars.map((h, i) => (
+                  <div key={i} className="flex-1 rounded-t transition-all"
+                    style={{ height: show(3) ? `${h}%` : '0%',
+                      background: i === 5 ? C.dark : `rgba(14,165,233,${0.25 + i * 0.08})`,
+                      transitionDuration: `${600 + i * 80}ms`,
+                      transitionTimingFunction: 'cubic-bezier(.34,1.56,.64,1)',
+                      transitionDelay: `${show(3) ? 200 + i * 60 : 0}ms` }} />
+                ))}
+              </div>
+            </div>
+            <div className="rounded-lg p-3 sm:p-4 transition-all duration-500"
+              style={{ background: '#fff', border: '1px solid #f1f5f9', height: 140,
+                opacity: show(3) ? 1 : 0, transform: show(3) ? 'translateY(0)' : 'translateY(12px)',
+                transitionDelay: '150ms' }}>
+              <div className="text-[9px] sm:text-[10px] font-medium mb-3" style={{ color: '#475569' }}>Monthly trend</div>
+              <svg viewBox="0 0 200 55" style={{ width: '100%', height: 80, overflow: 'visible' }}>
+                <path d="M0,45 Q25,38 50,28 T100,14 T150,18 T200,6" fill="none" stroke={C.cyan} strokeWidth="2" strokeLinecap="round"
+                  strokeDasharray="300" strokeDashoffset={show(3) ? 0 : 300} style={{ transition: 'stroke-dashoffset 1.8s cubic-bezier(.16,1,.3,1) 0.5s' }} />
+                <path d="M0,45 Q25,38 50,28 T100,14 T150,18 T200,6 L200,55 L0,55 Z" fill="rgba(14,165,233,0.06)"
+                  opacity={show(3) ? 1 : 0} style={{ transition: 'opacity 0.8s ease 1.5s' }} />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* Glow behind */}
+      <div className="absolute -inset-8 -z-10 rounded-3xl" style={{ background: 'radial-gradient(ellipse at 50% 60%, rgba(14,165,233,0.05), transparent 65%)' }} />
+    </div>
   )
 }
 
@@ -333,7 +369,7 @@ function FeatureCard({ icon: Icon, title, desc, color, delay }) {
     <FadeIn delay={delay}>
       <div className="p-6 rounded-2xl h-full cursor-default transition-all duration-300"
         onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-        style={{ background: '#fff', border: '1px solid #e2e8f0', transform: h ? 'translateY(-6px)' : 'none', boxShadow: h ? `0 16px 40px rgba(12,20,37,0.06)` : 'none' }}>
+        style={{ background: '#fff', border: '1px solid #e2e8f0', transform: h ? 'translateY(-6px)' : 'none', boxShadow: h ? '0 16px 40px rgba(12,20,37,0.06)' : 'none' }}>
         <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 transition-all duration-300"
           style={{ background: `${color}08`, transform: h ? 'scale(1.1) rotate(-3deg)' : 'none' }}>
           <Icon className="w-5 h-5" style={{ color }} />
@@ -465,7 +501,7 @@ function Pricing() {
                 style={{ background: p.a ? `linear-gradient(135deg, ${C.dark}, ${C.mid})` : '#f8fafc', border: p.a ? 'none' : '1px solid #e2e8f0', boxShadow: p.a ? '0 24px 60px rgba(12,20,37,0.18)' : 'none', padding: p.a ? '40px 28px 28px' : '28px' }}>
                 {p.a && <>
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-b-lg text-[10px] font-bold uppercase tracking-wider text-white" style={{ background: C.cyan }}>Most popular</div>
-                  <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(105deg, transparent 40%, rgba(14,165,233,0.06) 45%, rgba(14,165,233,0.12) 50%, rgba(14,165,233,0.06) 55%, transparent 60%)`, backgroundSize: '200% 100%', animation: 'sh 4s ease-in-out infinite' }} />
+                  <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(105deg, transparent 40%, rgba(14,165,233,0.06) 45%, rgba(14,165,233,0.12) 50%, rgba(14,165,233,0.06) 55%, transparent 60%)', backgroundSize: '200% 100%', animation: 'sh 4s ease-in-out infinite' }} />
                 </>}
                 <div className="mb-6 relative">
                   <h3 className="text-sm font-bold uppercase tracking-wider mb-3" style={{ color: p.a ? 'rgba(255,255,255,0.45)' : '#94a3b8' }}>{p.name}</h3>
@@ -534,7 +570,7 @@ export default function LandingPage() {
   return (
     <div style={{ background: '#f8fafc' }}>
       <Navbar />
-      <ParticleChartHero />
+      <Hero />
       <SocialProof />
       <Features />
       <HowItWorks />
