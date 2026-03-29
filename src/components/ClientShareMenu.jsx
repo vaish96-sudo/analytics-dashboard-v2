@@ -4,8 +4,10 @@ import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
 import { grantClientAccess, revokeClientAccess } from '../lib/projectService'
 import { Users, Check, X, Loader2 } from 'lucide-react'
+import { useToast } from './Toast'
 
 export default function ClientShareMenu({ clientName, teamId, onClose, anchorRef }) {
+  const toast = useToast()
   const { user } = useAuth()
   const [members, setMembers] = useState([])
   const [access, setAccess] = useState({})
@@ -69,14 +71,14 @@ export default function ClientShareMenu({ clientName, teamId, onClose, anchorRef
           headers: { 'Authorization': `Bearer ${localStorage.getItem('nb_session_token')}` },
         })
         if (res.ok) accessData = await res.json()
-      } catch {}
+      } catch (err) { toast.error(err?.message || 'Something went wrong') }
 
       const accessMap = {}
       ;(Array.isArray(accessData) ? accessData : []).forEach(a => { accessMap[a.user_id] = true })
 
       setMembers(filtered)
       setAccess(accessMap)
-    } catch {} finally { setLoading(false) }
+    } catch (err) { toast.error(err?.message || 'Something went wrong') } finally { setLoading(false) }
   }
 
   const toggleAccess = async (memberId) => {
@@ -90,7 +92,7 @@ export default function ClientShareMenu({ clientName, teamId, onClose, anchorRef
         await grantClientAccess(teamId, memberId, clientName)
         setAccess(prev => ({ ...prev, [memberId]: true }))
       }
-    } catch {} finally { setSaving(null) }
+    } catch (err) { toast.error(err?.message || 'Something went wrong') } finally { setSaving(null) }
   }
 
   const activeMembers = members.filter(m => m.status === 'active' && m.user_id)

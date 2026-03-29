@@ -3,11 +3,13 @@ import { useAuth } from '../context/AuthContext'
 import { useTier } from '../context/TierContext'
 import { api } from '../lib/api'
 import { Users, UserPlus, Mail, Shield, Trash2, Loader2, CheckCircle, Clock, X, Crown } from 'lucide-react'
+import { useToast } from './Toast'
 
 const ROLE_LABELS = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer' }
 const ROLE_DESCRIPTIONS = { admin: 'Manage members + edit', editor: 'Create and edit projects', viewer: 'View-only access' }
 
 export default function TeamManager() {
+  const toast = useToast()
   const { user } = useAuth()
   const { profile, can, config, updateProfileField } = useTier()
   const [team, setTeam] = useState(null)
@@ -48,7 +50,7 @@ export default function TeamManager() {
       // Update local profile with team_id
       await updateProfileField({ team_id: newTeam.id, role: 'owner' })
       await loadTeam()
-    } catch (err) { setError(err.message) } finally { setCreating(false) }
+    } catch (err) { setError(err.message); toast.error(err.message) } finally { setCreating(false) }
   }
 
   const handleInvite = async () => {
@@ -82,7 +84,8 @@ export default function TeamManager() {
 
       setInviteEmail('')
       await loadTeam()
-    } catch (err) { setError(err.message) } finally { setInviting(false) }
+      toast.success('Invite sent!')
+    } catch (err) { setError(err.message); toast.error(err.message) } finally { setInviting(false) }
   }
 
   const handleRemoveMember = async (memberId) => {

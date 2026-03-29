@@ -40,12 +40,17 @@ export async function validateSession(req) {
  */
 export function checkOrigin(req, res) {
   const method = req.method?.toUpperCase()
-  // Only check mutating requests
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return false
 
   const origin = (typeof req.headers?.get === 'function'
     ? req.headers.get('origin') || req.headers.get('referer')
     : req.headers?.origin || req.headers?.referer) || ''
+
+  // Require Origin header on mutating requests (blocks curl/Postman CSRF)
+  if (!origin) {
+    res.status(403).json({ error: 'Forbidden: Origin header required' })
+    return true
+  }
 
   const allowed = [
     'https://analytics-dashboard-v2-zeta.vercel.app',
@@ -53,16 +58,13 @@ export function checkOrigin(req, res) {
     'http://localhost:3000',
   ]
 
-  // If no origin header at all (e.g., server-to-server), allow it
-  // Browsers always send Origin on cross-origin requests
-  if (!origin) return false
-
+  // Strict check: exact match OR preview deploys matching exact subdomain pattern
   const isAllowed = allowed.some(a => origin.startsWith(a)) ||
-    (origin.includes('vercel.app') && origin.includes('analytics-dashboard'))
+    /^https:\/\/analytics-dashboard-v2-git-[a-z0-9-]+-vaish96-5704s-projects\.vercel\.app$/.test(origin)
   if (!isAllowed) {
     res.status(403).json({ error: 'Forbidden: invalid origin' })
-    return true // blocked
+    return true
   }
 
-  return false // allowed
+  return false
 }

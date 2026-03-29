@@ -17,6 +17,7 @@ import AllChats from './components/AllChats'
 import AllInsights from './components/AllInsights'
 import UserProfile from './components/UserProfile'
 import OnboardingOverlay from './components/OnboardingOverlay'
+import { ToastProvider } from './components/Toast'
 import { Loader2 } from 'lucide-react'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
@@ -290,6 +291,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      <ToastProvider>
       <AuthProvider>
         <TierProvider>
         <ProjectProvider>
@@ -299,6 +301,7 @@ export default function App() {
         </ProjectProvider>
         </TierProvider>
       </AuthProvider>
+      </ToastProvider>
     </ThemeProvider>
   )
 }

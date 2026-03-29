@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 
 function getGreeting() {
+  const toast = useToast()
   const h = new Date().getHours()
   if (h < 12) return 'Good morning'
   if (h < 17) return 'Good afternoon'
@@ -40,6 +41,7 @@ import TierBadge from './TierBadge'
 import PendingInvites from './PendingInvites'
 import ClientShareMenu from './ClientShareMenu'
 import ProjectShareMenu from './ProjectShareMenu'
+import { useToast } from './Toast'
 
 function ThemeToggle() {
   const { mode, setTheme } = useTheme()
@@ -111,7 +113,7 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
     if (!newName.trim()) return
     try {
       await renameProject(projectId, newName.trim())
-    } catch {}
+    } catch (err) { toast.error(err?.message || 'Something went wrong') }
     setEditingProjectId(null)
   }
 
@@ -121,7 +123,7 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
     try {
       await api.patch('/api/data/rename-client', { oldName, newName: newName.trim() })
       window.location.reload()
-    } catch {}
+    } catch (err) { toast.error(err?.message || 'Something went wrong') }
     setEditingClientOld(null)
   }
 
@@ -130,7 +132,7 @@ export default function HomeScreen({ onOpenProject, onNewProject, onSettings, on
     try {
       await api.patch(`/api/data/project/${projectId}`, { client_name: newClientName || null })
       window.location.reload()
-    } catch {}
+    } catch (err) { toast.error(err?.message || 'Something went wrong') }
   }
 
   // Delayed click — prevents single-click navigation when user double-clicks to rename

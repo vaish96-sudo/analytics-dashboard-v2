@@ -11,8 +11,10 @@ import {
 } from 'lucide-react'
 import { UsageBadge } from './UpgradePrompt'
 import LogoMark from './LogoMark'
+import { useToast } from './Toast'
 
 function MarkdownText({ text }) {
+  const toast = useToast()
   if (!text) return null
   const lines = text.split('\n')
   const elements = []
@@ -108,7 +110,7 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
       setMessages(msgs)
       setConversationId(id)
       onConversationChange?.(id)
-    } catch (err) { console.error('Failed to load conversation:', err) }
+    } catch (err) { toast.error(err?.message || 'Something went wrong') }
   }
 
   const startNewChat = async () => {
@@ -118,7 +120,7 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
       setMessages([])
       onConversationChange?.(conv.id)
       await loadConversationList()
-    } catch (err) { console.error('Failed to create conversation:', err) }
+    } catch (err) { toast.error(err?.message || 'Something went wrong') }
   }
 
   const deleteConversation = async (id) => {
@@ -126,7 +128,7 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
       await projectService.deleteConversation(id)
       if (conversationId === id) { setConversationId(null); setMessages([]) }
       await loadConversationList()
-    } catch (err) { console.error('Failed to delete conversation:', err) }
+    } catch (err) { toast.error(err?.message || 'Something went wrong') }
   }
 
   const suggestions = useMemo(() => {
@@ -159,7 +161,7 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
         convId = conv.id
         setConversationId(conv.id)
         onConversationChange?.(conv.id)
-      } catch (err) { console.error('Failed to create conversation:', err); return }
+      } catch (err) { toast.error(err?.message || 'Something went wrong'); return }
     }
 
     const userMsg = { role: 'user', content: q }

@@ -43,14 +43,21 @@ export default async function handler(req) {
   const supabase = createClient(supabaseUrl, supabaseKey)
 
   try {
-    const { email, password, name } = await req.json()
+    const body = await req.json()
+    const email = (body.email || '').toString().trim().toLowerCase().slice(0, 254)
+    const password = (body.password || '').toString()
+    const name = (body.name || '').toString().trim().slice(0, 100).replace(/[<>"']/g, '')
 
     if (!email || !password) {
       return new Response(JSON.stringify({ error: 'Email and password are required' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
     }
 
-    if (password.length < 8) {
-      return new Response(JSON.stringify({ error: 'Password must be at least 8 characters' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return new Response(JSON.stringify({ error: 'Invalid email format' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
+    }
+
+    if (password.length < 8 || password.length > 200) {
+      return new Response(JSON.stringify({ error: 'Password must be 8-200 characters' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
     }
 
     // Check if email already exists

@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { listAllInsights } from '../lib/projectService'
 import { Lightbulb, ArrowLeft, Loader2, Search, ChevronRight, TrendingUp, AlertTriangle, Target, Sparkles } from 'lucide-react'
+import { useToast } from './Toast'
 
 function timeAgo(dateStr) {
+  const toast = useToast()
   if (!dateStr) return ''
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
@@ -40,7 +42,7 @@ export default function AllInsights({ onBack, onOpenProject }) {
     setLoading(true)
     listAllInsights(user.id)
       .then(data => setProjectInsights(data))
-      .catch(err => console.error('Failed to load insights:', err))
+      .catch(err => toast.error(err?.message || 'Something went wrong'))
       .finally(() => setLoading(false))
   }, [user?.id])
 

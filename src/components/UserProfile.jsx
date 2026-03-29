@@ -6,8 +6,10 @@ import { api } from '../lib/api'
 import { TIER_CONFIG, TIER_ORDER } from '../lib/tierConfig'
 import { User, Mail, Building2, Camera, Save, Loader2, CheckCircle, Sun, Moon, Monitor, Crown, Shield, Zap, Lock, Upload, Trash2, FileText, Sparkles } from 'lucide-react'
 import TeamManager from './TeamManager'
+import { useToast } from './Toast'
 
 export default function UserProfile() {
+  const toast = useToast()
   const { user, updateProfile, logout } = useAuth()
   const { mode, setTheme } = useTheme()
   const { tier, config, profile, can, remaining, limitLabel, updateProfileField } = useTier()
@@ -44,7 +46,8 @@ export default function UserProfile() {
     try {
       await updateProfile({ name, company, avatar_url: avatarUrl || null })
       setSaved(true); setTimeout(() => setSaved(false), 3000)
-    } catch (err) { setError(err.message) } finally { setSaving(false) }
+      toast.success('Profile saved')
+    } catch (err) { setError(err.message); toast.error(err.message) } finally { setSaving(false) }
   }
 
   const handleSaveWhiteLabel = async () => {
@@ -52,7 +55,8 @@ export default function UserProfile() {
     try {
       await updateProfileField({ custom_logo_url: customLogo || null, custom_company_name: customCompany || null })
       setSaved(true); setTimeout(() => setSaved(false), 3000)
-    } catch (err) { setError(err.message) } finally { setSaving(false) }
+      toast.success('White-label settings saved')
+    } catch (err) { setError(err.message); toast.error(err.message) } finally { setSaving(false) }
   }
 
   const handleLogoUpload = async (e) => {

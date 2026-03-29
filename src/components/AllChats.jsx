@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { listAllConversations } from '../lib/projectService'
 import { MessageSquare, ArrowLeft, Loader2, Search, ChevronRight } from 'lucide-react'
+import { useToast } from './Toast'
 
 function timeAgo(dateStr) {
+  const toast = useToast()
   if (!dateStr) return ''
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
@@ -27,7 +29,7 @@ export default function AllChats({ onBack, onOpenProject }) {
     setLoading(true)
     listAllConversations(user.id)
       .then(data => setConversations(data))
-      .catch(err => console.error('Failed to load conversations:', err))
+      .catch(err => toast.error(err?.message || 'Something went wrong'))
       .finally(() => setLoading(false))
   }, [user?.id])
 

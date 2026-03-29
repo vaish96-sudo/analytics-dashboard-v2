@@ -35,9 +35,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  // CORS for same-origin
+  // CORS — strict origin check
   const origin = req.headers.origin || ''
-  if (origin && !origin.includes('vercel.app') && !origin.includes('localhost')) {
+  const validOrigin = !origin ||
+    origin.startsWith('https://analytics-dashboard-v2') ||
+    origin.includes('localhost:5173') || origin.includes('localhost:3000')
+  if (!validOrigin) {
     return res.status(403).json({ error: 'Forbidden' })
   }
 

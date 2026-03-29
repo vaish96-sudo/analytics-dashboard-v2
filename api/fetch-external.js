@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js'
+
 export const config = { runtime: 'edge' }
 
 function getNestedValue(obj, path) {
@@ -30,7 +32,24 @@ export default async function handler(req) {
   }
 
   try {
-    const { url, auth_method, auth_value, json_path } = await req.json()
+    // Auth check — require valid session
+    const authHeader = req.headers.get('authorization') || ''
+    if (!authHeader.startsWith('Bearer ') || authHeader.length < 40) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
+    }
+    const token = authHeader.slice(7)
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY
+    if (supabaseUrl && supabaseKey) {
+      const supabase = createClient(supabaseUrl, supabaseKey)
+      const { data: session } = await supabase.from('sessions').select('user_id, expires_at').eq('token', token).single()
+      if (!session || new Date(session.expires_at) < new Date()) {
+        return new Response(JSON.stringify({ error: 'Unauthorized — invalid session' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
+      }
+    }
+
+    const body = await req.json()
+    const { url, auth_method, auth_value, json_path } = body
 
     if (!url) {
       return new Response(JSON.stringify({ error: 'URL is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } })

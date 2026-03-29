@@ -19,6 +19,7 @@ import LogoMark from './LogoMark'
 import InsightsPreview from './InsightsPreview'
 import AutoRefreshToggle from './AutoRefreshToggle'
 import {
+import { useToast } from './Toast'
   LayoutDashboard, Table2, Wand2, Sparkles,
   FileSpreadsheet, Upload, ChevronRight, Settings, Menu, X, ChevronDown,
   Plus, Trash2, LogOut, Home, Sun, Moon, Monitor, FileDown, Crown, Loader2, FolderOpen, Users
@@ -33,6 +34,7 @@ const TABS = [
 ]
 
 function ThemeToggleSmall() {
+  const toast = useToast()
   const { mode, setTheme } = useTheme()
   const next = mode === 'light' ? 'dark' : mode === 'dark' ? 'system' : 'light'
   const Icon = mode === 'light' ? Sun : mode === 'dark' ? Moon : Monitor
@@ -178,7 +180,7 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
         reportBuilderState,
       })
     } catch (err) {
-      console.error('Export failed:', err)
+      toast.error(err?.message || 'Something went wrong')
     } finally {
       setExporting(false)
     }

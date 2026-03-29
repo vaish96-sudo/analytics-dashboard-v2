@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useProject } from '../context/ProjectContext'
 import * as projectService from '../lib/projectService'
 import {
+import { useToast } from './Toast'
   MessageSquare, Plus, Trash2, Pencil, Check, X, Loader2, MoreHorizontal
 } from 'lucide-react'
 
 export default function ChatHistory({ activeConversationId, onSelect, onNewChat }) {
+  const toast = useToast()
   const { activeProjectId } = useProject()
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(false)
@@ -31,7 +33,7 @@ export default function ChatHistory({ activeConversationId, onSelect, onNewChat 
       const list = await projectService.listConversations(activeProjectId)
       setConversations(list)
     } catch (err) {
-      console.error('Failed to load conversations:', err)
+      toast.error(err?.message || 'Something went wrong')
     } finally {
       setLoading(false)
     }
@@ -49,7 +51,7 @@ export default function ChatHistory({ activeConversationId, onSelect, onNewChat 
       await projectService.updateConversation(id, { title: editTitle.trim() })
       setConversations(prev => prev.map(c => c.id === id ? { ...c, title: editTitle.trim() } : c))
     } catch (err) {
-      console.error('Failed to rename:', err)
+      toast.error(err?.message || 'Something went wrong')
     }
     setEditingId(null)
   }
@@ -60,7 +62,7 @@ export default function ChatHistory({ activeConversationId, onSelect, onNewChat 
       setConversations(prev => prev.filter(c => c.id !== id))
       if (activeConversationId === id) onNewChat?.()
     } catch (err) {
-      console.error('Failed to delete:', err)
+      toast.error(err?.message || 'Something went wrong')
     }
     setMenuId(null)
   }

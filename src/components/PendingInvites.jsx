@@ -3,8 +3,10 @@ import { useAuth } from '../context/AuthContext'
 import { useTier } from '../context/TierContext'
 import { api } from '../lib/api'
 import { Users, Check, X, Loader2 } from 'lucide-react'
+import { useToast } from './Toast'
 
 export default function PendingInvites() {
+  const toast = useToast()
   const { user } = useAuth()
   const { reloadProfile, updateProfileField } = useTier()
   const [invites, setInvites] = useState([])
@@ -29,7 +31,7 @@ export default function PendingInvites() {
         const data = await res.json()
         setInvites(data || [])
       }
-    } catch {} finally { setLoading(false) }
+    } catch (err) { toast.error(err?.message || 'Something went wrong') } finally { setLoading(false) }
   }
 
   const handleAccept = async (invite) => {
@@ -45,7 +47,8 @@ export default function PendingInvites() {
 
       reloadProfile?.()
       await loadInvites()
-    } catch {} finally { setProcessing(null) }
+      toast.success('Invite accepted!')
+    } catch (err) { toast.error(err?.message || 'Something went wrong') } finally { setProcessing(null) }
   }
 
   const handleDecline = async (invite) => {
@@ -56,7 +59,7 @@ export default function PendingInvites() {
         updates: { status: 'declined' },
       })
       await loadInvites()
-    } catch {} finally { setProcessing(null) }
+    } catch (err) { toast.error(err?.message || 'Something went wrong') } finally { setProcessing(null) }
   }
 
   if (loading || invites.length === 0) return null

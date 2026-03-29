@@ -4,8 +4,10 @@ import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
 import { grantProjectAccess, revokeProjectAccess } from '../lib/projectService'
 import { FolderOpen, Check, X, Loader2 } from 'lucide-react'
+import { useToast } from './Toast'
 
 export default function ProjectShareMenu({ projectId, projectName, teamId, onClose, anchorRef }) {
+  const toast = useToast()
   const { user } = useAuth()
   const [members, setMembers] = useState([])
   const [access, setAccess] = useState({})
@@ -60,14 +62,14 @@ export default function ProjectShareMenu({ projectId, projectName, teamId, onClo
       let accessData = []
       try {
         accessData = await api.get(`/api/data/project-access?teamId=${teamId}&projectId=${projectId}`)
-      } catch {}
+      } catch (err) { toast.error(err?.message || 'Something went wrong') }
 
       const accessMap = {}
       ;(Array.isArray(accessData) ? accessData : []).forEach(a => { accessMap[a.user_id] = true })
 
       setMembers(filtered)
       setAccess(accessMap)
-    } catch {} finally { setLoading(false) }
+    } catch (err) { toast.error(err?.message || 'Something went wrong') } finally { setLoading(false) }
   }
 
   const toggleAccess = async (memberId) => {
@@ -81,7 +83,7 @@ export default function ProjectShareMenu({ projectId, projectName, teamId, onClo
         await grantProjectAccess(teamId, memberId, projectId)
         setAccess(prev => ({ ...prev, [memberId]: true }))
       }
-    } catch {} finally { setSaving(null) }
+    } catch (err) { toast.error(err?.message || 'Something went wrong') } finally { setSaving(null) }
   }
 
   const activeMembers = members.filter(m => m.status === 'active' && m.user_id)

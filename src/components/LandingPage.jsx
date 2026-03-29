@@ -159,7 +159,7 @@ function AmbientCanvas() {
   useEffect(() => {
     const cv = canvasRef.current, ctx = cv.getContext('2d')
     const container = containerRef.current
-    let W, H
+    let W, H, mx = -999, my = -999
     const blues = ['#38bdf8', '#0ea5e9', '#7dd3fc', '#0284c7', '#bae6fd']
 
     function resize() {
@@ -169,21 +169,27 @@ function AmbientCanvas() {
     resize()
     window.addEventListener('resize', resize)
 
-    // Create small chart clusters scattered across the page
+    // Mouse tracking
+    container.addEventListener('mousemove', e => { const r = container.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top })
+    container.addEventListener('touchmove', e => { const t = e.touches[0]; const r = container.getBoundingClientRect(); mx = t.clientX - r.left; my = t.clientY - r.top }, { passive: true })
+    container.addEventListener('mouseleave', () => { mx = -999; my = -999 })
+
     const clusters = []
-    const chartTypes = ['bar', 'line', 'donut', 'bar', 'line', 'scatter', 'bar', 'line']
-    for (let ci = 0; ci < 8; ci++) {
-      const cw = 50 + Math.random() * 60
-      const ch = 40 + Math.random() * 50
-      // Place clusters in edges only — avoid center 60% where text lives
+    const chartTypes = ['bar', 'line', 'donut', 'bar', 'line', 'scatter', 'bar', 'line', 'donut', 'bar']
+    for (let ci = 0; ci < 10; ci++) {
+      const cw = 70 + Math.random() * 80
+      const ch = 55 + Math.random() * 65
+      // Place in left and right margins, and also top/bottom corners
       let cx, cy
-      if (ci < 4) { cx = Math.random() * 0.15 + 0.02; cy = Math.random() * 0.8 + 0.05 }
-      else { cx = Math.random() * 0.15 + 0.83; cy = Math.random() * 0.8 + 0.05 }
+      if (ci < 3) { cx = Math.random() * 0.14 + 0.02; cy = Math.random() * 0.7 + 0.08 }
+      else if (ci < 6) { cx = Math.random() * 0.14 + 0.84; cy = Math.random() * 0.7 + 0.08 }
+      else if (ci < 8) { cx = Math.random() * 0.4 + 0.3; cy = Math.random() * 0.1 + 0.01 }
+      else { cx = Math.random() * 0.4 + 0.3; cy = Math.random() * 0.1 + 0.85 }
+
       const particles = []
       const type = chartTypes[ci]
       const SZ = 3
 
-      // Generate chart particles relative to cluster center
       if (type === 'bar') {
         const heights = [0.5, 0.35, 0.65, 0.3, 0.55]
         const bW = cw * 0.16, gap = (cw - bW * 5) / 6
@@ -201,11 +207,11 @@ function AmbientCanvas() {
           for (let x = x1; x < x2; x += SZ) {
             const t = (x - x1) / (x2 - x1), ly = y1 + (y2 - y1) * t
             particles.push({ ox: x, oy: ly, c: '#0ea5e9' })
-            if (Math.random() < 0.4) particles.push({ ox: x, oy: ly + SZ * 2 + Math.random() * (ch * 0.8 - ly), c: '#bae6fd' })
+            if (Math.random() < 0.3) particles.push({ ox: x, oy: ly + SZ * 2 + Math.random() * (ch * 0.7 - ly), c: '#bae6fd' })
           }
         }
       } else if (type === 'donut') {
-        const R = Math.min(cw, ch) * 0.4, iR = R * 0.55
+        const R = Math.min(cw, ch) * 0.38, iR = R * 0.55
         const slices = [0.35, 0.25, 0.2, 0.2]; let sA = -Math.PI / 2
         slices.forEach((s, si) => {
           const eA = sA + s * Math.PI * 2
@@ -214,23 +220,22 @@ function AmbientCanvas() {
           sA = eA
         })
       } else {
-        for (let i = 0; i < 25; i++) {
+        for (let i = 0; i < 30; i++) {
           const px = Math.random() * cw * 0.8 + cw * 0.1
-          const py = ch * 0.8 - (px / cw) * ch * 0.5 + (Math.random() - 0.5) * ch * 0.2
+          const py = ch * 0.75 - (px / cw) * ch * 0.5 + (Math.random() - 0.5) * ch * 0.2
           particles.push({ ox: px, oy: py, c: blues[i % blues.length] })
         }
       }
 
-      // Initialize with positions
       particles.forEach(p => {
-        p.x = cx * W + p.ox + (Math.random() - 0.5) * W * 0.3
-        p.y = cy * H + p.oy + (Math.random() - 0.5) * H * 0.3
+        p.x = cx * W + p.ox + (Math.random() - 0.5) * W * 0.25
+        p.y = cy * H + p.oy + (Math.random() - 0.5) * H * 0.25
         p.vx = 0; p.vy = 0
         p.tx = cx * W + p.ox; p.ty = cy * H + p.oy
         p.dtx = Math.random() * W; p.dty = Math.random() * H
       })
 
-      clusters.push({ particles, cx, cy, phase: 'forming', timer: Math.floor(Math.random() * 100), opacity: 0.15 + Math.random() * 0.2 })
+      clusters.push({ particles, cx, cy, phase: 'forming', timer: Math.floor(Math.random() * 120), opacity: 0.35 + Math.random() * 0.25 })
     }
 
     let raf
@@ -239,15 +244,15 @@ function AmbientCanvas() {
 
       clusters.forEach(cl => {
         cl.timer++
-        if (cl.phase === 'forming' && cl.timer > 120) { cl.phase = 'holding'; cl.timer = 0 }
-        else if (cl.phase === 'holding' && cl.timer > 200) {
+        if (cl.phase === 'forming' && cl.timer > 140) { cl.phase = 'holding'; cl.timer = 0 }
+        else if (cl.phase === 'holding' && cl.timer > 220) {
           cl.phase = 'drifting'; cl.timer = 0
-          cl.particles.forEach(p => { p.dtx = cl.cx * W + (Math.random() - 0.5) * W * 0.4; p.dty = cl.cy * H + (Math.random() - 0.5) * H * 0.4 })
+          cl.particles.forEach(p => { p.dtx = cl.cx * W + (Math.random() - 0.5) * W * 0.3; p.dty = cl.cy * H + (Math.random() - 0.5) * H * 0.3 })
         }
-        else if (cl.phase === 'drifting' && cl.timer > 250) { cl.phase = 'forming'; cl.timer = 0 }
+        else if (cl.phase === 'drifting' && cl.timer > 280) { cl.phase = 'forming'; cl.timer = 0 }
 
-        const spring = cl.phase === 'forming' ? 0.025 : cl.phase === 'holding' ? 0.08 : 0.012
-        const fric = cl.phase === 'holding' ? 0.82 : 0.92
+        const spring = cl.phase === 'forming' ? 0.03 : cl.phase === 'holding' ? 0.09 : 0.015
+        const fric = cl.phase === 'holding' ? 0.82 : 0.91
         const useDrift = cl.phase === 'drifting'
 
         let settled = 0
@@ -255,20 +260,40 @@ function AmbientCanvas() {
           const targetX = useDrift ? p.dtx : p.tx
           const targetY = useDrift ? p.dty : p.ty
           p.vx += (targetX - p.x) * spring; p.vy += (targetY - p.y) * spring
-          if (useDrift) { p.vx += (Math.random() - 0.5) * 0.06; p.vy += (Math.random() - 0.5) * 0.06 }
+          if (useDrift) { p.vx += (Math.random() - 0.5) * 0.08; p.vy += (Math.random() - 0.5) * 0.08 }
+
+          // Mouse interaction — attract nearby particles
+          if (mx > 0) {
+            const dx = mx - p.x, dy = my - p.y, dist = Math.sqrt(dx * dx + dy * dy)
+            if (dist < 120 && dist > 1) {
+              p.vx += dx * 0.15 / dist
+              p.vy += dy * 0.15 / dist
+            }
+          }
+
           p.vx *= fric; p.vy *= fric; p.x += p.vx; p.y += p.vy
           if (Math.abs(targetX - p.x) < 2 && Math.abs(targetY - p.y) < 2) settled++
         })
 
         const isSolid = cl.phase === 'holding' || (cl.phase === 'forming' && settled / cl.particles.length > 0.7)
-        ctx.globalAlpha = cl.opacity * (useDrift ? 0.5 : 1)
+        ctx.globalAlpha = cl.opacity * (useDrift ? 0.6 : 1)
 
         cl.particles.forEach(p => {
           ctx.fillStyle = p.c
           if (isSolid) ctx.fillRect(p.x, p.y, 3, 3)
-          else { ctx.beginPath(); ctx.arc(p.x, p.y, 1.2, 0, Math.PI * 2); ctx.fill() }
+          else { ctx.beginPath(); ctx.arc(p.x, p.y, 1.8, 0, Math.PI * 2); ctx.fill() }
         })
       })
+
+      // Connection lines between all nearby particles across clusters
+      ctx.globalAlpha = 1
+      const allP = clusters.flatMap(cl => cl.particles)
+      for (let i = 0; i < allP.length; i += 4) {
+        for (let j = i + 4; j < allP.length; j += 4) {
+          const dx = allP[i].x - allP[j].x, dy = allP[i].y - allP[j].y, d = Math.sqrt(dx * dx + dy * dy)
+          if (d < 25) { ctx.beginPath(); ctx.moveTo(allP[i].x, allP[i].y); ctx.lineTo(allP[j].x, allP[j].y); ctx.strokeStyle = `rgba(14,165,233,${0.06 * (1 - d / 25)})`; ctx.lineWidth = 0.4; ctx.stroke() }
+        }
+      }
 
       ctx.globalAlpha = 1
       raf = requestAnimationFrame(draw)
@@ -278,8 +303,8 @@ function AmbientCanvas() {
   }, [])
 
   return (
-    <div ref={containerRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-      <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />
+    <div ref={containerRef} className="absolute inset-0" style={{ zIndex: 0 }}>
+      <canvas ref={canvasRef} style={{ width: '100%', height: '100%', cursor: 'default' }} />
     </div>
   )
 }
@@ -605,10 +630,44 @@ function TryItNow() {
    PRICING
    ============================================================ */
 function Pricing() {
+  const [loading, setLoading] = useState(false)
+
+  const handleProCheckout = async () => {
+    setLoading(true)
+    try {
+      // Check if user is logged in (has session token)
+      const token = localStorage.getItem('nb_session_token')
+      if (!token) {
+        // Not logged in — send to login, then they can upgrade from dashboard
+        window.location.href = '/#login'
+        return
+      }
+
+      const res = await fetch('/api/stripe/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          priceId: window.__STRIPE_PRO_PRICE_ID || 'price_REPLACE_WITH_YOUR_STRIPE_PRICE_ID',
+          trial: true,
+        }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        alert(data.error || 'Failed to start checkout')
+      }
+    } catch (err) {
+      alert('Failed to start checkout. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const plans = [
-    { name: 'Free', price: '$0', period: 'forever', a: false, features: ['1 project', '1 dataset per project', '5 AI insight runs / month', '3 AI questions / month', 'Basic charts & KPIs', 'CSV upload'], cta: 'Get started free', href: '/#login' },
-    { name: 'Pro', price: '$19', period: '/month', a: true, features: ['Unlimited projects', 'Unlimited datasets', 'Unlimited AI insights', 'Unlimited AI questions', 'PDF export with branding', 'Google Sheets live sync', 'Team sharing (up to 5)', 'White-label dashboards', 'Scheduled reports', 'Priority support'], cta: 'Start Pro — 14 day trial', href: '/#login' },
-    { name: 'Enterprise', price: 'Custom', period: '', a: false, features: ['Everything in Pro', 'Unlimited team members', 'SSO / SAML', 'Custom integrations', 'Dedicated support', 'SLA guarantee', 'Custom data connectors', 'On-premise option'], cta: 'Contact us', href: 'mailto:hello@meuris.io' },
+    { name: 'Free', price: '$0', period: 'forever', a: false, features: ['1 project', '1 dataset per project', '5 AI insight runs / month', '3 AI questions / month', 'Basic charts & KPIs', 'CSV upload'], cta: 'Get started free', action: () => { window.location.href = '/#login' } },
+    { name: 'Pro', price: '$19', period: '/month', a: true, features: ['Unlimited projects', 'Unlimited datasets', 'Unlimited AI insights', 'Unlimited AI questions', 'PDF export with branding', 'Google Sheets live sync', 'Team sharing (up to 5)', 'White-label dashboards', 'Scheduled reports', 'Priority support'], cta: loading ? 'Loading...' : 'Start Pro — 14 day trial', action: handleProCheckout },
+    { name: 'Enterprise', price: 'Custom', period: '', a: false, features: ['Everything in Pro', 'Unlimited team members', 'SSO / SAML', 'Custom integrations', 'Dedicated support', 'SLA guarantee', 'Custom data connectors', 'On-premise option'], cta: 'Contact us', action: () => { window.location.href = 'mailto:hello@meuris.io' } },
   ]
   return (
     <section id="pricing" className="py-24 px-6" style={{ background: '#fff' }}>
@@ -637,8 +696,9 @@ function Pricing() {
                 <ul className="space-y-3 flex-1 mb-8 relative">
                   {p.features.map(f => <li key={f} className="flex items-start gap-2.5 text-sm" style={{ color: p.a ? 'rgba(255,255,255,0.7)' : '#64748b' }}><Check className="w-4 h-4 shrink-0 mt-0.5" style={{ color: C.cyan }} />{f}</li>)}
                 </ul>
-                <a href={p.href} className="relative block text-center px-6 py-3 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02]"
-                  style={{ background: p.a ? C.cyan : 'transparent', color: p.a ? '#fff' : C.dark, border: p.a ? 'none' : `1.5px solid ${C.dark}`, textDecoration: 'none' }}>{p.cta}</a>
+                <button onClick={p.action} disabled={loading && p.a}
+                  className="relative block w-full text-center px-6 py-3 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02] cursor-pointer disabled:opacity-60"
+                  style={{ background: p.a ? C.cyan : 'transparent', color: p.a ? '#fff' : C.dark, border: p.a ? 'none' : `1.5px solid ${C.dark}` }}>{p.cta}</button>
               </div>
             </FadeIn>
           ))}

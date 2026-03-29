@@ -9,6 +9,7 @@ import {
 
 // Theme-aware colors: teal on light, amber on dark
 function useCustomMetricColors() {
+  const toast = useToast()
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
   return {
@@ -24,6 +25,7 @@ function useCustomMetricColors() {
 }
 
 import { callClaudeAPI } from '../utils/claudeClient.js'
+import { useToast } from './Toast'
 
 // ─── Formula display: replace col keys with labels ───────────────
 function formulaToDisplay(formula, schema) {
@@ -332,6 +334,7 @@ export default function CustomMetrics() {
       setSuggestions(results)
     } catch (err) {
       setSuggestError(err.message)
+      toast.error(err.message || 'Failed to get AI suggestions')
     } finally {
       setSuggestLoading(false)
     }

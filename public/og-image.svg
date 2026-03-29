@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0c1425"/>
+      <stop offset="100%" stop-color="#162236"/>
+    </linearGradient>
+    <linearGradient id="mu" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <text x="180" y="310" font-size="120" font-weight="800" font-style="italic" font-family="Georgia,serif" fill="url(#mu)">µ</text>
+  <text x="310" y="270" font-size="48" font-weight="700" font-family="system-ui,sans-serif" fill="#e2e8f0">Meuris Analytics</text>
+  <text x="310" y="330" font-size="24" font-weight="400" font-family="system-ui,sans-serif" fill="#94a3b8">Upload a spreadsheet. Get answers in seconds.</text>
+  <text x="310" y="370" font-size="18" font-weight="400" font-family="system-ui,sans-serif" fill="#64748b">AI-powered dashboards from any CSV or Google Sheet</text>
+  <!-- Mini bar chart decoration -->
+  <rect x="850" y="200" width="40" height="120" rx="4" fill="#0ea5e9" opacity="0.6"/>
+  <rect x="900" y="240" width="40" height="80" rx="4" fill="#38bdf8" opacity="0.5"/>
+  <rect x="950" y="180" width="40" height="140" rx="4" fill="#0ea5e9" opacity="0.7"/>
+  <rect x="1000" y="260" width="40" height="60" rx="4" fill="#38bdf8" opacity="0.4"/>
+  <rect x="1050" y="220" width="40" height="100" rx="4" fill="#0ea5e9" opacity="0.55"/>
+  <!-- Trend line -->
+  <path d="M850,420 Q900,400 950,380 T1050,360 T1100,340" fill="none" stroke="#0ea5e9" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+</svg>

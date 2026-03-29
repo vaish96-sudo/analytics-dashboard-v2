@@ -27,10 +27,11 @@ export default async function handler(req) {
   const supabase = createClient(supabaseUrl, supabaseKey)
 
   try {
-    const { email } = await req.json()
+    const body = await req.json()
+    const email = (body.email || '').toString().trim().toLowerCase().slice(0, 254)
 
-    if (!email) {
-      return new Response(JSON.stringify({ error: 'Email is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return new Response(JSON.stringify({ error: 'Valid email is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
     }
 
     // Always return success to prevent email enumeration

@@ -2,12 +2,14 @@ import React, { useState } from 'react'
 import { useProject } from '../context/ProjectContext'
 import { api } from '../lib/api'
 import { RefreshCw, Clock, ToggleLeft, ToggleRight } from 'lucide-react'
+import { useToast } from './Toast'
 
 /**
  * Auto-refresh toggle for Google Sheets connected projects.
  * Shows the last refresh time and a toggle to enable/disable daily auto-refresh.
  */
 export default function AutoRefreshToggle() {
+  const toast = useToast()
   const { activeProject } = useProject()
   const [saving, setSaving] = useState(false)
   const [enabled, setEnabled] = useState(
@@ -35,8 +37,9 @@ export default function AutoRefreshToggle() {
         sheetName: meta.sheet_name,
         enabled: newState,
       })
+      toast.success(newState ? 'Auto-refresh enabled' : 'Auto-refresh disabled')
     } catch (err) {
-      console.error('Failed to toggle auto-refresh:', err)
+      toast.error(err?.message || 'Something went wrong')
       setEnabled(!newState) // revert
     } finally {
       setSaving(false)
