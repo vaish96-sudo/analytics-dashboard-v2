@@ -177,7 +177,14 @@ export default function AuthScreen() {
     if (password !== confirmPassword) { setLocalError('Passwords do not match'); return }
     setLoading(true)
     try {
-      await signup(email, password, name)
+      const result = await signup(email, password, name)
+      if (result?.requiresVerification) {
+        // Redirect to code entry — user needs to verify email
+        setCodeExpiresIn(600) // 10 minutes
+        setCodeExpired(false)
+        setCode('')
+        setMode('code')
+      }
     } catch {} finally { setLoading(false) }
   }
 

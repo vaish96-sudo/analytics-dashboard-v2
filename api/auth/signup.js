@@ -87,24 +87,40 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ error: createErr.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
     }
 
-    // Create session
-    const sessionToken = generateToken()
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+    // Generate a 6-digit verification code (same as passwordless flow)
+    const verifyCode = String(Math.floor(100000 + Math.random() * 900000))
+    const codeExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString()
 
-    await supabase.from('sessions').insert({
-      user_id: user.id,
-      token: sessionToken,
-      expires_at: expiresAt.toISOString(),
-    })
+    await supabase.from('users').update({
+      verification_code: verifyCode,
+      code_expires_at: codeExpires,
+    }).eq('id', user.id)
 
-    // TODO: Send verification email with verificationToken
-    // For now, auto-verify in development
-    await supabase.from('users').update({ email_verified: true }).eq('id', user.id)
-    user.email_verified = true
+    // Send verification email via Resend (if configured)
+    const resendKey = process.env.RESEND_API_KEY
+    if (resendKey) {
+      try {
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: 'Meuris Analytics <noreply@meuris.io>',
+            to: email,
+            subject: `${verifyCode} is your Meuris verification code`,
+            html: `<p>Your verification code is: <strong style="font-size:24px;letter-spacing:4px">${verifyCode}</strong></p><p>This code expires in 10 minutes.</p><p>If you didn't create an account, you can ignore this email.</p>`,
+          }),
+        })
+      } catch (emailErr) {
+        console.error('Failed to send verification email:', emailErr.message)
+      }
+    } else {
+      console.log(`[DEV] Verification code for ${email}: ${verifyCode}`)
+    }
 
+    // DO NOT create session. User must verify email first.
     return new Response(JSON.stringify({
-      user,
-      token: sessionToken,
+      requiresVerification: true,
+      message: 'Account created. Check your email for a verification code.',
     }), { status: 201, headers: { 'Content-Type': 'application/json' } })
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })

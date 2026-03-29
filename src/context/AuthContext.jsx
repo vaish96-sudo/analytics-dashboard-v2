@@ -89,6 +89,12 @@ export function AuthProvider({ children }) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Signup failed')
+
+      // If server requires verification, don't log in yet
+      if (data.requiresVerification) {
+        return { requiresVerification: true, email }
+      }
+
       setUser(data.user)
       setSessionToken(data.token)
       saveSession(data.token, data.user)
