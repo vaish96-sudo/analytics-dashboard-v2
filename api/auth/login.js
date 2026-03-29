@@ -67,15 +67,22 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ error: 'Email and password are required' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
     }
 
+    // FIX #21: Per-account lockout — check failed_login_attempts before verifying password
     // Find user
     const { data: user, error: findErr } = await supabase
       .from('users')
-      .select('id, email, name, company, avatar_url, email_verified, password_hash')
+      .select('id, email, name, company, avatar_url, email_verified, password_hash, failed_login_attempts, locked_until')
       .eq('email', email.toLowerCase())
       .single()
 
     if (findErr || !user) {
       return new Response(JSON.stringify({ error: 'Invalid email or password' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // Check if account is temporarily locked (FIX #21)
+    if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      const minutesLeft = Math.ceil((new Date(user.locked_until) - new Date()) / 60000)
+      return new Response(JSON.stringify({ error: `Account temporarily locked. Try again in ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'}.` }), { status: 429, headers: { 'Content-Type': 'application/json' } })
     }
 
     // Passwordless accounts cannot use password login
@@ -86,7 +93,20 @@ export default async function handler(req) {
     // Verify password
     const valid = await verifyPassword(password, user.password_hash)
     if (!valid) {
+      // FIX #21: Increment failed attempts, lock after 10
+      const attempts = (user.failed_login_attempts || 0) + 1
+      const lockUpdate = { failed_login_attempts: attempts }
+      if (attempts >= 10) {
+        lockUpdate.locked_until = new Date(Date.now() + 15 * 60 * 1000).toISOString() // 15 min lockout
+        lockUpdate.failed_login_attempts = 0 // reset counter after lock
+      }
+      await supabase.from('users').update(lockUpdate).eq('id', user.id).catch(() => {})
       return new Response(JSON.stringify({ error: 'Invalid email or password' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // FIX #21: Reset failed attempts on successful login
+    if (user.failed_login_attempts > 0) {
+      await supabase.from('users').update({ failed_login_attempts: 0, locked_until: null }).eq('id', user.id).catch(() => {})
     }
 
     // Clean up expired sessions for this user

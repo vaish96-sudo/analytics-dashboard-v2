@@ -9,12 +9,12 @@ export const config = {
 }
 
 // Magic bytes for allowed image formats
+// FIX #3: SVG removed — SVGs can contain executable JavaScript (<script>, onload, etc.)
 const IMAGE_SIGNATURES = {
   'image/png':  [0x89, 0x50, 0x4E, 0x47],           // ‰PNG
   'image/jpeg': [0xFF, 0xD8, 0xFF],                   // ÿØÿ
   'image/gif':  [0x47, 0x49, 0x46],                   // GIF
   'image/webp': [0x52, 0x49, 0x46, 0x46],             // RIFF (then WEBP at offset 8)
-  'image/svg+xml': [0x3C],                             // < (XML start)
 }
 
 const ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
@@ -31,11 +31,6 @@ function validateImageBytes(buffer) {
   // Check WEBP (RIFF....WEBP)
   if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
       buffer.length > 11 && buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) return 'image/webp'
-  // Check SVG (starts with < and contains <svg)
-  if (buffer[0] === 0x3C) {
-    const text = buffer.slice(0, Math.min(1024, buffer.length)).toString('utf-8').toLowerCase()
-    if (text.includes('<svg')) return 'image/svg+xml'
-  }
 
   return false
 }

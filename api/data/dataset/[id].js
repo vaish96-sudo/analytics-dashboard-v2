@@ -25,7 +25,43 @@ export default async function handler(req, res) {
     .single()
 
   if (dsErr || !dataset) return res.status(404).json({ error: 'Dataset not found' })
-  if (dataset.projects.user_id !== userId) return res.status(403).json({ error: 'Access denied' })
+
+  const isOwner = dataset.projects.user_id === userId
+
+  // FIX #7: Allow shared access (team members with project/client access) — same logic as project/[id].js
+  if (!isOwner) {
+    let hasAccess = false
+    try {
+      const { data: memberships } = await supabase
+        .from('team_members').select('team_id').eq('user_id', userId).eq('status', 'active')
+      if (memberships && memberships.length > 0) {
+        const teamIds = memberships.map(m => m.team_id)
+        const { data: teams } = await supabase
+          .from('teams').select('id').in('id', teamIds).eq('owner_id', dataset.projects.user_id)
+        if (teams && teams.length > 0) {
+          const relevantTeamIds = teams.map(t => t.id)
+          // Check project-level access
+          try {
+            const { data: projAccess } = await supabase
+              .from('project_access').select('id').eq('user_id', userId).eq('project_id', dataset.project_id).in('team_id', relevantTeamIds).limit(1)
+            if (projAccess && projAccess.length > 0) hasAccess = true
+          } catch {}
+          // Check client-level access
+          if (!hasAccess) {
+            try {
+              const { data: fullProj } = await supabase
+                .from('projects').select('client_name').eq('id', dataset.project_id).single()
+              const clientName = fullProj?.client_name || 'Uncategorized'
+              const { data: clientAccess } = await supabase
+                .from('client_access').select('id').eq('user_id', userId).eq('client_name', clientName).in('team_id', relevantTeamIds).limit(1)
+              if (clientAccess && clientAccess.length > 0) hasAccess = true
+            } catch {}
+          }
+        }
+      }
+    } catch {}
+    if (!hasAccess) return res.status(403).json({ error: 'Access denied' })
+  }
 
   if (req.method === 'GET') {
     // Download raw data from storage if path exists
@@ -56,6 +92,8 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'DELETE') {
+    // Only owners can delete datasets
+    if (!isOwner) return res.status(403).json({ error: 'Only the project owner can delete datasets' })
     // Clean up storage
     if (dataset.raw_data_path) {
       await supabase.storage.from('datasets').remove([dataset.raw_data_path]).catch(() => {})

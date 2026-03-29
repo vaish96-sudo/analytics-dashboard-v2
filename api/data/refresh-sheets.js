@@ -15,14 +15,18 @@ export const config = { maxDuration: 60 }
 export default async function handler(req, res) {
   // Verify this is a cron call or authenticated request
   const authHeader = req.headers.authorization
-  const cronSecret = req.headers['x-vercel-cron']
+  const cronHeader = req.headers['x-vercel-cron']
 
-  if (!cronSecret && !authHeader) {
+  // FIX #13: Verify CRON_SECRET value — not just header existence
+  const expectedCronSecret = process.env.CRON_SECRET
+  const isValidCron = cronHeader && expectedCronSecret && cronHeader === expectedCronSecret
+
+  if (!isValidCron && !authHeader) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
-  // If not cron, validate the Bearer token
-  if (!cronSecret && authHeader) {
+  // If not a valid cron call, validate the Bearer token
+  if (!isValidCron && authHeader) {
     if (!authHeader.startsWith('Bearer ') || authHeader.length < 40) {
       return res.status(401).json({ error: 'Unauthorized' })
     }

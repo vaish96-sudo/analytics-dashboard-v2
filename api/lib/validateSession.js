@@ -54,9 +54,11 @@ export function checkOrigin(req, res) {
 
   const allowed = [
     'https://analytics-dashboard-v2-zeta.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:3000',
   ]
+  // FIX #18: Only allow localhost in development — not in production
+  if (process.env.NODE_ENV !== 'production' && process.env.VERCEL_ENV !== 'production') {
+    allowed.push('http://localhost:5173', 'http://localhost:3000')
+  }
 
   // Strict check: exact match OR preview deploys matching exact subdomain pattern
   const isAllowed = allowed.some(a => origin.startsWith(a)) ||

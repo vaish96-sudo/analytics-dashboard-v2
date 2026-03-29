@@ -4,6 +4,11 @@ import { checkIPRateLimit } from '../lib/ipRateLimit.js'
 
 export const config = { runtime: 'edge' }
 
+// FIX #5: Escape HTML to prevent injection via user-controlled names in emails
+function escapeHtml(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
 export default async function handler(req) {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } })
@@ -35,6 +40,9 @@ export default async function handler(req) {
     }
 
     const roleLabel = role === 'admin' ? 'Admin' : role === 'editor' ? 'Editor' : 'Viewer'
+    // FIX #5: HTML-escape all user-provided values before interpolation
+    const safeInviterName = escapeHtml(inviter_name || 'A team member')
+    const safeTeamName = escapeHtml(team_name || 'Meuris Analytics Team')
 
     const emailRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -45,19 +53,19 @@ export default async function handler(req) {
       body: JSON.stringify({
         from: fromEmail,
         to: [to_email.toLowerCase().trim()],
-        subject: `${inviter_name || 'Someone'} invited you to ${team_name || 'a team'} on Meuris Analytics`,
+        subject: `${safeInviterName} invited you to ${safeTeamName} on Meuris Analytics`,
         html: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 40px 24px;">
             <div style="margin-bottom: 32px;">
               <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin: 0 0 4px;">You've been invited</h2>
-              <p style="font-size: 14px; color: #666; margin: 0;">to join <strong style="color: #1a1a1a;">${team_name || 'a team'}</strong> on Meuris Analytics</p>
+              <p style="font-size: 14px; color: #666; margin: 0;">to join <strong style="color: #1a1a1a;">${safeTeamName}</strong> on Meuris Analytics</p>
             </div>
 
             <div style="background: #f8f9fa; border: 1px solid #e2e4e8; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
               <table style="width: 100%; border-collapse: collapse;">
                 <tr>
                   <td style="padding: 4px 0; font-size: 13px; color: #999; width: 100px;">Invited by</td>
-                  <td style="padding: 4px 0; font-size: 13px; color: #1a1a1a; font-weight: 500;">${inviter_name || 'A team member'}</td>
+                  <td style="padding: 4px 0; font-size: 13px; color: #1a1a1a; font-weight: 500;">${safeInviterName}</td>
                 </tr>
                 <tr>
                   <td style="padding: 4px 0; font-size: 13px; color: #999;">Your role</td>
@@ -65,7 +73,7 @@ export default async function handler(req) {
                 </tr>
                 <tr>
                   <td style="padding: 4px 0; font-size: 13px; color: #999;">Team</td>
-                  <td style="padding: 4px 0; font-size: 13px; color: #1a1a1a; font-weight: 500;">${team_name || 'Meuris Analytics Team'}</td>
+                  <td style="padding: 4px 0; font-size: 13px; color: #1a1a1a; font-weight: 500;">${safeTeamName}</td>
                 </tr>
               </table>
             </div>
@@ -77,7 +85,7 @@ export default async function handler(req) {
             </div>
 
             <p style="font-size: 12px; color: #999; margin: 0; text-align: center;">
-              Sign in with <strong>${to_email}</strong> to access shared projects and dashboards.
+              Sign in with <strong>${escapeHtml(to_email)}</strong> to access shared projects and dashboards.
             </p>
           </div>
         `,

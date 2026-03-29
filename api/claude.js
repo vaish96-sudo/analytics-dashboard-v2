@@ -65,6 +65,31 @@ export default async function handler(req, res) {
   try {
     const { messages, system, max_tokens = 1024, feature } = req.body
 
+    // FIX #10: Server-side tier enforcement — check usage limits before calling Anthropic API
+    const featureToColumn = {
+      ask_ai: 'ai_queries_used', query_plan: 'ai_queries_used',
+      insights: 'insights_runs_used', recommendations: 'recommendations_runs_used',
+      column_tagging: 'ai_suggest_runs_used', chart_builder: 'ai_suggest_runs_used',
+      custom_metric: 'ai_suggest_runs_used',
+    }
+    const usageColumn = featureToColumn[feature]
+    if (usageColumn) {
+      const { data: profile } = await session.supabase
+        .from('user_profiles').select('tier, ' + usageColumn).eq('id', session.userId).single()
+      const tier = profile?.tier || 'free'
+      const used = profile?.[usageColumn] || 0
+      // Tier limits — must match tierConfig.js
+      const LIMITS = {
+        free: { ai_queries_used: 5, insights_runs_used: 1, recommendations_runs_used: 0, ai_suggest_runs_used: 1 },
+        pro: { ai_queries_used: 100, insights_runs_used: 10, recommendations_runs_used: 5, ai_suggest_runs_used: -1 },
+        agency: { ai_queries_used: -1, insights_runs_used: -1, recommendations_runs_used: -1, ai_suggest_runs_used: -1 },
+      }
+      const limit = (LIMITS[tier] || LIMITS.free)[usageColumn] ?? 0
+      if (limit !== -1 && used >= limit) {
+        return res.status(403).json({ error: `You've reached your ${tier} tier limit for this feature. Please upgrade for more usage.` })
+      }
+    }
+
     // M3: Server controls model based on feature name
     const useModel = FEATURE_MODEL_MAP[feature] || FEATURE_MODEL_MAP.default
 
@@ -99,6 +124,22 @@ export default async function handler(req, res) {
         output_tokens: outputTokens,
         estimated_cost_usd: estimateCost(useModel, inputTokens, outputTokens),
       })
+
+      // FIX #10 continued: Increment usage counter server-side (authoritative source of truth)
+      if (usageColumn) {
+        await session.supabase.rpc('increment_usage', { p_user_id: session.userId, p_column: usageColumn })
+          .then(() => {})
+          .catch(async () => {
+            // Fallback: manual increment if RPC doesn't exist
+            const { data: currentProfile } = await session.supabase
+              .from('user_profiles').select(usageColumn).eq('id', session.userId).single()
+            if (currentProfile) {
+              await session.supabase.from('user_profiles')
+                .update({ [usageColumn]: (currentProfile[usageColumn] || 0) + 1 })
+                .eq('id', session.userId)
+            }
+          })
+      }
     } catch (_) {
       // Usage logging failure should never block the response
     }

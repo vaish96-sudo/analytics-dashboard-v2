@@ -58,9 +58,14 @@ export default async function handler(req) {
     }
 
     // Check if email already exists
+    // FIX #19: Don't reveal whether email exists — always say "check your email"
     const { data: existing } = await supabase.from('users').select('id').eq('email', email.toLowerCase()).single()
     if (existing) {
-      return new Response(JSON.stringify({ error: 'An account with this email already exists' }), { status: 409, headers: { 'Content-Type': 'application/json' } })
+      // Return same shape as success to prevent email enumeration
+      return new Response(JSON.stringify({
+        requiresVerification: true,
+        message: 'Account created. Check your email for a verification code.',
+      }), { status: 201, headers: { 'Content-Type': 'application/json' } })
     }
 
     // Hash password
@@ -85,7 +90,10 @@ export default async function handler(req) {
     }
 
     // Generate a 6-digit verification code — store in login_codes table (same as passwordless flow)
-    const verifyCode = String(Math.floor(100000 + Math.random() * 900000))
+    // FIX #4: Use cryptographically secure random for verification code (not Math.random)
+    const codeBytes = crypto.getRandomValues(new Uint8Array(4))
+    const codeNum = ((codeBytes[0] << 24) | (codeBytes[1] << 16) | (codeBytes[2] << 8) | codeBytes[3]) >>> 0
+    const verifyCode = String(codeNum % 900000 + 100000)
     const codeExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString()
 
     // Delete any existing codes for this email, then insert new one

@@ -17,6 +17,11 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Not configured' })
   }
 
+  // FIX #1: Webhook signature is now MANDATORY — reject if secret not configured
+  if (!webhookSecret) {
+    return res.status(500).json({ error: 'Webhook secret not configured' })
+  }
+
   const supabase = createClient(supabaseUrl, supabaseKey)
 
   try {
@@ -24,31 +29,32 @@ export default async function handler(req, res) {
     const chunks = []
     for await (const chunk of req) { chunks.push(chunk) }
     const rawBody = Buffer.concat(chunks).toString('utf8')
-    const event = JSON.parse(rawBody)
 
-    // If webhook secret is set, verify signature
-    if (webhookSecret) {
-      const sig = req.headers['stripe-signature']
-      if (!sig) {
-        return res.status(400).json({ error: 'Missing stripe-signature header' })
-      }
-      // Simple HMAC verification (without Stripe SDK)
-      const crypto = await import('crypto')
-      const timestamp = sig.split(',').find(s => s.startsWith('t='))?.split('=')[1]
-      const v1Sig = sig.split(',').find(s => s.startsWith('v1='))?.split('=')[1]
-      if (!timestamp || !v1Sig) {
-        return res.status(400).json({ error: 'Invalid signature format' })
-      }
-      const payload = `${timestamp}.${rawBody}`
-      const expected = crypto.createHmac('sha256', webhookSecret).update(payload).digest('hex')
-      if (expected !== v1Sig) {
-        return res.status(400).json({ error: 'Invalid signature' })
-      }
-      // Check timestamp freshness (5 min tolerance)
-      if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) {
-        return res.status(400).json({ error: 'Timestamp too old' })
-      }
+    // FIX #1 continued: Always verify Stripe signature with timing-safe comparison
+    const sig = req.headers['stripe-signature']
+    if (!sig) {
+      return res.status(400).json({ error: 'Missing stripe-signature header' })
     }
+    const crypto = await import('crypto')
+    const timestamp = sig.split(',').find(s => s.startsWith('t='))?.split('=')[1]
+    const v1Sig = sig.split(',').find(s => s.startsWith('v1='))?.split('=')[1]
+    if (!timestamp || !v1Sig) {
+      return res.status(400).json({ error: 'Invalid signature format' })
+    }
+    const payload = `${timestamp}.${rawBody}`
+    const expected = crypto.createHmac('sha256', webhookSecret).update(payload).digest('hex')
+    // FIX #2: Use timing-safe comparison to prevent timing attacks
+    const expectedBuf = Buffer.from(expected, 'utf8')
+    const receivedBuf = Buffer.from(v1Sig, 'utf8')
+    if (expectedBuf.length !== receivedBuf.length || !crypto.timingSafeEqual(expectedBuf, receivedBuf)) {
+      return res.status(400).json({ error: 'Invalid signature' })
+    }
+    // Check timestamp freshness (5 min tolerance)
+    if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) {
+      return res.status(400).json({ error: 'Timestamp too old' })
+    }
+
+    const event = JSON.parse(rawBody)
 
     // Handle events
     if (event.type === 'checkout.session.completed') {

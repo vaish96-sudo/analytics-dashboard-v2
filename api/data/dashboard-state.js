@@ -1,5 +1,6 @@
 import { validateSession, checkOrigin } from '../lib/validateSession.js'
 import { applyRateLimit } from '../lib/rateLimit.js'
+import { sanitizeJSON } from '../lib/sanitize.js'
 
 export default async function handler(req, res) {
   const session = await validateSession(req)
@@ -49,10 +50,19 @@ export default async function handler(req, res) {
     if (ds.projects.user_id !== userId) return res.status(403).json({ error: 'Access denied' })
 
     // Strict field whitelist — only these fields can be updated
+    // FIX #15: Validate JSON size on all object fields to prevent database bloat
     const ALLOWED_FIELDS = ['charts_state', 'active_tab', 'global_filters', 'report_builder_state', 'data_table_state', 'recommendations', 'ai_charts', 'custom_metrics', 'kpi_order', 'hidden_charts']
     const safeState = {}
     for (const key of ALLOWED_FIELDS) {
-      if (body[key] !== undefined) safeState[key] = body[key]
+      if (body[key] !== undefined) {
+        if (typeof body[key] === 'object' && body[key] !== null) {
+          const sanitized = sanitizeJSON(body[key], 500000) // 500KB max per field
+          if (sanitized === null) return res.status(400).json({ error: `${key} is too large (max 500KB)` })
+          safeState[key] = sanitized
+        } else {
+          safeState[key] = body[key]
+        }
+      }
     }
 
     // Try update first

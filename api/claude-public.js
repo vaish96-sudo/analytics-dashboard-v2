@@ -40,9 +40,16 @@ export default async function handler(req, res) {
   if (!origin) {
     return res.status(403).json({ error: 'Forbidden: Origin header required' })
   }
-  const validOrigin =
-    origin.startsWith('https://analytics-dashboard-v2') ||
-    origin.includes('localhost:5173') || origin.includes('localhost:3000')
+  // FIX #8: Strict origin check — exact match + Vercel preview regex (not startsWith)
+  const allowedOrigins = [
+    'https://analytics-dashboard-v2-zeta.vercel.app',
+  ]
+  // FIX #18: Only allow localhost in development
+  if (process.env.NODE_ENV !== 'production' && process.env.VERCEL_ENV !== 'production') {
+    allowedOrigins.push('http://localhost:5173', 'http://localhost:3000')
+  }
+  const validOrigin = allowedOrigins.some(a => origin === a) ||
+    /^https:\/\/analytics-dashboard-v2-git-[a-z0-9-]+-vaish96-5704s-projects\.vercel\.app$/.test(origin)
   if (!validOrigin) {
     return res.status(403).json({ error: 'Forbidden' })
   }
@@ -60,6 +67,16 @@ export default async function handler(req, res) {
 
   try {
     const { messages, system, max_tokens = 300 } = req.body
+
+    // FIX #6: Validate input size to prevent cost abuse via oversized payloads
+    if (!Array.isArray(messages) || messages.length === 0 || messages.length > 5) {
+      return res.status(400).json({ error: 'Invalid messages: must be an array of 1-5 messages' })
+    }
+    const systemLen = typeof system === 'string' ? system.length : 0
+    const messagesLen = messages.reduce((sum, m) => sum + (typeof m.content === 'string' ? m.content.length : 0), 0)
+    if (systemLen + messagesLen > 30000) {
+      return res.status(400).json({ error: 'Input too large for instant analysis' })
+    }
 
     // Allow up to 1500 tokens (column tagging needs ~1200)
     const safeMaxTokens = Math.min(Number(max_tokens) || 300, 1500)

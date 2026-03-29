@@ -45,8 +45,8 @@ export default async function handler(req, res) {
     const updates = req.body || {}
 
     // Allowlist fields that users can update
+    // FIX #9: Usage counters removed — must only be incremented server-side (in /api/claude)
     const allowed = [
-      'ai_queries_used', 'insights_runs_used', 'recommendations_runs_used', 'ai_suggest_runs_used',
       'team_id', 'role', 'playbook', 'logo_url', 'company_name', 'onboarding_completed',
       'custom_branding', 'report_logo_url',
     ]
