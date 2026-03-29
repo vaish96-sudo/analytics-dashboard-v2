@@ -1,6 +1,7 @@
 import { validateSession, checkOrigin } from '../lib/validateSession.js'
 import { auditLog } from '../lib/auditLog.js'
 import { applyRateLimit } from '../lib/rateLimit.js'
+import { sanitizeString, sanitizeJSON } from '../lib/sanitize.js'
 
 export default async function handler(req, res) {
   const session = await validateSession(req)
@@ -51,7 +52,20 @@ export default async function handler(req, res) {
     ]
     const safeUpdates = {}
     for (const key of allowed) {
-      if (updates[key] !== undefined) safeUpdates[key] = updates[key]
+      if (updates[key] !== undefined) {
+        // Sanitize string values to prevent stored XSS
+        if (typeof updates[key] === 'string') {
+          safeUpdates[key] = sanitizeString(updates[key], key === 'playbook' ? 10000 : 500)
+        } else if (typeof updates[key] === 'number') {
+          safeUpdates[key] = updates[key]
+        } else if (typeof updates[key] === 'boolean') {
+          safeUpdates[key] = updates[key]
+        } else if (typeof updates[key] === 'object') {
+          safeUpdates[key] = sanitizeJSON(updates[key], 50000)
+        } else {
+          safeUpdates[key] = updates[key]
+        }
+      }
     }
 
     // Prevent tier escalation from frontend
@@ -66,7 +80,7 @@ export default async function handler(req, res) {
       .select()
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     await auditLog(supabase, userId, 'profile.update', { fields: Object.keys(safeUpdates) })
     return res.json(data)
   }

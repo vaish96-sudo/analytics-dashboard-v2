@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       .eq('id', profile.team_id)
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     return res.json(team)
   }
 
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       .select()
       .single()
 
-    if (err) return res.status(500).json({ error: err.message })
+    if (err) return res.status(500).json({ error: 'Something went wrong' })
 
     // Update user profile with team
     await supabase.from('user_profiles').update({ team_id: newTeam.id, role: 'owner' }).eq('id', userId)

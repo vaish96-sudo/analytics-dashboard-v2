@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     if (clientName) query = query.eq('client_name', clientName)
 
     const { data, error } = await query
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     return res.json(data || [])
   }
 
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     const { error } = await supabase.from('client_access').insert({
       team_id: safeTeamId, user_id: safeTargetId, client_name: safeClient,
     })
-    if (error && !error.message.includes('duplicate')) return res.status(500).json({ error: error.message })
+    if (error && !error.message.includes('duplicate')) return res.status(500).json({ error: 'Something went wrong' })
     await auditLog(supabase, userId, 'sharing.client_grant', { teamId: safeTeamId, targetUserId: safeTargetId, clientName: safeClient })
     return res.status(201).json({ success: true })
   }

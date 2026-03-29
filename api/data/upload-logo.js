@@ -17,7 +17,7 @@ const IMAGE_SIGNATURES = {
   'image/svg+xml': [0x3C],                             // < (XML start)
 }
 
-const ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']
+const ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
 
 function validateImageBytes(buffer) {
   if (!buffer || buffer.length < 4) return false
@@ -67,7 +67,7 @@ export default async function handler(req, res) {
     // Validate file extension
     const ext = (file.originalFilename || 'logo.png').split('.').pop().toLowerCase()
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      return res.status(400).json({ error: 'Invalid file type. Allowed: PNG, JPG, GIF, WebP, SVG' })
+      return res.status(400).json({ error: 'Invalid file type. Allowed: PNG, JPG, GIF, WebP' })
     }
 
     // Validate actual file content (magic bytes)
@@ -89,6 +89,6 @@ export default async function handler(req, res) {
 
     return res.json({ url: publicUrl })
   } catch (err) {
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: 'Something went wrong' })
   }
 }

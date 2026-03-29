@@ -35,9 +35,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  // CORS — strict origin check
+  // CORS — strict origin check, require Origin header
   const origin = req.headers.origin || ''
-  const validOrigin = !origin ||
+  if (!origin) {
+    return res.status(403).json({ error: 'Forbidden: Origin header required' })
+  }
+  const validOrigin =
     origin.startsWith('https://analytics-dashboard-v2') ||
     origin.includes('localhost:5173') || origin.includes('localhost:3000')
   if (!validOrigin) {
@@ -82,6 +85,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json(data)
   } catch (err) {
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: 'Something went wrong' })
   }
 }

@@ -1,5 +1,6 @@
 import { validateSession, checkOrigin } from '../../lib/validateSession.js'
 import { applyRateLimit } from '../../lib/rateLimit.js'
+import { sanitizeUUID } from '../../lib/sanitize.js'
 
 export default async function handler(req, res) {
   const session = await validateSession(req)
@@ -9,8 +10,8 @@ export default async function handler(req, res) {
   if (applyRateLimit(req, res, userId)) return
   if (checkOrigin(req, res)) return
 
-  const conversationId = req.query.id
-  if (!conversationId) return res.status(400).json({ error: 'Missing conversation ID' })
+  const conversationId = sanitizeUUID(req.query.id)
+  if (!conversationId) return res.status(400).json({ error: 'Missing or invalid conversation ID' })
 
   // Ownership via project
   const { data: convo, error: cErr } = await supabase
@@ -29,26 +30,32 @@ export default async function handler(req, res) {
       .eq('id', conversationId)
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     return res.json(data)
   }
 
   if (req.method === 'PATCH') {
-    const updates = req.body || {}
+    const body = req.body || {}
+    // Only title is editable
+    const safeUpdates = {}
+    if (typeof body.title === 'string') safeUpdates.title = body.title.trim().slice(0, 500)
+    if (Object.keys(safeUpdates).length === 0) return res.status(400).json({ error: 'No valid fields to update' })
+
+    safeUpdates.updated_at = new Date().toISOString()
     const { data, error } = await supabase
       .from('conversations')
-      .update(updates)
+      .update(safeUpdates)
       .eq('id', conversationId)
       .select()
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Failed to update conversation' })
     return res.json(data)
   }
 
   if (req.method === 'DELETE') {
     const { error } = await supabase.from('conversations').delete().eq('id', conversationId)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     return res.status(204).end()
   }
 

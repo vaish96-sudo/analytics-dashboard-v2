@@ -1,4 +1,5 @@
-import { validateSession } from '../lib/validateSession.js'
+import { validateSession, checkOrigin } from '../lib/validateSession.js'
+import { applyRateLimit } from '../lib/rateLimit.js'
 
 export const config = { maxDuration: 30 }
 
@@ -11,6 +12,9 @@ export default async function handler(req, res) {
   if (!session) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
+
+  if (applyRateLimit(req, res, session.userId, 5, 60_000)) return
+  if (checkOrigin(req, res)) return
 
   const stripeKey = process.env.STRIPE_SECRET_KEY
   if (!stripeKey) {
@@ -78,7 +82,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ url: stripeData.url, sessionId: stripeData.id })
   } catch (err) {
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: 'Something went wrong' })
   }
 }
 

@@ -61,7 +61,7 @@ export default async function handler(req, res) {
 
   if (error) {
     await supabase.storage.from('datasets').remove([storagePath])
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'Something went wrong' })
   }
 
   // Auto-create dashboard state

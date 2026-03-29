@@ -1,6 +1,7 @@
 import { validateSession, checkOrigin } from '../../lib/validateSession.js'
 import { auditLog } from '../../lib/auditLog.js'
 import { applyRateLimit } from '../../lib/rateLimit.js'
+import { sanitizeUUID } from '../../lib/sanitize.js'
 import { gunzipSync } from 'zlib'
 
 export const config = { maxDuration: 60 }
@@ -13,8 +14,8 @@ export default async function handler(req, res) {
   if (applyRateLimit(req, res, userId)) return
   if (checkOrigin(req, res)) return
 
-  const datasetId = req.query.id
-  if (!datasetId) return res.status(400).json({ error: 'Missing dataset ID' })
+  const datasetId = sanitizeUUID(req.query.id)
+  if (!datasetId) return res.status(400).json({ error: 'Missing or invalid dataset ID' })
 
   // Ownership check via project
   const { data: dataset, error: dsErr } = await supabase
@@ -51,8 +52,6 @@ export default async function handler(req, res) {
     }
 
     const { projects, ...rest } = dataset
-    // Cache for 5 minutes — dataset data doesn't change after upload
-    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600')
     return res.json({ ...rest, raw_data: rawData })
   }
 
@@ -62,7 +61,7 @@ export default async function handler(req, res) {
       await supabase.storage.from('datasets').remove([dataset.raw_data_path]).catch(() => {})
     }
     const { error } = await supabase.from('datasets').delete().eq('id', datasetId)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     await auditLog(supabase, userId, 'dataset.delete', { datasetId })
     return res.status(204).end()
   }

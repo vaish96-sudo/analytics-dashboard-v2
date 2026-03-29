@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { checkIPRateLimit } from './lib/ipRateLimit.js'
 
 export const config = { runtime: 'edge' }
 
@@ -32,6 +33,10 @@ export default async function handler(req) {
   }
 
   try {
+    // Rate limit: 30 requests per minute per IP
+    const ipBlock = checkIPRateLimit(req, 30, 60_000, 'fetch-external')
+    if (ipBlock) return ipBlock
+
     // Auth check — require valid session
     const authHeader = req.headers.get('authorization') || ''
     if (!authHeader.startsWith('Bearer ') || authHeader.length < 40) {
@@ -161,6 +166,6 @@ export default async function handler(req) {
     if (err.name === 'TimeoutError' || err.name === 'AbortError') {
       return new Response(JSON.stringify({ error: 'Request timed out after 15 seconds' }), { status: 408, headers: { 'Content-Type': 'application/json' } })
     }
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ error: 'Something went wrong' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 }

@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       .eq('project_id', projectId)
       .order('updated_at', { ascending: false })
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     return res.json(data || [])
   }
 
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       .select()
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     return res.status(201).json(data)
   }
 

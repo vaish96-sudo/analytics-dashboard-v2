@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   }
 
   const { error } = await supabase.from('projects').update({ data_source_meta: updatedMeta }).eq('id', safeProjectId)
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return res.status(500).json({ error: 'Something went wrong' })
 
   return res.json({ success: true, auto_refresh: updatedMeta.auto_refresh })
 }

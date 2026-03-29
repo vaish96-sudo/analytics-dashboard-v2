@@ -79,6 +79,6 @@ export default async function handler(req) {
       message: 'Password has been reset successfully. Please log in with your new password.',
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ error: 'Something went wrong' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 }

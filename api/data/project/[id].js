@@ -1,6 +1,7 @@
 import { validateSession, checkOrigin } from '../../lib/validateSession.js'
 import { applyRateLimit } from '../../lib/rateLimit.js'
 import { auditLog } from '../../lib/auditLog.js'
+import { sanitizeUUID } from '../../lib/sanitize.js'
 
 export default async function handler(req, res) {
   const session = await validateSession(req)
@@ -10,8 +11,8 @@ export default async function handler(req, res) {
   if (applyRateLimit(req, res, userId)) return
   if (checkOrigin(req, res)) return
 
-  const projectId = req.query.id
-  if (!projectId) return res.status(400).json({ error: 'Missing project ID' })
+  const projectId = sanitizeUUID(req.query.id)
+  if (!projectId) return res.status(400).json({ error: 'Missing or invalid project ID' })
 
   // Check if user owns the project OR has shared access
   const { data: project, error: projErr } = await supabase
@@ -95,7 +96,7 @@ export default async function handler(req, res) {
       .eq('id', projectId)
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
 
     // Fetch dashboard_states for all datasets
     if (data?.datasets && data.datasets.length > 0) {
@@ -128,22 +129,34 @@ export default async function handler(req, res) {
   if (!isOwner) return res.status(403).json({ error: 'Only the project owner can modify this project' })
 
   if (req.method === 'PATCH') {
-    const updates = req.body || {}
+    const body = req.body || {}
+    // Strict field whitelist — prevent overwriting user_id, id, etc.
+    const ALLOWED = ['name', 'client_name', 'data_source_type', 'data_source_meta']
+    const safeUpdates = {}
+    for (const key of ALLOWED) {
+      if (body[key] !== undefined) safeUpdates[key] = body[key]
+    }
+    if (typeof safeUpdates.name === 'string') safeUpdates.name = safeUpdates.name.trim().slice(0, 200)
+    if (typeof safeUpdates.client_name === 'string') safeUpdates.client_name = safeUpdates.client_name.trim().slice(0, 200)
+    if (typeof safeUpdates.data_source_type === 'string') safeUpdates.data_source_type = safeUpdates.data_source_type.trim().slice(0, 50)
+
+    if (Object.keys(safeUpdates).length === 0) return res.status(400).json({ error: 'No valid fields to update' })
+
     const { data, error } = await supabase
       .from('projects')
-      .update(updates)
+      .update(safeUpdates)
       .eq('id', projectId)
       .select()
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
-    await auditLog(supabase, userId, 'project.update', { projectId, updates: Object.keys(updates) })
+    if (error) return res.status(500).json({ error: 'Failed to update project' })
+    await auditLog(supabase, userId, 'project.update', { projectId, updates: Object.keys(safeUpdates) })
     return res.json(data)
   }
 
   if (req.method === 'DELETE') {
     const { error } = await supabase.from('projects').delete().eq('id', projectId)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     await auditLog(supabase, userId, 'project.delete', { projectId })
     return res.status(204).end()
   }

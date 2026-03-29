@@ -21,7 +21,7 @@ export default async function handler(req, res) {
       .eq('user_id', userId)
       .order('updated_at', { ascending: false })
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     return res.json(data || [])
   }
 
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
       .select()
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     await auditLog(supabase, userId, 'project.create', { projectId: data.id, name: safeName })
     return res.status(201).json(data)
   }

@@ -1,3 +1,4 @@
+import { generateToken } from '../lib/crypto.js'
 import { createClient } from '@supabase/supabase-js'
 import { checkIPRateLimit } from '../lib/ipRateLimit.js'
 
@@ -39,10 +40,6 @@ async function verifyPassword(password, stored) {
   return hashHex === storedHashHex
 }
 
-function generateToken() {
-  const bytes = crypto.getRandomValues(new Uint8Array(32))
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
-}
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
@@ -81,6 +78,11 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ error: 'Invalid email or password' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
     }
 
+    // Passwordless accounts cannot use password login
+    if (user.password_hash === 'passwordless') {
+      return new Response(JSON.stringify({ error: 'This account uses passwordless login. Please use the "Send me a login code" option instead.' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
+    }
+
     // Verify password
     const valid = await verifyPassword(password, user.password_hash)
     if (!valid) {
@@ -108,6 +110,6 @@ export default async function handler(req) {
       token: sessionToken,
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ error: 'Something went wrong' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 }

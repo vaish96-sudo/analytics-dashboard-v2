@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     .eq('user_id', userId)
     .order('updated_at', { ascending: false })
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return res.status(500).json({ error: 'Something went wrong' })
   if (!projects) return res.json([])
 
   const allDatasetIds = projects.flatMap(p => (p.datasets || []).map(d => d.id))

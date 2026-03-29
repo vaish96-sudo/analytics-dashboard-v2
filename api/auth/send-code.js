@@ -38,7 +38,7 @@ export default async function handler(req) {
   const supabaseUrl = process.env.SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY
   const resendKey = process.env.RESEND_API_KEY
-  const fromEmail = process.env.FROM_EMAIL || 'Northern Bird <noreply@northernbird.app>'
+  const fromEmail = process.env.FROM_EMAIL || 'Meuris Analytics <noreply@meuris.io>'
 
   if (!supabaseUrl || !supabaseKey) {
     return new Response(JSON.stringify({ error: 'Database not configured' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
@@ -93,11 +93,11 @@ export default async function handler(req) {
       body: JSON.stringify({
         from: fromEmail,
         to: [normalizedEmail],
-        subject: 'Your login code for Northern Bird Analytics',
+        subject: 'Your login code for Meuris Analytics',
         html: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 24px;">
             <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin: 0 0 8px;">Your login code</h2>
-            <p style="font-size: 14px; color: #666; margin: 0 0 32px;">Enter this code in Northern Bird Analytics to sign in.</p>
+            <p style="font-size: 14px; color: #666; margin: 0 0 32px;">Enter this code in Meuris Analytics to sign in.</p>
             <div style="background: #f8f9fa; border: 1px solid #e2e4e8; border-radius: 12px; padding: 24px; text-align: center; margin: 0 0 32px;">
               <span style="font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #1a1a1a; font-family: monospace;">${code}</span>
             </div>
@@ -119,6 +119,6 @@ export default async function handler(req) {
       expiresIn: 600, // seconds, for UI countdown
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message || 'Something went wrong. Please try again.' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ error: 'Something went wrong. Please try again.' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 }

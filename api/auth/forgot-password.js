@@ -1,12 +1,9 @@
+import { generateToken } from '../lib/crypto.js'
 import { createClient } from '@supabase/supabase-js'
 import { checkIPRateLimit } from '../lib/ipRateLimit.js'
 
 export const config = { runtime: 'edge' }
 
-function generateToken() {
-  const bytes = crypto.getRandomValues(new Uint8Array(32))
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
-}
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
@@ -59,6 +56,6 @@ export default async function handler(req) {
       message: 'If an account exists with that email, a password reset link has been sent.',
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ error: 'Something went wrong' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 }

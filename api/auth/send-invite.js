@@ -14,7 +14,7 @@ export default async function handler(req) {
   if (ipBlock) return ipBlock
 
   const resendKey = process.env.RESEND_API_KEY
-  const fromEmail = process.env.FROM_EMAIL || 'Northern Bird <onboarding@resend.dev>'
+  const fromEmail = process.env.FROM_EMAIL || 'Meuris Analytics <noreply@meuris.io>'
   const appUrl = process.env.APP_URL || 'https://analytics-dashboard-v2-zeta.vercel.app'
 
   if (!resendKey) {
@@ -45,12 +45,12 @@ export default async function handler(req) {
       body: JSON.stringify({
         from: fromEmail,
         to: [to_email.toLowerCase().trim()],
-        subject: `${inviter_name || 'Someone'} invited you to ${team_name || 'a team'} on Northern Bird Analytics`,
+        subject: `${inviter_name || 'Someone'} invited you to ${team_name || 'a team'} on Meuris Analytics`,
         html: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 40px 24px;">
             <div style="margin-bottom: 32px;">
               <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin: 0 0 4px;">You've been invited</h2>
-              <p style="font-size: 14px; color: #666; margin: 0;">to join <strong style="color: #1a1a1a;">${team_name || 'a team'}</strong> on Northern Bird Analytics</p>
+              <p style="font-size: 14px; color: #666; margin: 0;">to join <strong style="color: #1a1a1a;">${team_name || 'a team'}</strong> on Meuris Analytics</p>
             </div>
 
             <div style="background: #f8f9fa; border: 1px solid #e2e4e8; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
@@ -65,13 +65,13 @@ export default async function handler(req) {
                 </tr>
                 <tr>
                   <td style="padding: 4px 0; font-size: 13px; color: #999;">Team</td>
-                  <td style="padding: 4px 0; font-size: 13px; color: #1a1a1a; font-weight: 500;">${team_name || 'Northern Bird Team'}</td>
+                  <td style="padding: 4px 0; font-size: 13px; color: #1a1a1a; font-weight: 500;">${team_name || 'Meuris Analytics Team'}</td>
                 </tr>
               </table>
             </div>
 
             <div style="text-align: center; margin-bottom: 32px;">
-              <a href="${appUrl}" style="display: inline-block; background: #b08d57; color: #fff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 32px; border-radius: 8px;">
+              <a href="${appUrl}" style="display: inline-block; background: #0c1425; color: #fff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 32px; border-radius: 8px;">
                 Sign in to get started
               </a>
             </div>
@@ -91,6 +91,6 @@ export default async function handler(req) {
 
     return new Response(JSON.stringify({ message: 'Invite sent' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message || 'Failed to send invite' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ error: 'Failed to send invite' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 }

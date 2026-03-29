@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     if (!membership) return res.status(403).json({ error: 'Access denied' })
 
     const { data, error } = await supabase.from('team_members').select('*, users:user_id(email, name)').eq('team_id', teamId)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     return res.json(data || [])
   }
 
@@ -44,7 +44,7 @@ export default async function handler(req, res) {
       status: 'pending',
     }).select().single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     await auditLog(supabase, userId, 'team.invite', { teamId: safeTeamId, email: safeEmail, role: safeRole })
     return res.status(201).json(data)
   }
@@ -75,7 +75,7 @@ export default async function handler(req, res) {
     }
 
     const { data, error } = await supabase.from('team_members').update(safeUpdates).eq('id', safeMemberId).select().single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     await auditLog(supabase, userId, 'team.member_update', { memberId: safeMemberId, updates: safeUpdates })
     return res.json(data)
   }
@@ -91,7 +91,7 @@ export default async function handler(req, res) {
     if (!team || team.owner_id !== userId) return res.status(403).json({ error: 'Only the team owner can remove members' })
 
     const { error } = await supabase.from('team_members').delete().eq('id', memberId)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     await auditLog(supabase, userId, 'team.member_remove', { memberId, teamId: member.team_id })
     return res.status(204).end()
   }

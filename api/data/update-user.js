@@ -31,6 +31,6 @@ export default async function handler(req, res) {
     .select('id, email, name, company, avatar_url, email_verified')
     .single()
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return res.status(500).json({ error: 'Something went wrong' })
   return res.json(data)
 }

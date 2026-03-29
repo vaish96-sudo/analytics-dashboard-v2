@@ -1,12 +1,9 @@
+import { generateToken } from '../lib/crypto.js'
 import { createClient } from '@supabase/supabase-js'
 import { checkIPRateLimit } from '../lib/ipRateLimit.js'
 
 export const config = { runtime: 'edge' }
 
-function generateToken() {
-  const bytes = crypto.getRandomValues(new Uint8Array(32))
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
-}
 
 export default async function handler(req) {
   if (req.method !== 'POST') {

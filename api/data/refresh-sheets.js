@@ -15,11 +15,23 @@ export const config = { maxDuration: 60 }
 export default async function handler(req, res) {
   // Verify this is a cron call or authenticated request
   const authHeader = req.headers.authorization
-  const cronSecret = req.headers['x-vercel-cron'] // Vercel cron sets this automatically
+  const cronSecret = req.headers['x-vercel-cron']
 
-  // Allow cron or Bearer token auth
   if (!cronSecret && !authHeader) {
     return res.status(401).json({ error: 'Unauthorized' })
+  }
+
+  // If not cron, validate the Bearer token
+  if (!cronSecret && authHeader) {
+    if (!authHeader.startsWith('Bearer ') || authHeader.length < 40) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+    const token = authHeader.slice(7)
+    const tmpSupabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+    const { data: sess } = await tmpSupabase.from('sessions').select('user_id, expires_at').eq('token', token).single()
+    if (!sess || new Date(sess.expires_at) < new Date()) {
+      return res.status(401).json({ error: 'Unauthorized — invalid session' })
+    }
   }
 
   const supabaseUrl = process.env.SUPABASE_URL
@@ -152,6 +164,6 @@ export default async function handler(req, res) {
 
     return res.json({ refreshed, errors: errors.length > 0 ? errors : undefined, message: `Refreshed ${refreshed} datasets` })
   } catch (err) {
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: 'Something went wrong' })
   }
 }

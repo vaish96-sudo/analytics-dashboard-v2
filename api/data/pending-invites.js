@@ -21,6 +21,6 @@ export default async function handler(req, res) {
     .eq('invited_email', user.email.toLowerCase())
     .eq('status', 'pending')
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return res.status(500).json({ error: 'Something went wrong' })
   return res.json(data || [])
 }

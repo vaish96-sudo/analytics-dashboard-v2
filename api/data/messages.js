@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true })
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     return res.json(data || [])
   }
 
@@ -63,7 +63,7 @@ export default async function handler(req, res) {
       .select()
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
 
     // Touch conversation updated_at
     await supabase

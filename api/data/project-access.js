@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     if (safeProjId) query = query.eq('project_id', safeProjId)
 
     const { data, error } = await query
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     return res.json(data || [])
   }
 
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     const { error } = await supabase.from('project_access').insert({
       team_id: safeTeamId, user_id: safeTargetId, project_id: safeProjId,
     })
-    if (error && !error.message.includes('duplicate')) return res.status(500).json({ error: error.message })
+    if (error && !error.message.includes('duplicate')) return res.status(500).json({ error: 'Something went wrong' })
     await auditLog(supabase, userId, 'sharing.project_grant', { teamId: safeTeamId, targetUserId: safeTargetId, projectId: safeProjId })
     return res.status(201).json({ success: true })
   }

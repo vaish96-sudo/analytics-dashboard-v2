@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     if (!(await checkDatasetOwnership(datasetId))) return res.status(403).json({ error: 'Access denied' })
 
     const { data, error } = await supabase.from('scheduled_reports').select('*').eq('dataset_id', datasetId).order('created_at', { ascending: false })
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     return res.json(data || [])
   }
 
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
       format: safeFormat, sections: Array.isArray(sections) ? sections.slice(0, 20) : [], enabled: true,
     }).select().single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     return res.status(201).json(data)
   }
 
@@ -67,7 +67,7 @@ export default async function handler(req, res) {
     if (Array.isArray(updates?.sections)) safeUpdates.sections = updates.sections.slice(0, 20)
 
     const { data, error } = await supabase.from('scheduled_reports').update(safeUpdates).eq('id', safeReportId).select().single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     return res.json(data)
   }
 
@@ -80,7 +80,7 @@ export default async function handler(req, res) {
     if (!(await checkDatasetOwnership(report.dataset_id))) return res.status(403).json({ error: 'Access denied' })
 
     const { error } = await supabase.from('scheduled_reports').delete().eq('id', reportId)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Something went wrong' })
     return res.status(204).end()
   }
 

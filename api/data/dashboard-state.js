@@ -34,7 +34,8 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PATCH') {
-    const { datasetId, ...state } = req.body || {}
+    const body = req.body || {}
+    const datasetId = body.datasetId
     if (!datasetId) return res.status(400).json({ error: 'Missing datasetId' })
 
     // Ownership via project
@@ -47,8 +48,12 @@ export default async function handler(req, res) {
     if (dsErr || !ds) return res.status(404).json({ error: 'Dataset not found' })
     if (ds.projects.user_id !== userId) return res.status(403).json({ error: 'Access denied' })
 
-    // Strip insights fields — they use a dedicated endpoint
-    const { insights, insights_loaded, ...safeState } = state
+    // Strict field whitelist — only these fields can be updated
+    const ALLOWED_FIELDS = ['charts_state', 'active_tab', 'global_filters', 'report_builder_state', 'data_table_state', 'recommendations', 'ai_charts', 'custom_metrics', 'kpi_order', 'hidden_charts']
+    const safeState = {}
+    for (const key of ALLOWED_FIELDS) {
+      if (body[key] !== undefined) safeState[key] = body[key]
+    }
 
     // Try update first
     const { data, error } = await supabase
@@ -57,7 +62,7 @@ export default async function handler(req, res) {
       .eq('dataset_id', datasetId)
       .select('id')
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Failed to save dashboard state' })
 
     // Auto-create if missing
     if (!data || data.length === 0) {
@@ -94,7 +99,7 @@ export default async function handler(req, res) {
       .eq('dataset_id', datasetId)
       .select('id, insights_loaded')
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Failed to save insights' })
 
     if (!data || data.length === 0) {
       await supabase.from('dashboard_states').insert({

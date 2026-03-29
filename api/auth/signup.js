@@ -1,3 +1,4 @@
+import { generateToken } from '../lib/crypto.js'
 import { createClient } from '@supabase/supabase-js'
 import { checkIPRateLimit } from '../lib/ipRateLimit.js'
 
@@ -19,10 +20,6 @@ async function hashPassword(password) {
   return `pbkdf2:100000:${saltHex}:${hashHex}`
 }
 
-function generateToken() {
-  const bytes = crypto.getRandomValues(new Uint8Array(32))
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
-}
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
@@ -84,17 +81,21 @@ export default async function handler(req) {
       .single()
 
     if (createErr) {
-      return new Response(JSON.stringify({ error: createErr.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ error: 'Failed to create account' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
     }
 
-    // Generate a 6-digit verification code (same as passwordless flow)
+    // Generate a 6-digit verification code — store in login_codes table (same as passwordless flow)
     const verifyCode = String(Math.floor(100000 + Math.random() * 900000))
     const codeExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString()
 
-    await supabase.from('users').update({
-      verification_code: verifyCode,
-      code_expires_at: codeExpires,
-    }).eq('id', user.id)
+    // Delete any existing codes for this email, then insert new one
+    await supabase.from('login_codes').delete().eq('email', email)
+    await supabase.from('login_codes').insert({
+      email: email,
+      code: verifyCode,
+      expires_at: codeExpires,
+      attempts: 0,
+    })
 
     // Send verification email via Resend (if configured)
     const resendKey = process.env.RESEND_API_KEY
@@ -123,6 +124,6 @@ export default async function handler(req) {
       message: 'Account created. Check your email for a verification code.',
     }), { status: 201, headers: { 'Content-Type': 'application/json' } })
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ error: 'Something went wrong' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 }
