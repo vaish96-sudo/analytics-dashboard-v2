@@ -18,8 +18,8 @@ import TierBadge from './TierBadge'
 import LogoMark from './LogoMark'
 import InsightsPreview from './InsightsPreview'
 import AutoRefreshToggle from './AutoRefreshToggle'
-import {
 import { useToast } from './Toast'
+import {
   LayoutDashboard, Table2, Wand2, Sparkles,
   FileSpreadsheet, Upload, ChevronRight, Settings, Menu, X, ChevronDown,
   Plus, Trash2, LogOut, Home, Sun, Moon, Monitor, FileDown, Crown, Loader2, FolderOpen, Users
@@ -34,7 +34,6 @@ const TABS = [
 ]
 
 function ThemeToggleSmall() {
-  const toast = useToast()
   const { mode, setTheme } = useTheme()
   const next = mode === 'light' ? 'dark' : mode === 'dark' ? 'system' : 'light'
   const Icon = mode === 'light' ? Sun : mode === 'dark' ? Moon : Monitor
@@ -140,6 +139,7 @@ function ProjectSwitcher({ onGoHome }) {
 }
 
 export default function Dashboard({ user, onLogout, onNewProject, onGoHome, initialConversationId, onConversationConsumed }) {
+  const toast = useToast()
   const { rowCount, columnsByType, setStep, editSchema, datasets, activeTab, setActiveTab, rawData, schema, fileName, globalFilters, insights, reportBuilderState } = useData()
   const { activeProject, projects, selectProject, canEdit, isSharedView } = useProject()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
