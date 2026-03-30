@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react'
+import React, { useMemo, useState, useEffect, useCallback, useRef, memo } from 'react'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useData } from '../context/DataContext'
 import { CHART_COLORS, smartFormat, truncate } from '../utils/formatters'
@@ -20,7 +20,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
-export function ChartCard({ defaultType, defaultDim, defaultMet, index, schema, columnsByType, aggregate, savedState, onStateChange, onBarClick, globalFilters }) {
+export const ChartCard = memo(function ChartCard({ defaultType, defaultDim, defaultMet, index, schema, columnsByType, aggregate, savedState, onStateChange, onBarClick, globalFilters }) {
   const [expanded, setExpanded] = useState(false)
   const [dim, setDim] = useState(savedState?.dim || defaultDim)
   const [met, setMet] = useState(savedState?.met || defaultMet)
@@ -116,189 +116,7 @@ export function ChartCard({ defaultType, defaultDim, defaultMet, index, schema, 
       </div>
     </div>
   )
-}
-
-export default function AutoCharts() {
-  const { rawData, schema, columnsByType, aggregate, activeDatasetId, updateDatasetState, globalFilters, setGlobalFilters, chartsState } = useData()
-  const [aiChartConfigs, setAiChartConfigs] = useState(null)
-  const [aiLoading, setAiLoading] = useState(false)
-  const aiRequestedRef = useRef(null)
-  const userModifiedRef = useRef(false)
-
-  // Track if user has manually changed any chart
-  const handleChartStateChange = useCallback((index, state) => {
-    userModifiedRef.current = true
-    updateDatasetState('chartsState', { ...chartsState, [index]: state })
-  }, [chartsState, updateDatasetState])
-
-  // Compute dimension cardinalities for smarter selection
-  const dimCardinalities = useMemo(() => {
-    if (!rawData || !columnsByType) return {}
-    const result = {}
-    const allDims = [...columnsByType.dimensions, ...columnsByType.dates]
-    allDims.forEach(dim => {
-      result[dim] = new Set(rawData.map(r => r[dim])).size
-    })
-    return result
-  }, [rawData, columnsByType])
-
-  // Smarter basic heuristic (instant fallback) — avoids useless dimensions
-  const basicCharts = useMemo(() => {
-    if (!rawData || !schema) return []
-    const { dimensions, metrics, dates } = columnsByType
-    const c = []
-
-    // Filter out bad chart dimensions: too many unique values or ID-like names
-    const isGoodChartDim = (dim) => {
-      const card = dimCardinalities[dim] || 0
-      if (card < 2 || card > 50) return false
-      const lower = dim.toLowerCase()
-      const words = lower.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_\-]+/g, ' ').split(/\s+/)
-      if (words.includes('id') || lower.endsWith('_id') || lower.endsWith('id')) return false
-      return true
-    }
-
-    const rankedDims = [...dimensions].filter(isGoodChartDim).sort((a, b) => {
-      const ca = dimCardinalities[a] || 0, cb = dimCardinalities[b] || 0
-      const scoreA = ca >= 3 && ca <= 15 ? 100 - Math.abs(ca - 7) : ca > 15 ? 30 - ca : 0
-      const scoreB = cb >= 3 && cb <= 15 ? 100 - Math.abs(cb - 7) : cb > 15 ? 30 - cb : 0
-      return scoreB - scoreA
-    })
-
-    const rankedDates = dates.filter(d => (dimCardinalities[d] || 0) >= 2)
-
-    if (rankedDims[0] && metrics[0]) c.push({ type: 'bar', dim: rankedDims[0], met: metrics[0] })
-    if (rankedDates[0] && metrics[0]) c.push({ type: 'line', dim: rankedDates[0], met: metrics[0] })
-    if (rankedDims[0] && metrics[0] && (dimCardinalities[rankedDims[0]] || 0) <= 8) c.push({ type: 'pie', dim: rankedDims[0], met: metrics[0] })
-    else if (rankedDims[1] && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[1], met: metrics[1] })
-    if (rankedDims.length > 1 && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[1], met: metrics[1] })
-    else if (rankedDims[0] && metrics.length > 1) c.push({ type: 'bar', dim: rankedDims[0], met: metrics[1] })
-
-    if (c.length === 0 && rankedDates[0] && metrics[0]) c.push({ type: 'line', dim: rankedDates[0], met: metrics[0] })
-    if (c.length === 0 && dimensions[0] && metrics[0]) c.push({ type: 'bar', dim: dimensions[0], met: metrics[0] })
-
-    // Deduplicate
-    const seen = new Set()
-    return c.filter(ch => {
-      const key = `${ch.dim}-${ch.met}-${ch.type}`
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    }).slice(0, 4)
-  }, [rawData, schema, columnsByType, dimCardinalities])
-
-  // AI-powered smart chart selection — runs once per dataset, only for new/unmodified projects
-  useEffect(() => {
-    if (!rawData || !schema || !activeDatasetId) return
-    if (activeDatasetId === '__pending__') return
-    if (aiRequestedRef.current === activeDatasetId) return
-    if (userModifiedRef.current) return
-
-    aiRequestedRef.current = activeDatasetId
-    setAiLoading(true)
-
-    const cols = Object.entries(schema)
-      .filter(([, def]) => def.type !== 'ignore' && !def.isCustom)
-      .map(([col, def]) => `- ${col} (${def.type}): "${def.label}"`)
-      .join('\n')
-
-    const { dimensions, metrics, dates } = columnsByType
-    const summaryParts = []
-
-    // Unique value counts — this is the critical info for chart selection
-    ;[...dimensions, ...dates].slice(0, 10).forEach(dim => {
-      const unique = dimCardinalities[dim] || 0
-      const topValues = [...new Set(rawData.map(r => r[dim]))].slice(0, 5).map(v => String(v)).join(', ')
-      summaryParts.push(`${dim}: ${unique} unique values (e.g. ${topValues})`)
-    })
-
-    metrics.slice(0, 8).forEach(met => {
-      const vals = rawData.map(r => parseFloat(String(r[met] ?? 0).replace(/[,$%]/g, ''))).filter(v => !isNaN(v))
-      if (vals.length > 0) {
-        const min = Math.min(...vals), max = Math.max(...vals), avg = vals.reduce((a, b) => a + b, 0) / vals.length
-        summaryParts.push(`${met}: min=${min.toFixed(1)}, max=${max.toFixed(1)}, avg=${avg.toFixed(1)}, range=${(max - min).toFixed(1)}`)
-      }
-    })
-
-    const system = `You are a data visualization expert. Recommend 4 insightful charts for this dataset.
-
-Columns:
-${cols}
-
-Data profile (${rawData.length} rows):
-${summaryParts.join('\n')}
-
-CRITICAL RULES:
-- Use EXACT column names from the list.
-- NEVER use a dimension with only 1 unique value — it produces a useless single-bar chart.
-- Prefer dimensions with 3-12 unique values for the best visual impact.
-- For pie charts, the dimension MUST have 2-8 unique values.
-- For bar charts, prefer dimensions with 3-15 unique values.
-- For line/area charts, use date columns or dimensions with natural ordering.
-- Pick metrics with the widest range (most variance) — they reveal the most.
-- Each chart should show a DIFFERENT dimension+metric combo. No repeats.
-- Think about what a business user would want to see first.
-
-Respond with ONLY a JSON array (no markdown, no backticks):
-[{"type":"bar|line|pie|area","dim":"column_name","met":"column_name"}]`
-
-    callClaudeAPI({
-      system,
-      messages: [{ role: 'user', content: 'Pick the 4 most insightful chart combinations.' }],
-      max_tokens: 400,
-      feature: 'chart_builder',
-    })
-      .then(({ text }) => {
-        try {
-          const configs = JSON.parse(text.replace(/```json|```/g, '').trim())
-          const validTypes = ['bar', 'line', 'pie', 'area']
-          const valid = configs.filter(c =>
-            validTypes.includes(c.type) &&
-            schema[c.dim] &&
-            schema[c.met] &&
-            (dimCardinalities[c.dim] || 0) >= 2
-          )
-          if (valid.length >= 2) {
-            setAiChartConfigs(valid.slice(0, 4))
-          }
-        } catch (e) {
-        }
-      })
-      .catch(() => {})
-      .finally(() => setAiLoading(false))
-  }, [activeDatasetId, rawData, schema, columnsByType, dimCardinalities])
-
-  // Priority: AI configs > basic heuristic
-  const charts = aiChartConfigs || basicCharts
-
-  const handleBarClick = useCallback((dimension, value) => {
-    setGlobalFilters(prev => {
-      const current = prev[dimension] || []
-      if (current.includes(value)) {
-        const next = current.filter(v => v !== value)
-        const result = { ...prev }
-        if (next.length === 0) delete result[dimension]
-        else result[dimension] = next
-        return result
-      } else {
-        return { ...prev, [dimension]: [value] }
-      }
-    })
-  }, [setGlobalFilters])
-
-  if (charts.length === 0) return null
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {charts.map((ch, i) => (
-        <ChartCard key={`${activeDatasetId}-${i}`} index={i}
-          defaultType={ch.type} defaultDim={ch.dim} defaultMet={ch.met}
-          savedState={chartsState[i]} onStateChange={handleChartStateChange}
-          onBarClick={handleBarClick} globalFilters={globalFilters}
-          schema={schema} columnsByType={columnsByType} aggregate={aggregate} />
-      ))}
-    </div>
-  )
-}
+})
 
 /** Hook: returns chart configs and all props needed to render individual ChartCards */
 export function useAutoChartData() {

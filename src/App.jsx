@@ -1,24 +1,27 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense, lazy } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ProjectProvider, useProject } from './context/ProjectContext'
 import { DataProvider, useData } from './context/DataContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { TierProvider, useTier } from './context/TierContext'
-import AuthScreen from './components/AuthScreen'
-import LandingPage from './components/LandingPage'
-import InstantDashboard from './components/InstantDashboard'
-import HomeScreen from './components/HomeScreen'
-import ProjectWizard from './components/ProjectWizard'
-import FileUpload from './components/FileUpload'
-import ColumnTagger from './components/ColumnTagger'
-import Dashboard from './components/Dashboard'
-import GoogleSheetsPicker from './components/GoogleSheetsPicker'
-import AllChats from './components/AllChats'
-import AllInsights from './components/AllInsights'
-import UserProfile from './components/UserProfile'
-import OnboardingOverlay from './components/OnboardingOverlay'
 import { ToastProvider } from './components/Toast'
+import ErrorBoundary from './components/ErrorBoundary'
 import { Loader2 } from 'lucide-react'
+
+// Lazy-loaded route-level components
+const AuthScreen = lazy(() => import('./components/AuthScreen'))
+const LandingPage = lazy(() => import('./components/LandingPage'))
+const InstantDashboard = lazy(() => import('./components/InstantDashboard'))
+const HomeScreen = lazy(() => import('./components/HomeScreen'))
+const ProjectWizard = lazy(() => import('./components/ProjectWizard'))
+const FileUpload = lazy(() => import('./components/FileUpload'))
+const ColumnTagger = lazy(() => import('./components/ColumnTagger'))
+const Dashboard = lazy(() => import('./components/Dashboard'))
+const GoogleSheetsPicker = lazy(() => import('./components/GoogleSheetsPicker'))
+const AllChats = lazy(() => import('./components/AllChats'))
+const AllInsights = lazy(() => import('./components/AllInsights'))
+const UserProfile = lazy(() => import('./components/UserProfile'))
+const OnboardingOverlay = lazy(() => import('./components/OnboardingOverlay'))
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 const REDIRECT_URI = `${window.location.origin}/auth/callback`
@@ -33,7 +36,17 @@ function GoogleAuthCallback({ onToken, onError }) {
     const params = new URLSearchParams(window.location.search)
     const code = params.get('code')
     const error = params.get('error')
+    const returnedState = params.get('state')
     if (error) { onError(error === 'access_denied' ? 'Access was denied.' : error); window.history.replaceState({}, '', '/'); return }
+    // Validate OAuth state parameter to prevent CSRF
+    const savedState = sessionStorage.getItem('nb_oauth_state')
+    if (returnedState && savedState && returnedState !== savedState) {
+      onError('OAuth state mismatch — possible CSRF attack. Please try again.')
+      sessionStorage.removeItem('nb_oauth_state')
+      window.history.replaceState({}, '', '/')
+      return
+    }
+    sessionStorage.removeItem('nb_oauth_state')
     if (code) {
       fetch('/api/google-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, redirect_uri: REDIRECT_URI }) })
         .then(r => r.json()).then(d => {
@@ -56,6 +69,19 @@ function GoogleAuthCallback({ onToken, onError }) {
           <span style={{ fontSize: 28, fontWeight: 800, fontStyle: "italic", fontFamily: "Georgia,serif", background: "linear-gradient(135deg,#38bdf8,#0c1425)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>µ</span>
         </div>
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Connecting to Google Sheets...</p>
+      </div>
+    </div>
+  )
+}
+
+function SuspenseLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+      <div className="text-center">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3 animate-pulse" style={{ background: 'var(--border-accent)' }}>
+          <span style={{ fontSize: 22, fontWeight: 800, fontStyle: "italic", fontFamily: "Georgia,serif", background: "linear-gradient(135deg,#38bdf8,#0c1425)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>µ</span>
+        </div>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading...</p>
       </div>
     </div>
   )
@@ -103,7 +129,10 @@ function AppContent() {
       if (googleToken) { setShowSheetsPicker(true); setShowProjectWizard(false) }
       else if (GOOGLE_CLIENT_ID) {
         localStorage.setItem('nb_pending_sheets', '1')
-        const params = new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, redirect_uri: REDIRECT_URI, response_type: 'code', scope: SCOPES, access_type: 'offline', prompt: 'consent' })
+        // Generate a random state parameter to prevent CSRF attacks on OAuth flow
+        const oauthState = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36)
+        sessionStorage.setItem('nb_oauth_state', oauthState)
+        const params = new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, redirect_uri: REDIRECT_URI, response_type: 'code', scope: SCOPES, access_type: 'offline', prompt: 'consent', state: oauthState })
         window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
       }
     }
@@ -286,11 +315,13 @@ function AppContent() {
 export default function App() {
   // Instant tool — no login required, standalone page
   if (window.location.pathname === '/instant') {
-    return <ThemeProvider><InstantDashboard /></ThemeProvider>
+    return <ThemeProvider><Suspense fallback={<SuspenseLoader />}><InstantDashboard /></Suspense></ThemeProvider>
   }
 
   return (
     <ThemeProvider>
+      <ErrorBoundary name="Application">
+      <Suspense fallback={<SuspenseLoader />}>
       <ToastProvider>
       <AuthProvider>
         <TierProvider>
@@ -302,6 +333,8 @@ export default function App() {
         </TierProvider>
       </AuthProvider>
       </ToastProvider>
+      </Suspense>
+      </ErrorBoundary>
     </ThemeProvider>
   )
 }

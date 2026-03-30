@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 import { useAuth } from './AuthContext'
 import { api } from '../lib/api'
 import * as projectService from '../lib/projectService'
@@ -142,25 +142,32 @@ export function ProjectProvider({ children }) {
 
   const canEdit = !isSharedView || sharedRole === 'admin' || sharedRole === 'editor'
 
+  const contextValue = useMemo(() => ({
+    projects,
+    sharedProjects,
+    activeProjectId,
+    activeProject,
+    loading,
+    projectLoading,
+    loadProjects,
+    selectProject,
+    createProject,
+    deleteProject: deleteProjectById,
+    renameProject,
+    addDatasetToProject,
+    removeDatasetFromProject,
+    isSharedView,
+    sharedRole,
+    canEdit,
+  }), [
+    projects, sharedProjects, activeProjectId, activeProject,
+    loading, projectLoading, isSharedView, sharedRole, canEdit,
+    loadProjects, selectProject, createProject, deleteProjectById,
+    renameProject, addDatasetToProject, removeDatasetFromProject,
+  ])
+
   return (
-    <ProjectContext.Provider value={{
-      projects,
-      sharedProjects,
-      activeProjectId,
-      activeProject,
-      loading,
-      projectLoading,
-      loadProjects,
-      selectProject,
-      createProject,
-      deleteProject: deleteProjectById,
-      renameProject,
-      addDatasetToProject,
-      removeDatasetFromProject,
-      isSharedView,
-      sharedRole,
-      canEdit,
-    }}>
+    <ProjectContext.Provider value={contextValue}>
       {children}
     </ProjectContext.Provider>
   )

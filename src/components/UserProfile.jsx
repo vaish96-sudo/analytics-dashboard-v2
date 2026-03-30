@@ -7,6 +7,7 @@ import { TIER_CONFIG, TIER_ORDER } from '../lib/tierConfig'
 import { User, Mail, Building2, Camera, Save, Loader2, CheckCircle, Sun, Moon, Monitor, Crown, Shield, Zap, Lock, Upload, Trash2, FileText, Sparkles } from 'lucide-react'
 import TeamManager from './TeamManager'
 import { useToast } from './Toast'
+import { isSafeImageUrl } from '../utils/sanitize'
 
 export default function UserProfile() {
   const toast = useToast()
@@ -43,6 +44,7 @@ export default function UserProfile() {
   const handleSave = async (e) => {
     e.preventDefault()
     setSaving(true); setError(null); setSaved(false)
+    if (avatarUrl && !isSafeImageUrl(avatarUrl)) { setError('Invalid avatar URL. Only http/https URLs are allowed.'); setSaving(false); return }
     try {
       await updateProfile({ name, company, avatar_url: avatarUrl || null })
       setSaved(true); setTimeout(() => setSaved(false), 3000)
@@ -52,6 +54,7 @@ export default function UserProfile() {
 
   const handleSaveWhiteLabel = async () => {
     setSaving(true); setError(null)
+    if (customLogo && !isSafeImageUrl(customLogo)) { setError('Invalid logo URL. Only http/https URLs are allowed.'); setSaving(false); return }
     try {
       await updateProfileField({ custom_logo_url: customLogo || null, custom_company_name: customCompany || null })
       setSaved(true); setTimeout(() => setSaved(false), 3000)
@@ -102,7 +105,7 @@ export default function UserProfile() {
         <form onSubmit={handleSave} className="p-4 sm:p-6 space-y-5">
           <div className="flex items-center gap-4">
             <div className="relative">
-              {avatarUrl ? (
+              {avatarUrl && isSafeImageUrl(avatarUrl) ? (
                 <img src={avatarUrl} alt="" className="w-16 h-16 rounded-full object-cover" style={{ border: '2px solid var(--border)' }} />
               ) : (
                 <div className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-display font-bold text-white" style={{ background: 'var(--accent)' }}>{initials}</div>

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, memo } from 'react'
 import { useData } from '../context/DataContext'
 import { smartFormat } from '../utils/formatters'
 
@@ -18,7 +18,7 @@ export function useKPIData() {
 }
 
 /** Single KPI card — rendered individually in the drag grid */
-export function SingleKPICard({ kpi, index = 0 }) {
+export const SingleKPICard = memo(function SingleKPICard({ kpi, index = 0 }) {
   const i = index
   return (
     <div className={`p-4 rounded-xl bg-white border-2 ${kpi.isCustom ? 'border-teal-400 dark:border-amber-500' : BORDER_COLORS[i % BORDER_COLORS.length]} hover:shadow-md transition-all duration-300`}>
@@ -27,7 +27,7 @@ export function SingleKPICard({ kpi, index = 0 }) {
       <div className="text-xs text-slate-400 mt-1">{kpi.isCustom ? 'calculated' : 'total'}</div>
     </div>
   )
-}
+})
 
 /** Default export: renders all KPI cards in a grid (backward compatible) */
 export default function KPICards() {

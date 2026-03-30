@@ -1,11 +1,12 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useEffect, memo } from 'react'
 import { useData } from '../context/DataContext'
 import { smartFormat, truncate } from '../utils/formatters'
+import { useDebounce } from '../hooks/useDebounce'
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Search, Filter, X, Download } from 'lucide-react'
 
 const PAGE_SIZE = 25
 
-function ColumnFilter({ col, schema, uniqueValues, selected, hasFilter, onToggle, onClear, onSelectAll }) {
+const ColumnFilter = memo(function ColumnFilter({ col, schema, uniqueValues, selected, hasFilter, onToggle, onClear, onSelectAll }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const ref = useRef(null)
@@ -49,7 +50,7 @@ function ColumnFilter({ col, schema, uniqueValues, selected, hasFilter, onToggle
       )}
     </div>
   )
-}
+})
 
 export default function DataTable() {
   const { rawData, schema, getUniqueValues, activeDatasetId, updateDatasetState, dataTableState } = useData()
@@ -61,6 +62,7 @@ export default function DataTable() {
   const [page, setPage] = useState(saved.page || 0)
   const [search, setSearch] = useState(saved.search || '')
   const [colFilters, setColFilters] = useState(saved.colFilters || {})
+  const debouncedSearch = useDebounce(search, 250)
 
   // Sync state back to DataContext
   useEffect(() => {
@@ -108,9 +110,9 @@ export default function DataTable() {
       if (vals.length === 0) d = []
       else d = d.filter(row => vals.includes(String(row[col])))
     })
-    if (search.trim()) { const q = search.toLowerCase(); d = d.filter(row => visibleCols.some(col => { const v = row[col]; return v !== null && v !== undefined && String(v).toLowerCase().includes(q) })) }
+    if (debouncedSearch.trim()) { const q = debouncedSearch.toLowerCase(); d = d.filter(row => visibleCols.some(col => { const v = row[col]; return v !== null && v !== undefined && String(v).toLowerCase().includes(q) })) }
     return d
-  }, [rawData, search, visibleCols, colFilters])
+  }, [rawData, debouncedSearch, visibleCols, colFilters])
 
   const sortedData = useMemo(() => {
     if (!sortCol) return filteredData

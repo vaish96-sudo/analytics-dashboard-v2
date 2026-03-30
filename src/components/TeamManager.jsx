@@ -36,7 +36,7 @@ export default function TeamManager() {
         const memberData = await api.get(`/api/data/team-members?team_id=${teamData.id}`)
         setMembers(memberData || [])
       }
-    } catch {} finally { setLoading(false) }
+    } catch (err) { console.warn('Failed to load team:', err.message) } finally { setLoading(false) }
   }, [profile?.team_id])
 
   useEffect(() => { loadTeam() }, [loadTeam])
@@ -68,19 +68,14 @@ export default function TeamManager() {
       })
 
       // Send invite email
-      const sessionToken = localStorage.getItem('nb_session_token')
       try {
-        await fetch('/api/auth/send-invite', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-          body: JSON.stringify({
-            to_email: inviteEmail.toLowerCase().trim(),
-            team_name: team.name,
-            inviter_name: user.name || user.email,
-            role: inviteRole,
-          }),
+        await api.post('/api/auth/send-invite', {
+          to_email: inviteEmail.toLowerCase().trim(),
+          team_name: team.name,
+          inviter_name: user.name || user.email,
+          role: inviteRole,
         })
-      } catch { /* Email failure shouldn't block the invite creation */ }
+      } catch (err) { console.warn('Invite email failed (invite was still created):', err.message) }
 
       setInviteEmail('')
       await loadTeam()

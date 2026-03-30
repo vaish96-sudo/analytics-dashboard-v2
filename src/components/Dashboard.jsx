@@ -4,7 +4,7 @@ import { useProject } from '../context/ProjectContext'
 import { useTheme } from '../context/ThemeContext'
 import { exportDashboardReport } from '../utils/exportService'
 import KPICards, { useKPIData, SingleKPICard } from './KPICards'
-import AutoCharts, { ChartCard, useAutoChartData } from './AutoCharts'
+import { ChartCard, useAutoChartData } from './AutoCharts'
 import DataTable from './DataTable'
 import ReportBuilder from './ReportBuilder'
 import AIHub from './AIHub'
@@ -18,11 +18,12 @@ import TierBadge from './TierBadge'
 import LogoMark from './LogoMark'
 import InsightsPreview from './InsightsPreview'
 import AutoRefreshToggle from './AutoRefreshToggle'
+import ErrorBoundary from './ErrorBoundary'
 import { useToast } from './Toast'
 import {
   LayoutDashboard, Table2, Wand2, Sparkles,
   FileSpreadsheet, Upload, ChevronRight, Settings, Menu, X, ChevronDown,
-  Plus, Trash2, LogOut, Home, Sun, Moon, Monitor, FileDown, Crown, Loader2, FolderOpen, Users
+  Plus, Trash2, LogOut, Home, Sun, Moon, Monitor, FileDown, Loader2, FolderOpen, Users
 } from 'lucide-react'
 
 const TABS = [
@@ -362,11 +363,11 @@ export default function Dashboard({ user, onLogout, onNewProject, onGoHome, init
           )}
           {showFilterBar && <GlobalFilterBar />}
           <div className="space-y-4 lg:space-y-6">
-            {activeTab === 'overview' && <OverviewGrid />}
-            {activeTab === 'builder' && <><CustomMetrics /><ReportBuilder /></>}
-            {activeTab === 'data' && <DataTable />}
-            {activeTab === 'ai' && <AIHub conversationId={activeConversationId} onConversationChange={setActiveConversationId} />}
-            {activeTab === 'settings' && <><UserProfile /><ScheduledReports /></>}
+            {activeTab === 'overview' && <ErrorBoundary name="Overview" variant="inline"><OverviewGrid /></ErrorBoundary>}
+            {activeTab === 'builder' && <ErrorBoundary name="Builder" variant="inline"><CustomMetrics /><ReportBuilder /></ErrorBoundary>}
+            {activeTab === 'data' && <ErrorBoundary name="Data Table" variant="inline"><DataTable /></ErrorBoundary>}
+            {activeTab === 'ai' && <ErrorBoundary name="AI Assistant" variant="inline"><AIHub conversationId={activeConversationId} onConversationChange={setActiveConversationId} /></ErrorBoundary>}
+            {activeTab === 'settings' && <ErrorBoundary name="Settings" variant="inline"><UserProfile /><ScheduledReports /></ErrorBoundary>}
           </div>
         </div>
       </main>

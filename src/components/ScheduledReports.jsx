@@ -26,7 +26,7 @@ export default function ScheduledReports() {
     try {
       const data = await api.get(`/api/data/scheduled-reports?dataset_id=${activeDatasetId}`)
       setReports(data || [])
-    } catch {} finally { setLoading(false) }
+    } catch (err) { console.warn('Failed to load scheduled reports:', err.message) } finally { setLoading(false) }
   }, [activeDatasetId])
 
   useEffect(() => { loadReports() }, [loadReports])
@@ -60,14 +60,14 @@ export default function ScheduledReports() {
     try {
       await api.patch('/api/data/scheduled-reports', { reportId: id, updates: { enabled: !currentEnabled } })
       await loadReports()
-    } catch {}
+    } catch (err) { console.warn('Failed to toggle report:', err.message) }
   }
 
   const handleDelete = async (id) => {
     try {
       await api.del(`/api/data/scheduled-reports?report_id=${id}`)
       await loadReports()
-    } catch {}
+    } catch (err) { console.warn('Failed to delete report:', err.message) }
   }
 
   if (!can('scheduledReports')) return null

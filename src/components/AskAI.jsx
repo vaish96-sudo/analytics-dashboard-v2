@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useRef, useEffect, useMemo, memo } from 'react'
 import { useData } from '../context/DataContext'
 import { useProject } from '../context/ProjectContext'
 import { useTier } from '../context/TierContext'
@@ -55,7 +55,7 @@ function MarkdownText({ text }) {
   return <div className="space-y-0.5">{elements}</div>
 }
 
-function MessageBubble({ message }) {
+const MessageBubble = memo(function MessageBubble({ message }) {
   const isUser = message.role === 'user'
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''} animate-slide-up`}>
@@ -77,7 +77,7 @@ function MessageBubble({ message }) {
       </div>
     </div>
   )
-}
+})
 
 export default function AskAI({ conversationId: externalConvId, onConversationChange }) {
   const { schema, rawData, aggregateUnfiltered, columnsByType, activeDatasetId } = useData()
@@ -101,7 +101,7 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
     try {
       const list = await projectService.listConversations(activeProjectId)
       setConversations(list)
-    } catch {}
+    } catch (err) { console.warn('Failed to load conversations:', err.message) }
   }
 
   const loadConversation = async (id) => {
@@ -169,7 +169,7 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
     setMessages(withUserMsg)
     setLoading(true)
 
-    try { await projectService.addMessage(convId, { role: 'user', content: q }) } catch {}
+    try { await projectService.addMessage(convId, { role: 'user', content: q }) } catch (err) { console.warn('Failed to save user message:', err.message) }
 
     try {
       const r = await askAI(q, schema, rawData, aggregateUnfiltered, withUserMsg)
@@ -178,12 +178,12 @@ export default function AskAI({ conversationId: externalConvId, onConversationCh
       setMessages(prev => [...prev, assistantMsg])
       try {
         await projectService.addMessage(convId, { role: 'assistant', content: r.answer, sqlPlan: r.sql, meta: { tokensUsed: r.tokensUsed, estimatedCost: r.estimatedCost } })
-      } catch {}
+      } catch (err) { console.warn('Failed to save assistant message:', err.message) }
 
       // Auto-name conversation from first user question
       if (withUserMsg.filter(m => m.role === 'user').length === 1) {
         const title = q.length > 50 ? q.slice(0, 47) + '...' : q
-        try { await projectService.updateConversation(convId, { title }) } catch {}
+        try { await projectService.updateConversation(convId, { title }) } catch (err) { console.warn('Failed to rename conversation:', err.message) }
       }
     } catch (err) {
       setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err.message}` }])

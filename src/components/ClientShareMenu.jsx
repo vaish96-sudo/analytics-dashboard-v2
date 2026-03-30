@@ -65,12 +65,7 @@ export default function ClientShareMenu({ clientName, teamId, onClose, anchorRef
       // The server returns all members; we need client_access separately
       let accessData = []
       try {
-        // We'll use a query param approach — but since we don't have a dedicated endpoint,
-        // we check against the shared-projects logic. For simplicity, fetch from the API.
-        const res = await fetch(`/api/data/client-access?teamId=${teamId}&clientName=${encodeURIComponent(clientName)}&list=true`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('nb_session_token')}` },
-        })
-        if (res.ok) accessData = await res.json()
+        accessData = await api.get(`/api/data/client-access?teamId=${teamId}&clientName=${encodeURIComponent(clientName)}&list=true`)
       } catch (err) { toast.error(err?.message || 'Something went wrong') }
 
       const accessMap = {}

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react'
 import { Upload, FileSpreadsheet, AlertCircle, Plus } from 'lucide-react'
 import { useData } from '../context/DataContext'
+import LogoMark from './LogoMark'
 
 export default function FileUpload() {
   const { loadData, datasets, switchDataset } = useData()

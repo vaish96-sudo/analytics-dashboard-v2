@@ -47,8 +47,12 @@ async function request(method, path, body, opts = {}) {
   }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
-    throw new Error(err.error || `Request failed: ${res.status}`)
+    const err = await res.json().catch(() => ({}))
+    // Provide user-friendly messages instead of leaking server internals
+    const userMessage = err.error && err.error.length < 200
+      ? err.error
+      : `Request failed (${res.status})`
+    throw new Error(userMessage)
   }
 
   // Some DELETE routes return 204 No Content

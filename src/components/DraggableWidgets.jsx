@@ -80,10 +80,10 @@ export default function DraggableWidgets({ children, storageKey = 'widget_order'
       if (si === -1 || ti === -1) return prev
       n.splice(si, 1)
       n.splice(ti, 0, sourceId)
-      try { 
+      try {
         const hidden = Array.isArray(widgetOrder) ? [] : (widgetOrder?.hidden || [])
-        updateDatasetState(storageKey, { order: n, hidden }) 
-      } catch {}
+        updateDatasetState(storageKey, { order: n, hidden })
+      } catch (err) { console.warn('Failed to save widget order:', err.message) }
       return n
     })
     setHoverId(null)

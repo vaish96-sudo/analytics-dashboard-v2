@@ -441,6 +441,7 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
         console.warn('AI column tagging failed, using heuristic:', aiErr.message) 
       }
     } catch (err) {
+      console.warn('Data loading failed:', err.message)
     } finally {
       setSchemaLoading(false)
     }
@@ -731,7 +732,22 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
     setStep('tag')
   }, [datasets, activeDatasetId, baseSchema])
 
-  return <DataContext.Provider value={{
+  // Stable defaults to avoid new references on every render
+  const EMPTY_OBJ = useMemo(() => ({}), [])
+  const EMPTY_ARR = useMemo(() => [], [])
+
+  const chartsState = localDashboardState.chartsState || EMPTY_OBJ
+  const reportBuilderState = localDashboardState.reportBuilderState || EMPTY_OBJ
+  const dataTableState = localDashboardState.dataTableState || EMPTY_OBJ
+  const aiCharts = localDashboardState.aiCharts || EMPTY_ARR
+  const localCustomMetrics = localDashboardState.customMetrics || EMPTY_ARR
+  const insights = localDashboardState.insights || EMPTY_ARR
+  const insightsLoaded = localDashboardState.insightsLoaded || false
+  const recommendations = localDashboardState.recommendations || EMPTY_ARR
+  const chatHistory = localDashboardState.chatHistory || EMPTY_ARR
+  const widgetOrder = localDashboardState.widget_order || null
+
+  const contextValue = useMemo(() => ({
     rawData, filteredRawData, fileName, schema, step, setStep, activeTab, setActiveTab,
     globalFilters, setGlobalFilters, hasGlobalFilters,
     loadData, cancelTagging, confirmTagging, editSchema, updateColumnSchema, removeColumn, columnsByType, schemaLoading,
@@ -739,15 +755,20 @@ Respond with ONLY a JSON object (no markdown, no backticks) mapping column names
     aggregate, aggregateUnfiltered, getUniqueValues, rowCount, filteredRowCount,
     datasets, activeDatasetId, activeDataset, switchDataset, removeDataset, updateDatasetState,
     clearAll, goHome, openProject, flushSave,
-    chartsState: localDashboardState.chartsState || {},
-    reportBuilderState: localDashboardState.reportBuilderState || {},
-    dataTableState: localDashboardState.dataTableState || {},
-    aiCharts: localDashboardState.aiCharts || [],
-    localCustomMetrics: localDashboardState.customMetrics || [],
-    insights: localDashboardState.insights || [],
-    insightsLoaded: localDashboardState.insightsLoaded || false,
-    recommendations: localDashboardState.recommendations || [],
-    chatHistory: localDashboardState.chatHistory || [],
-    widgetOrder: localDashboardState.widget_order || null,
-  }}>{children}</DataContext.Provider>
+    chartsState, reportBuilderState, dataTableState, aiCharts, localCustomMetrics,
+    insights, insightsLoaded, recommendations, chatHistory, widgetOrder,
+  }), [
+    rawData, filteredRawData, fileName, schema, step, activeTab,
+    globalFilters, hasGlobalFilters, columnsByType, schemaLoading,
+    confirmLoading, confirmError, dataLoading, rowCount, filteredRowCount,
+    datasets, activeDatasetId, activeDataset,
+    chartsState, reportBuilderState, dataTableState, aiCharts, localCustomMetrics,
+    insights, insightsLoaded, recommendations, chatHistory, widgetOrder,
+    // Stable callbacks (wrapped in useCallback)
+    loadData, cancelTagging, confirmTagging, editSchema, updateColumnSchema, removeColumn,
+    aggregate, aggregateUnfiltered, getUniqueValues, switchDataset, removeDataset, updateDatasetState,
+    clearAll, goHome, openProject, flushSave,
+  ])
+
+  return <DataContext.Provider value={contextValue}>{children}</DataContext.Provider>
 }
